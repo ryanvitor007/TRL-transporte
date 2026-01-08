@@ -2,18 +2,103 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DollarSign, TrendingDown, AlertTriangle, Fuel, BarChart3 } from "lucide-react"
-import { mockFuelEntries, mockMonthlyCosts, mockVehicleTCO } from "@/lib/mock-data"
+import { DollarSign, TrendingDown, AlertTriangle, Fuel, BarChart3, GitCompare } from "lucide-react"
+import { mockFuelEntries, mockMonthlyCosts, mockVehicleTCO, mockVehicles, filterByBranch } from "@/lib/mock-data"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { useApp } from "@/contexts/app-context"
+import { ComparisonPanel, DeltaBadge } from "@/components/comparison-panel"
 
 export function FinancialsView() {
-  const totalMonthlyFuel = mockMonthlyCosts[mockMonthlyCosts.length - 1]?.fuel || 0
-  const totalMonthlyMaintenance = mockMonthlyCosts[mockMonthlyCosts.length - 1]?.maintenance || 0
-  const totalMonthlyCost = mockMonthlyCosts[mockMonthlyCosts.length - 1]?.total || 0
-  const anomalyCount = mockFuelEntries.filter((e) => e.hasAnomaly).length
+  const { selectedBranch, comparison, toggleComparison } = useApp()
 
-  const tcoChartData = mockVehicleTCO.map((v) => ({
+  // Filter data by branch
+  const filteredFuelEntries = filterByBranch(mockFuelEntries, selectedBranch)
+  const filteredTCO = filterByBranch(mockVehicleTCO, selectedBranch)
+  const filteredVehicles = filterByBranch(mockVehicles, selectedBranch)
+
+  // Aggregate monthly costs by branch filter
+  const aggregateMonthlyCosts = () => {
+    const filtered = filterByBranch(mockMonthlyCosts, selectedBranch)
+    const grouped = filtered.reduce(
+      (acc, cost) => {
+        if (!acc[cost.month]) {
+          acc[cost.month] = { month: cost.month, fuel: 0, maintenance: 0, tires: 0, insurance: 0, total: 0 }
+        }
+        acc[cost.month].fuel += cost.fuel
+        acc[cost.month].maintenance += cost.maintenance
+        acc[cost.month].tires += cost.tires
+        acc[cost.month].insurance += cost.insurance
+        acc[cost.month].total += cost.total
+        return acc
+      },
+      {} as Record<
+        string,
+        { month: string; fuel: number; maintenance: number; tires: number; insurance: number; total: number }
+      >,
+    )
+    return Object.values(grouped)
+  }
+
+  const monthlyCosts = aggregateMonthlyCosts()
+  const currentMonth = monthlyCosts[monthlyCosts.length - 1]
+  const previousMonth = monthlyCosts[monthlyCosts.length - 2]
+
+  const totalMonthlyFuel = currentMonth?.fuel || 0
+  const totalMonthlyMaintenance = currentMonth?.maintenance || 0
+  const totalMonthlyCost = currentMonth?.total || 0
+  const anomalyCount = filteredFuelEntries.filter((e) => e.hasAnomaly).length
+
+  // Comparison chart data
+  const getComparisonChartData = () => {
+    if (!comparison.isActive || comparison.type !== "vehicles") return null
+
+    const selectedVehicleData = comparison.selectedVehicles.map((vehicleId) => {
+      const vehicle = mockVehicles.find((v) => v.id === vehicleId)
+      const tco = mockVehicleTCO.find((t) => t.vehicleId === vehicleId)
+      return {
+        id: vehicleId,
+        plate: vehicle?.plate || "",
+        model: vehicle?.model || "",
+        fuelCost: tco?.cumulativeFuelCost || 0,
+        maintenanceCost: tco?.cumulativeMaintenanceCost || 0,
+        fipeValue: tco?.currentFipeValue || 0,
+        depreciation: tco?.depreciationPercent || 0,
+      }
+    })
+
+    return selectedVehicleData
+  }
+
+  const getPeriodComparisonData = () => {
+    if (!comparison.isActive || comparison.type !== "periods") return null
+
+    const refData = monthlyCosts.find((m) => m.month === comparison.referenceMonth)
+    const curData = monthlyCosts.find((m) => m.month === comparison.currentMonth)
+
+    if (!refData || !curData) return null
+
+    return [
+      { category: "Combustível", [comparison.referenceMonth]: refData.fuel, [comparison.currentMonth]: curData.fuel },
+      {
+        category: "Manutenção",
+        [comparison.referenceMonth]: refData.maintenance,
+        [comparison.currentMonth]: curData.maintenance,
+      },
+      { category: "Pneus", [comparison.referenceMonth]: refData.tires, [comparison.currentMonth]: curData.tires },
+      {
+        category: "Seguro",
+        [comparison.referenceMonth]: refData.insurance,
+        [comparison.currentMonth]: curData.insurance,
+      },
+    ]
+  }
+
+  const vehicleComparisonData = getComparisonChartData()
+  const periodComparisonData = getPeriodComparisonData()
+
+  const tcoChartData = filteredTCO.map((v) => ({
     name: v.vehiclePlate,
     "Valor FIPE": v.currentFipeValue / 1000,
     "Custo Manutenção": v.cumulativeMaintenanceCost / 1000,
@@ -21,10 +106,18 @@ export function FinancialsView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Financeiro & TCO</h1>
-        <p className="text-muted-foreground">Custo Total de Propriedade e gestão de combustível</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Financeiro & TCO</h1>
+          <p className="text-muted-foreground">Custo Total de Propriedade e gestão de combustível</p>
+        </div>
+        <Button variant={comparison.isActive ? "default" : "outline"} onClick={toggleComparison} className="gap-2">
+          <GitCompare className="h-4 w-4" />
+          Comparação
+        </Button>
       </div>
+
+      <ComparisonPanel />
 
       {/* Métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -34,8 +127,11 @@ export function FinancialsView() {
             <DollarSign className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
-              {totalMonthlyCost.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            <div className="flex items-center gap-2">
+              <span className="text-3xl font-bold">
+                {totalMonthlyCost.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </span>
+              {previousMonth && <DeltaBadge current={totalMonthlyCost} reference={previousMonth.total} inverted />}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">Janeiro/2026</p>
           </CardContent>
@@ -47,12 +143,15 @@ export function FinancialsView() {
             <Fuel className="h-5 w-5 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
-              {totalMonthlyFuel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            <div className="flex items-center gap-2">
+              <span className="text-3xl font-bold">
+                {totalMonthlyFuel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </span>
+              {previousMonth && <DeltaBadge current={totalMonthlyFuel} reference={previousMonth.fuel} inverted />}
             </div>
             <div className="mt-1 flex items-center text-sm text-green-600">
               <TrendingDown className="mr-1 h-4 w-4" />
-              -8% vs mês anterior
+              vs mês anterior
             </div>
           </CardContent>
         </Card>
@@ -63,12 +162,17 @@ export function FinancialsView() {
             <BarChart3 className="h-5 w-5 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
-              {totalMonthlyMaintenance.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            <div className="flex items-center gap-2">
+              <span className="text-3xl font-bold">
+                {totalMonthlyMaintenance.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </span>
+              {previousMonth && (
+                <DeltaBadge current={totalMonthlyMaintenance} reference={previousMonth.maintenance} inverted />
+              )}
             </div>
             <div className="mt-1 flex items-center text-sm text-green-600">
               <TrendingDown className="mr-1 h-4 w-4" />
-              -58% vs mês anterior
+              vs mês anterior
             </div>
           </CardContent>
         </Card>
@@ -85,6 +189,81 @@ export function FinancialsView() {
         </Card>
       </div>
 
+      {/* Comparison Charts */}
+      {comparison.isActive &&
+        comparison.type === "vehicles" &&
+        vehicleComparisonData &&
+        vehicleComparisonData.length >= 2 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Comparação de Veículos - TCO</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={vehicleComparisonData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="plate" className="text-xs" />
+                    <YAxis tickFormatter={(value) => `R$${value / 1000}k`} className="text-xs" />
+                    <Tooltip
+                      formatter={(value: number) =>
+                        value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                      }
+                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                    />
+                    <Legend />
+                    <Bar dataKey="fuelCost" name="Combustível Acum." fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Bar
+                      dataKey="maintenanceCost"
+                      name="Manutenção Acum."
+                      fill="hsl(var(--destructive))"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+      {comparison.isActive && comparison.type === "periods" && periodComparisonData && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Comparação de Períodos: {comparison.referenceMonth} vs {comparison.currentMonth}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={periodComparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="category" className="text-xs" />
+                  <YAxis tickFormatter={(value) => `R$${value / 1000}k`} className="text-xs" />
+                  <Tooltip
+                    formatter={(value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                  />
+                  <Legend />
+                  <Bar
+                    dataKey={comparison.referenceMonth}
+                    name={comparison.referenceMonth}
+                    fill="hsl(var(--muted-foreground))"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey={comparison.currentMonth}
+                    name={comparison.currentMonth}
+                    fill="hsl(var(--primary))"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Gráfico de Custos Mensais */}
       <Card>
         <CardHeader>
@@ -93,7 +272,7 @@ export function FinancialsView() {
         <CardContent>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockMonthlyCosts}>
+              <BarChart data={monthlyCosts}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis tickFormatter={(value) => `R$${value / 1000}k`} className="text-xs" />
@@ -132,7 +311,7 @@ export function FinancialsView() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockFuelEntries.slice(0, 6).map((entry) => (
+                {filteredFuelEntries.slice(0, 6).map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell>{new Date(entry.date).toLocaleDateString("pt-BR")}</TableCell>
                     <TableCell>{entry.vehiclePlate}</TableCell>

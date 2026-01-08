@@ -1,4 +1,7 @@
 // Mock data para simular resposta do backend
+
+export type Branch = "São Paulo" | "Recife" | "Piauí"
+
 export interface Vehicle {
   id: string
   model: string
@@ -9,6 +12,7 @@ export interface Vehicle {
   lastMaintenance: string
   nextMaintenance: string
   nextMaintenanceMileage: number
+  branch: Branch // Added branch property
 }
 
 export interface Document {
@@ -18,6 +22,12 @@ export interface Document {
   type: "IPVA" | "Licenciamento" | "Seguro" | "CRLV"
   expirationDate: string
   status: "Válido" | "Vencendo" | "Vencido"
+  renavam?: string
+  valor?: number
+  parcelas?: number
+  parcelasPagas?: number
+  detranUrl?: string
+  branch: Branch // Added branch property
 }
 
 export interface Maintenance {
@@ -30,6 +40,7 @@ export interface Maintenance {
   scheduledMileage: number
   status: "Urgente" | "Agendada" | "Concluída"
   description: string
+  branch: Branch // Added branch property
 }
 
 export interface Fine {
@@ -40,7 +51,73 @@ export interface Fine {
   description: string
   value: number
   status: "Pendente" | "Paga" | "Recurso"
+  autoInfracao?: string
+  local?: string
+  pontos?: number
+  prazoRecurso?: string
+  detranUrl?: string
+  branch: Branch // Added branch property
 }
+
+export interface Driver {
+  id: string
+  name: string
+  cpf: string
+  cnh: string
+  cnhExpiry: string
+  branch: Branch
+}
+
+export const mockDrivers: Driver[] = [
+  {
+    id: "d1",
+    name: "João Pereira",
+    cpf: "123.456.789-00",
+    cnh: "12345678901",
+    cnhExpiry: "2027-05-15",
+    branch: "São Paulo",
+  },
+  {
+    id: "d2",
+    name: "Carlos Silva",
+    cpf: "234.567.890-11",
+    cnh: "23456789012",
+    cnhExpiry: "2026-08-20",
+    branch: "São Paulo",
+  },
+  {
+    id: "d3",
+    name: "Roberto Mendes",
+    cpf: "345.678.901-22",
+    cnh: "34567890123",
+    cnhExpiry: "2028-01-10",
+    branch: "Recife",
+  },
+  {
+    id: "d4",
+    name: "Antonio Costa",
+    cpf: "456.789.012-33",
+    cnh: "45678901234",
+    cnhExpiry: "2026-11-30",
+    branch: "Recife",
+  },
+  {
+    id: "d5",
+    name: "Marcos Oliveira",
+    cpf: "567.890.123-44",
+    cnh: "56789012345",
+    cnhExpiry: "2027-03-25",
+    branch: "Piauí",
+  },
+  {
+    id: "d6",
+    name: "Paulo Santos",
+    cpf: "678.901.234-55",
+    cnh: "67890123456",
+    cnhExpiry: "2028-06-18",
+    branch: "Piauí",
+  },
+]
 
 export const mockVehicles: Vehicle[] = [
   {
@@ -53,6 +130,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2025-12-15",
     nextMaintenance: "2026-02-15",
     nextMaintenanceMileage: 135000,
+    branch: "São Paulo",
   },
   {
     id: "2",
@@ -64,6 +142,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2025-11-20",
     nextMaintenance: "2026-01-20",
     nextMaintenanceMileage: 190000,
+    branch: "São Paulo",
   },
   {
     id: "3",
@@ -75,6 +154,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2026-01-05",
     nextMaintenance: "2026-03-05",
     nextMaintenanceMileage: 55000,
+    branch: "Recife",
   },
   {
     id: "4",
@@ -86,6 +166,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2025-10-10",
     nextMaintenance: "2025-12-10",
     nextMaintenanceMileage: 230000,
+    branch: "Recife",
   },
   {
     id: "5",
@@ -97,6 +178,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2025-12-28",
     nextMaintenance: "2026-02-28",
     nextMaintenanceMileage: 108000,
+    branch: "Piauí",
   },
   {
     id: "6",
@@ -108,6 +190,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2025-11-30",
     nextMaintenance: "2026-01-30",
     nextMaintenanceMileage: 166000,
+    branch: "Piauí",
   },
 ]
 
@@ -119,6 +202,12 @@ export const mockDocuments: Document[] = [
     type: "IPVA",
     expirationDate: "2026-01-15",
     status: "Vencendo",
+    renavam: "00123456789",
+    valor: 4850.0,
+    parcelas: 3,
+    parcelasPagas: 0,
+    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/pagamentoIPVA",
+    branch: "São Paulo",
   },
   {
     id: "2",
@@ -127,6 +216,10 @@ export const mockDocuments: Document[] = [
     type: "Licenciamento",
     expirationDate: "2026-03-20",
     status: "Válido",
+    renavam: "00123456789",
+    valor: 181.35,
+    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/licenciamentoAnual",
+    branch: "São Paulo",
   },
   {
     id: "3",
@@ -135,6 +228,10 @@ export const mockDocuments: Document[] = [
     type: "Seguro",
     expirationDate: "2026-01-10",
     status: "Vencendo",
+    renavam: "00987654321",
+    valor: 12500.0,
+    detranUrl: "https://www.susep.gov.br/",
+    branch: "São Paulo",
   },
   {
     id: "4",
@@ -143,6 +240,9 @@ export const mockDocuments: Document[] = [
     type: "CRLV",
     expirationDate: "2025-12-20",
     status: "Vencido",
+    renavam: "00456789123",
+    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/crlve",
+    branch: "Recife",
   },
   {
     id: "5",
@@ -151,6 +251,10 @@ export const mockDocuments: Document[] = [
     type: "Licenciamento",
     expirationDate: "2025-12-25",
     status: "Vencido",
+    renavam: "00456789123",
+    valor: 181.35,
+    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/licenciamentoAnual",
+    branch: "Recife",
   },
   {
     id: "6",
@@ -159,6 +263,12 @@ export const mockDocuments: Document[] = [
     type: "IPVA",
     expirationDate: "2026-02-15",
     status: "Válido",
+    renavam: "00321654987",
+    valor: 5200.0,
+    parcelas: 3,
+    parcelasPagas: 3,
+    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/pagamentoIPVA",
+    branch: "Recife",
   },
 ]
 
@@ -173,6 +283,7 @@ export const mockMaintenances: Maintenance[] = [
     scheduledMileage: 230000,
     status: "Urgente",
     description: "Manutenção preventiva - troca de óleo e filtros",
+    branch: "Recife",
   },
   {
     id: "2",
@@ -184,6 +295,7 @@ export const mockMaintenances: Maintenance[] = [
     scheduledMileage: 190000,
     status: "Agendada",
     description: "Revisão completa de 180.000km",
+    branch: "São Paulo",
   },
   {
     id: "3",
@@ -195,6 +307,7 @@ export const mockMaintenances: Maintenance[] = [
     scheduledMileage: 135000,
     status: "Agendada",
     description: "Substituição dos pneus dianteiros",
+    branch: "São Paulo",
   },
   {
     id: "4",
@@ -206,6 +319,7 @@ export const mockMaintenances: Maintenance[] = [
     scheduledMileage: 55000,
     status: "Concluída",
     description: "Alinhamento e balanceamento",
+    branch: "Recife",
   },
   {
     id: "5",
@@ -217,6 +331,7 @@ export const mockMaintenances: Maintenance[] = [
     scheduledMileage: 100000,
     status: "Agendada",
     description: "Revisão do sistema de freios",
+    branch: "Piauí",
   },
 ]
 
@@ -225,28 +340,45 @@ export const mockFines: Fine[] = [
     id: "1",
     vehicleId: "2",
     vehiclePlate: "DEF-5678",
-    date: "2025-11-15",
+    date: "2025-11-14",
     description: "Excesso de velocidade - 20% acima",
     value: 195.23,
     status: "Pendente",
+    autoInfracao: "AA00123456",
+    local: "Rod. Anhanguera, km 45 - São Paulo/SP",
+    pontos: 5,
+    prazoRecurso: "2026-01-14",
+    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/infracoes",
+    branch: "São Paulo",
   },
   {
     id: "2",
     vehicleId: "4",
     vehiclePlate: "JKL-3456",
-    date: "2025-10-28",
+    date: "2025-10-27",
     description: "Estacionamento irregular",
     value: 88.38,
     status: "Paga",
+    autoInfracao: "AA00789012",
+    local: "Rua Augusta, 500 - São Paulo/SP",
+    pontos: 3,
+    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/infracoes",
+    branch: "Recife",
   },
   {
     id: "3",
     vehicleId: "1",
     vehiclePlate: "ABC-1234",
-    date: "2025-12-05",
+    date: "2025-12-04",
     description: "Avanço de sinal vermelho",
     value: 293.47,
     status: "Recurso",
+    autoInfracao: "AA00345678",
+    local: "Av. Paulista, 1000 - São Paulo/SP",
+    pontos: 7,
+    prazoRecurso: "2026-02-04",
+    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/infracoes",
+    branch: "São Paulo",
   },
 ]
 
@@ -301,6 +433,7 @@ export interface FuelEntry {
   odometer: number
   efficiency: number // Km/L
   hasAnomaly: boolean
+  branch: Branch // Added branch property
 }
 
 export interface MonthlyCost {
@@ -310,6 +443,7 @@ export interface MonthlyCost {
   tires: number
   insurance: number
   total: number
+  branch: Branch // Added branch property
 }
 
 export interface VehicleTCO {
@@ -321,6 +455,7 @@ export interface VehicleTCO {
   cumulativeMaintenanceCost: number
   cumulativeFuelCost: number
   depreciationPercent: number
+  branch: Branch // Added branch property
 }
 
 export const mockFuelEntries: FuelEntry[] = [
@@ -334,6 +469,7 @@ export const mockFuelEntries: FuelEntry[] = [
     odometer: 125000,
     efficiency: 2.8,
     hasAnomaly: false,
+    branch: "São Paulo",
   },
   {
     id: "2",
@@ -344,7 +480,8 @@ export const mockFuelEntries: FuelEntry[] = [
     cost: 1624.0,
     odometer: 180000,
     efficiency: 1.9,
-    hasAnomaly: true, // Consumo anômalo
+    hasAnomaly: true,
+    branch: "São Paulo",
   },
   {
     id: "3",
@@ -356,6 +493,7 @@ export const mockFuelEntries: FuelEntry[] = [
     odometer: 45000,
     efficiency: 3.2,
     hasAnomaly: false,
+    branch: "Recife",
   },
   {
     id: "4",
@@ -367,6 +505,7 @@ export const mockFuelEntries: FuelEntry[] = [
     odometer: 124100,
     efficiency: 2.9,
     hasAnomaly: false,
+    branch: "São Paulo",
   },
   {
     id: "5",
@@ -378,6 +517,7 @@ export const mockFuelEntries: FuelEntry[] = [
     odometer: 98000,
     efficiency: 2.6,
     hasAnomaly: false,
+    branch: "Piauí",
   },
   {
     id: "6",
@@ -389,16 +529,32 @@ export const mockFuelEntries: FuelEntry[] = [
     odometer: 220000,
     efficiency: 2.1,
     hasAnomaly: true,
+    branch: "Recife",
   },
 ]
 
 export const mockMonthlyCosts: MonthlyCost[] = [
-  { month: "Ago/25", fuel: 45000, maintenance: 12000, tires: 8000, insurance: 5000, total: 70000 },
-  { month: "Set/25", fuel: 48000, maintenance: 8500, tires: 3000, insurance: 5000, total: 64500 },
-  { month: "Out/25", fuel: 52000, maintenance: 15000, tires: 12000, insurance: 5000, total: 84000 },
-  { month: "Nov/25", fuel: 49000, maintenance: 9800, tires: 4500, insurance: 5000, total: 68300 },
-  { month: "Dez/25", fuel: 55000, maintenance: 18000, tires: 6000, insurance: 5000, total: 84000 },
-  { month: "Jan/26", fuel: 42000, maintenance: 7500, tires: 2000, insurance: 5000, total: 56500 },
+  // São Paulo
+  { month: "Ago/25", fuel: 25000, maintenance: 8000, tires: 5000, insurance: 3000, total: 41000, branch: "São Paulo" },
+  { month: "Set/25", fuel: 27000, maintenance: 5500, tires: 2000, insurance: 3000, total: 37500, branch: "São Paulo" },
+  { month: "Out/25", fuel: 29000, maintenance: 9000, tires: 7000, insurance: 3000, total: 48000, branch: "São Paulo" },
+  { month: "Nov/25", fuel: 26000, maintenance: 6000, tires: 2500, insurance: 3000, total: 37500, branch: "São Paulo" },
+  { month: "Dez/25", fuel: 30000, maintenance: 11000, tires: 3500, insurance: 3000, total: 47500, branch: "São Paulo" },
+  { month: "Jan/26", fuel: 23000, maintenance: 4500, tires: 1000, insurance: 3000, total: 31500, branch: "São Paulo" },
+  // Recife
+  { month: "Ago/25", fuel: 12000, maintenance: 2500, tires: 2000, insurance: 1200, total: 17700, branch: "Recife" },
+  { month: "Set/25", fuel: 13000, maintenance: 1800, tires: 500, insurance: 1200, total: 16500, branch: "Recife" },
+  { month: "Out/25", fuel: 14500, maintenance: 4000, tires: 3500, insurance: 1200, total: 23200, branch: "Recife" },
+  { month: "Nov/25", fuel: 14000, maintenance: 2500, tires: 1200, insurance: 1200, total: 18900, branch: "Recife" },
+  { month: "Dez/25", fuel: 15500, maintenance: 5000, tires: 1500, insurance: 1200, total: 23200, branch: "Recife" },
+  { month: "Jan/26", fuel: 11500, maintenance: 2000, tires: 600, insurance: 1200, total: 15300, branch: "Recife" },
+  // Piauí
+  { month: "Ago/25", fuel: 8000, maintenance: 1500, tires: 1000, insurance: 800, total: 11300, branch: "Piauí" },
+  { month: "Set/25", fuel: 8000, maintenance: 1200, tires: 500, insurance: 800, total: 10500, branch: "Piauí" },
+  { month: "Out/25", fuel: 8500, maintenance: 2000, tires: 1500, insurance: 800, total: 12800, branch: "Piauí" },
+  { month: "Nov/25", fuel: 9000, maintenance: 1300, tires: 800, insurance: 800, total: 11900, branch: "Piauí" },
+  { month: "Dez/25", fuel: 9500, maintenance: 2000, tires: 1000, insurance: 800, total: 13300, branch: "Piauí" },
+  { month: "Jan/26", fuel: 7500, maintenance: 1000, tires: 400, insurance: 800, total: 9700, branch: "Piauí" },
 ]
 
 export const mockVehicleTCO: VehicleTCO[] = [
@@ -411,6 +567,7 @@ export const mockVehicleTCO: VehicleTCO[] = [
     cumulativeMaintenanceCost: 95000,
     cumulativeFuelCost: 180000,
     depreciationPercent: 15.3,
+    branch: "São Paulo",
   },
   {
     vehicleId: "2",
@@ -421,6 +578,7 @@ export const mockVehicleTCO: VehicleTCO[] = [
     cumulativeMaintenanceCost: 145000,
     cumulativeFuelCost: 220000,
     depreciationPercent: 25.6,
+    branch: "São Paulo",
   },
   {
     vehicleId: "3",
@@ -431,6 +589,7 @@ export const mockVehicleTCO: VehicleTCO[] = [
     cumulativeMaintenanceCost: 35000,
     cumulativeFuelCost: 65000,
     depreciationPercent: 7.6,
+    branch: "Recife",
   },
   {
     vehicleId: "4",
@@ -441,16 +600,39 @@ export const mockVehicleTCO: VehicleTCO[] = [
     cumulativeMaintenanceCost: 180000,
     cumulativeFuelCost: 280000,
     depreciationPercent: 35.4,
+    branch: "Recife",
+  },
+  {
+    vehicleId: "5",
+    vehiclePlate: "MNO-7891",
+    vehicleModel: "Iveco S-Way",
+    purchaseValue: 720000,
+    currentFipeValue: 650000,
+    cumulativeMaintenanceCost: 55000,
+    cumulativeFuelCost: 95000,
+    depreciationPercent: 9.7,
+    branch: "Piauí",
+  },
+  {
+    vehicleId: "6",
+    vehiclePlate: "PQR-2345",
+    vehicleModel: "Volvo FH 460",
+    purchaseValue: 780000,
+    currentFipeValue: 620000,
+    cumulativeMaintenanceCost: 98000,
+    cumulativeFuelCost: 165000,
+    depreciationPercent: 20.5,
+    branch: "Piauí",
   },
 ]
 
 // ========== TIRE MANAGEMENT ==========
 export interface Tire {
   id: string
-  position: "FL" | "FR" | "RL" | "RR" // Front Left, Front Right, Rear Left, Rear Right
+  position: "FL" | "FR" | "RL" | "RR"
   brand: string
   model: string
-  treadDepth: number // em mm
+  treadDepth: number
   installDate: string
   mileageAtInstall: number
 }
@@ -460,6 +642,7 @@ export interface VehicleTires {
   vehiclePlate: string
   vehicleModel: string
   tires: Tire[]
+  branch: Branch // Added branch property
 }
 
 export interface TireRotation {
@@ -469,6 +652,7 @@ export interface TireRotation {
   date: string
   description: string
   mileage: number
+  branch: Branch // Added branch property
 }
 
 export interface SpareTire {
@@ -478,6 +662,7 @@ export interface SpareTire {
   size: string
   quantity: number
   condition: "Novo" | "Usado - Bom" | "Usado - Regular"
+  branch: Branch // Added branch property
 }
 
 export const mockVehicleTires: VehicleTires[] = [
@@ -485,6 +670,7 @@ export const mockVehicleTires: VehicleTires[] = [
     vehicleId: "1",
     vehiclePlate: "ABC-1234",
     vehicleModel: "Volvo FH 540",
+    branch: "São Paulo",
     tires: [
       {
         id: "t1",
@@ -528,6 +714,7 @@ export const mockVehicleTires: VehicleTires[] = [
     vehicleId: "2",
     vehiclePlate: "DEF-5678",
     vehicleModel: "Scania R450",
+    branch: "São Paulo",
     tires: [
       {
         id: "t5",
@@ -571,6 +758,7 @@ export const mockVehicleTires: VehicleTires[] = [
     vehicleId: "3",
     vehiclePlate: "GHI-9012",
     vehicleModel: "Mercedes Actros",
+    branch: "Recife",
     tires: [
       {
         id: "t9",
@@ -620,6 +808,7 @@ export const mockTireRotations: TireRotation[] = [
     date: "2025-10-20",
     description: "Rodízio dianteiros para traseiros",
     mileage: 115000,
+    branch: "São Paulo",
   },
   {
     id: "r2",
@@ -628,6 +817,7 @@ export const mockTireRotations: TireRotation[] = [
     date: "2025-08-15",
     description: "Troca dos pneus dianteiros (novos)",
     mileage: 100000,
+    branch: "São Paulo",
   },
   {
     id: "r3",
@@ -636,6 +826,7 @@ export const mockTireRotations: TireRotation[] = [
     date: "2025-06-05",
     description: "Rodízio cruzado completo",
     mileage: 155000,
+    branch: "São Paulo",
   },
   {
     id: "r4",
@@ -644,14 +835,47 @@ export const mockTireRotations: TireRotation[] = [
     date: "2025-11-01",
     description: "Troca de todos os pneus (novos)",
     mileage: 40000,
+    branch: "Recife",
   },
 ]
 
 export const mockSpareTires: SpareTire[] = [
-  { id: "s1", brand: "Michelin", model: "X Line Energy", size: "295/80 R22.5", quantity: 4, condition: "Novo" },
-  { id: "s2", brand: "Continental", model: "HSR2", size: "295/80 R22.5", quantity: 2, condition: "Usado - Bom" },
-  { id: "s3", brand: "Bridgestone", model: "R249", size: "315/80 R22.5", quantity: 3, condition: "Novo" },
-  { id: "s4", brand: "Pirelli", model: "FR01", size: "295/80 R22.5", quantity: 1, condition: "Usado - Regular" },
+  {
+    id: "s1",
+    brand: "Michelin",
+    model: "X Line Energy",
+    size: "295/80 R22.5",
+    quantity: 4,
+    condition: "Novo",
+    branch: "São Paulo",
+  },
+  {
+    id: "s2",
+    brand: "Continental",
+    model: "HSR2",
+    size: "295/80 R22.5",
+    quantity: 2,
+    condition: "Usado - Bom",
+    branch: "São Paulo",
+  },
+  {
+    id: "s3",
+    brand: "Bridgestone",
+    model: "R249",
+    size: "315/80 R22.5",
+    quantity: 3,
+    condition: "Novo",
+    branch: "Recife",
+  },
+  {
+    id: "s4",
+    brand: "Pirelli",
+    model: "FR01",
+    size: "295/80 R22.5",
+    quantity: 1,
+    condition: "Usado - Regular",
+    branch: "Piauí",
+  },
 ]
 
 // Função para obter cor do status do pneu
@@ -683,6 +907,7 @@ export interface Incident {
   estimatedCost: number
   insuranceClaim: boolean
   photos: string[]
+  branch: Branch // Added branch property
 }
 
 export const mockIncidents: Incident[] = [
@@ -702,6 +927,7 @@ export const mockIncidents: Incident[] = [
     estimatedCost: 8500,
     insuranceClaim: true,
     photos: [],
+    branch: "São Paulo",
   },
   {
     id: "i2",
@@ -718,6 +944,7 @@ export const mockIncidents: Incident[] = [
     estimatedCost: 2200,
     insuranceClaim: false,
     photos: [],
+    branch: "Recife",
   },
   {
     id: "i3",
@@ -735,6 +962,7 @@ export const mockIncidents: Incident[] = [
     estimatedCost: 45000,
     insuranceClaim: true,
     photos: [],
+    branch: "São Paulo",
   },
   {
     id: "i4",
@@ -751,6 +979,7 @@ export const mockIncidents: Incident[] = [
     estimatedCost: 1800,
     insuranceClaim: false,
     photos: [],
+    branch: "Piauí",
   },
 ]
 
@@ -771,236 +1000,148 @@ export interface VehicleDocuments {
   vehiclePlate: string
   renavam: string
   chassi: string
+  crlv: string
+  crlvExpiry: string
   ipva: {
-    year: number
-    value: number
-    status: "Pago" | "Pendente" | "Vencido"
-    dueDate: string
-    paymentDate?: string
+    valor: number
+    parcelas: number
+    parcelasPagas: number
+    vencimento: string
+    status: "Pago" | "Pendente" | "Parcelado"
   }
-  licensing: {
-    year: number
-    status: "Válido" | "Vencendo" | "Vencido"
-    expirationDate: string
-    crlvNumber: string
-  }
-  insurance: {
-    company: string
-    policyNumber: string
-    startDate: string
-    endDate: string
-    coverageValue: number
+  licenciamento: { valor: number; vencimento: string; status: "Válido" | "Vencendo" | "Vencido" }
+  seguro: {
+    seguradora: string
+    apolice: string
+    cobertura: number
+    vigenciaInicio: string
+    vigenciaFim: string
     status: "Ativo" | "Vencendo" | "Vencido"
   }
-  semParar: {
-    active: boolean
-    tagNumber: string
-    lastUsage: string
-    monthlyAverage: number
-    balance: number
-  }
+  semParar: { tag: string; saldo: number; mediaGastoMensal: number; ultimoUso: string; ativo: boolean }
+  branch: Branch // Added branch property
 }
 
 export const mockVehicleDocuments: VehicleDocuments[] = [
   {
     vehicleId: "1",
     vehiclePlate: "ABC-1234",
-    renavam: "01234567890",
+    renavam: "00123456789",
     chassi: "9BWZZZ377VT004251",
-    ipva: {
-      year: 2026,
-      value: 12500,
-      status: "Pendente",
-      dueDate: "2026-01-15",
-    },
-    licensing: {
-      year: 2026,
-      status: "Válido",
-      expirationDate: "2026-03-20",
-      crlvNumber: "00123456789",
-    },
-    insurance: {
-      company: "Porto Seguro",
-      policyNumber: "PSG-2025-78945",
-      startDate: "2025-06-01",
-      endDate: "2026-06-01",
-      coverageValue: 950000,
+    crlv: "SP-2025-1234567",
+    crlvExpiry: "2026-12-31",
+    ipva: { valor: 4850, parcelas: 3, parcelasPagas: 2, vencimento: "2026-01-15", status: "Parcelado" },
+    licenciamento: { valor: 181.35, vencimento: "2026-03-20", status: "Válido" },
+    seguro: {
+      seguradora: "Porto Seguro",
+      apolice: "PS-2025-789456",
+      cobertura: 850000,
+      vigenciaInicio: "2025-06-01",
+      vigenciaFim: "2026-06-01",
       status: "Ativo",
     },
-    semParar: {
-      active: true,
-      tagNumber: "SP-789456123",
-      lastUsage: "2026-01-07",
-      monthlyAverage: 1250.0,
-      balance: 520.5,
-    },
+    semParar: { tag: "SP-001234567", saldo: 450.0, mediaGastoMensal: 380.0, ultimoUso: "2026-01-07", ativo: true },
+    branch: "São Paulo",
   },
   {
     vehicleId: "2",
     vehiclePlate: "DEF-5678",
-    renavam: "09876543210",
+    renavam: "00987654321",
     chassi: "9BWZZZ377VT004252",
-    ipva: {
-      year: 2026,
-      value: 11800,
-      status: "Pendente",
-      dueDate: "2026-01-10",
-    },
-    licensing: {
-      year: 2025,
+    crlv: "SP-2025-2345678",
+    crlvExpiry: "2026-12-31",
+    ipva: { valor: 4200, parcelas: 3, parcelasPagas: 3, vencimento: "2026-01-15", status: "Pago" },
+    licenciamento: { valor: 181.35, vencimento: "2026-04-15", status: "Válido" },
+    seguro: {
+      seguradora: "Bradesco Seguros",
+      apolice: "BD-2025-456123",
+      cobertura: 780000,
+      vigenciaInicio: "2025-07-01",
+      vigenciaFim: "2026-01-10",
       status: "Vencendo",
-      expirationDate: "2026-01-15",
-      crlvNumber: "00987654321",
     },
-    insurance: {
-      company: "Bradesco Seguros",
-      policyNumber: "BRD-2025-45678",
-      startDate: "2025-04-15",
-      endDate: "2026-04-15",
-      coverageValue: 880000,
-      status: "Ativo",
-    },
-    semParar: {
-      active: true,
-      tagNumber: "SP-456789012",
-      lastUsage: "2026-01-05",
-      monthlyAverage: 980.0,
-      balance: 340.2,
-    },
+    semParar: { tag: "SP-001234568", saldo: 120.0, mediaGastoMensal: 420.0, ultimoUso: "2026-01-05", ativo: true },
+    branch: "São Paulo",
   },
   {
     vehicleId: "3",
     vehiclePlate: "GHI-9012",
-    renavam: "11223344556",
+    renavam: "00321654987",
     chassi: "9BWZZZ377VT004253",
-    ipva: {
-      year: 2026,
-      value: 15200,
-      status: "Pago",
-      dueDate: "2026-02-15",
-      paymentDate: "2026-01-05",
-    },
-    licensing: {
-      year: 2026,
-      status: "Válido",
-      expirationDate: "2026-04-10",
-      crlvNumber: "00112233445",
-    },
-    insurance: {
-      company: "Allianz",
-      policyNumber: "ALZ-2025-12345",
-      startDate: "2025-08-01",
-      endDate: "2026-08-01",
-      coverageValue: 1100000,
+    crlv: "PE-2025-3456789",
+    crlvExpiry: "2026-12-31",
+    ipva: { valor: 5200, parcelas: 3, parcelasPagas: 3, vencimento: "2026-02-15", status: "Pago" },
+    licenciamento: { valor: 181.35, vencimento: "2026-05-10", status: "Válido" },
+    seguro: {
+      seguradora: "Tokio Marine",
+      apolice: "TM-2025-987321",
+      cobertura: 920000,
+      vigenciaInicio: "2025-11-01",
+      vigenciaFim: "2026-11-01",
       status: "Ativo",
     },
-    semParar: {
-      active: true,
-      tagNumber: "SP-123456789",
-      lastUsage: "2026-01-08",
-      monthlyAverage: 1450.0,
-      balance: 890.3,
-    },
+    semParar: { tag: "PE-001234569", saldo: 890.0, mediaGastoMensal: 290.0, ultimoUso: "2026-01-06", ativo: true },
+    branch: "Recife",
   },
   {
     vehicleId: "4",
     vehiclePlate: "JKL-3456",
-    renavam: "66778899001",
+    renavam: "00456789123",
     chassi: "9BWZZZ377VT004254",
-    ipva: {
-      year: 2025,
-      value: 9800,
-      status: "Vencido",
-      dueDate: "2025-12-20",
-    },
-    licensing: {
-      year: 2025,
-      status: "Vencido",
-      expirationDate: "2025-12-25",
-      crlvNumber: "00667788990",
-    },
-    insurance: {
-      company: "HDI Seguros",
-      policyNumber: "HDI-2025-98765",
-      startDate: "2025-03-01",
-      endDate: "2026-03-01",
-      coverageValue: 750000,
+    crlv: "PE-2024-4567890",
+    crlvExpiry: "2025-12-20",
+    ipva: { valor: 3800, parcelas: 3, parcelasPagas: 0, vencimento: "2026-01-20", status: "Pendente" },
+    licenciamento: { valor: 181.35, vencimento: "2025-12-25", status: "Vencido" },
+    seguro: {
+      seguradora: "SulAmérica",
+      apolice: "SA-2025-654987",
+      cobertura: 650000,
+      vigenciaInicio: "2025-03-01",
+      vigenciaFim: "2026-03-01",
       status: "Ativo",
     },
-    semParar: {
-      active: false,
-      tagNumber: "SP-987654321",
-      lastUsage: "2025-11-15",
-      monthlyAverage: 0,
-      balance: 0,
-    },
+    semParar: { tag: "PE-001234570", saldo: 0.0, mediaGastoMensal: 350.0, ultimoUso: "2025-12-15", ativo: false },
+    branch: "Recife",
   },
   {
     vehicleId: "5",
     vehiclePlate: "MNO-7891",
-    renavam: "22334455667",
+    renavam: "00654987321",
     chassi: "9BWZZZ377VT004255",
-    ipva: {
-      year: 2026,
-      value: 13500,
-      status: "Pago",
-      dueDate: "2026-01-28",
-      paymentDate: "2025-12-20",
-    },
-    licensing: {
-      year: 2026,
-      status: "Válido",
-      expirationDate: "2026-05-15",
-      crlvNumber: "00223344556",
-    },
-    insurance: {
-      company: "Mapfre",
-      policyNumber: "MPF-2025-55667",
-      startDate: "2025-07-01",
-      endDate: "2026-07-01",
-      coverageValue: 920000,
+    crlv: "PI-2025-5678901",
+    crlvExpiry: "2026-12-31",
+    ipva: { valor: 4100, parcelas: 3, parcelasPagas: 1, vencimento: "2026-02-10", status: "Parcelado" },
+    licenciamento: { valor: 181.35, vencimento: "2026-06-05", status: "Válido" },
+    seguro: {
+      seguradora: "Mapfre",
+      apolice: "MF-2025-321654",
+      cobertura: 720000,
+      vigenciaInicio: "2025-09-01",
+      vigenciaFim: "2026-09-01",
       status: "Ativo",
     },
-    semParar: {
-      active: true,
-      tagNumber: "SP-112233445",
-      lastUsage: "2026-01-07",
-      monthlyAverage: 1100.0,
-      balance: 675.8,
-    },
+    semParar: { tag: "PI-001234571", saldo: 650.0, mediaGastoMensal: 200.0, ultimoUso: "2026-01-07", ativo: true },
+    branch: "Piauí",
   },
   {
     vehicleId: "6",
     vehiclePlate: "PQR-2345",
-    renavam: "44556677889",
+    renavam: "00789321654",
     chassi: "9BWZZZ377VT004256",
-    ipva: {
-      year: 2026,
-      value: 11200,
-      status: "Pendente",
-      dueDate: "2026-01-29",
-    },
-    licensing: {
-      year: 2026,
-      status: "Válido",
-      expirationDate: "2026-03-30",
-      crlvNumber: "00445566778",
-    },
-    insurance: {
-      company: "SulAmérica",
-      policyNumber: "SAM-2025-33445",
-      startDate: "2025-09-01",
-      endDate: "2026-09-01",
-      coverageValue: 860000,
+    crlv: "PI-2025-6789012",
+    crlvExpiry: "2026-12-31",
+    ipva: { valor: 4500, parcelas: 3, parcelasPagas: 3, vencimento: "2026-01-15", status: "Pago" },
+    licenciamento: { valor: 181.35, vencimento: "2026-07-20", status: "Válido" },
+    seguro: {
+      seguradora: "HDI Seguros",
+      apolice: "HDI-2025-159753",
+      cobertura: 780000,
+      vigenciaInicio: "2025-08-15",
+      vigenciaFim: "2026-08-15",
       status: "Ativo",
     },
-    semParar: {
-      active: true,
-      tagNumber: "SP-556677889",
-      lastUsage: "2026-01-06",
-      monthlyAverage: 890.0,
-      balance: 445.6,
-    },
+    semParar: { tag: "PI-001234572", saldo: 320.0, mediaGastoMensal: 180.0, ultimoUso: "2026-01-04", ativo: true },
+    branch: "Piauí",
   },
 ]
 
@@ -1017,15 +1158,15 @@ export interface TachographCalibration {
   inmetroNumber: string
   lastCalibrationDate: string
   nextCalibrationDate: string
-  status: "Válido" | "Vencendo" | "Vencido"
-  technicianName: string
-  workshopName: string
+  certificateNumber: string
+  branch: Branch // Added branch property
 }
 
 export interface TachographReading {
   id: string
   vehicleId: string
   vehiclePlate: string
+  driverId: string
   driverName: string
   date: string
   startKm: number
@@ -1034,8 +1175,8 @@ export interface TachographReading {
   maxSpeed: number
   drivingTime: number // em horas
   hasViolation: boolean
-  diskPhotoUrl?: string
-  notes?: string
+  diskPhoto?: string // Renamed from diskPhotoUrl
+  branch: Branch // Added branch property
 }
 
 export const mockTachographCalibrations: TachographCalibration[] = [
@@ -1043,67 +1184,61 @@ export const mockTachographCalibrations: TachographCalibration[] = [
     vehicleId: "1",
     vehiclePlate: "ABC-1234",
     vehicleModel: "Volvo FH 540",
-    inmetroNumber: "INMETRO-2024-789456",
+    inmetroNumber: "INMETRO-SP-001234",
     lastCalibrationDate: "2025-06-15",
     nextCalibrationDate: "2026-06-15",
-    status: "Válido",
-    technicianName: "José Ferreira",
-    workshopName: "Tacógrafo Center SP",
+    certificateNumber: "CERT-2025-001234",
+    branch: "São Paulo",
   },
   {
     vehicleId: "2",
     vehiclePlate: "DEF-5678",
     vehicleModel: "Scania R450",
-    inmetroNumber: "INMETRO-2024-321654",
-    lastCalibrationDate: "2025-01-20",
+    inmetroNumber: "INMETRO-SP-005678",
+    lastCalibrationDate: "2025-08-20",
     nextCalibrationDate: "2026-01-20",
-    status: "Vencendo", // menos de 30 dias
-    technicianName: "Carlos Mendes",
-    workshopName: "Tacógrafo Center SP",
+    certificateNumber: "CERT-2025-005678",
+    branch: "São Paulo",
   },
   {
     vehicleId: "3",
     vehiclePlate: "GHI-9012",
     vehicleModel: "Mercedes Actros",
-    inmetroNumber: "INMETRO-2025-654987",
-    lastCalibrationDate: "2025-10-01",
-    nextCalibrationDate: "2026-10-01",
-    status: "Válido",
-    technicianName: "Roberto Silva",
-    workshopName: "Calibra Tacógrafos Ltda",
+    inmetroNumber: "INMETRO-PE-009012",
+    lastCalibrationDate: "2025-11-10",
+    nextCalibrationDate: "2026-11-10",
+    certificateNumber: "CERT-2025-009012",
+    branch: "Recife",
   },
   {
     vehicleId: "4",
     vehiclePlate: "JKL-3456",
     vehicleModel: "DAF XF",
-    inmetroNumber: "INMETRO-2023-147258",
-    lastCalibrationDate: "2024-12-10",
-    nextCalibrationDate: "2025-12-10",
-    status: "Vencido",
-    technicianName: "Antonio Costa",
-    workshopName: "Tacógrafo Express",
+    inmetroNumber: "INMETRO-PE-003456",
+    lastCalibrationDate: "2024-12-05",
+    nextCalibrationDate: "2025-12-05",
+    certificateNumber: "CERT-2024-003456",
+    branch: "Recife",
   },
   {
     vehicleId: "5",
     vehiclePlate: "MNO-7891",
     vehicleModel: "Iveco S-Way",
-    inmetroNumber: "INMETRO-2025-369852",
-    lastCalibrationDate: "2025-08-25",
-    nextCalibrationDate: "2026-08-25",
-    status: "Válido",
-    technicianName: "José Ferreira",
-    workshopName: "Tacógrafo Center SP",
+    inmetroNumber: "INMETRO-PI-007891",
+    lastCalibrationDate: "2025-09-25",
+    nextCalibrationDate: "2026-09-25",
+    certificateNumber: "CERT-2025-007891",
+    branch: "Piauí",
   },
   {
     vehicleId: "6",
     vehiclePlate: "PQR-2345",
     vehicleModel: "Volvo FH 460",
-    inmetroNumber: "INMETRO-2024-951753",
-    lastCalibrationDate: "2025-02-05",
-    nextCalibrationDate: "2026-02-05",
-    status: "Vencendo",
-    technicianName: "Carlos Mendes",
-    workshopName: "Calibra Tacógrafos Ltda",
+    inmetroNumber: "INMETRO-PI-002345",
+    lastCalibrationDate: "2025-07-18",
+    nextCalibrationDate: "2026-01-18",
+    certificateNumber: "CERT-2025-002345",
+    branch: "Piauí",
   },
 ]
 
@@ -1112,6 +1247,7 @@ export const mockTachographReadings: TachographReading[] = [
     id: "tr1",
     vehicleId: "1",
     vehiclePlate: "ABC-1234",
+    driverId: "d1",
     driverName: "João Pereira",
     date: "2026-01-07",
     startKm: 124500,
@@ -1120,37 +1256,43 @@ export const mockTachographReadings: TachographReading[] = [
     maxSpeed: 85,
     drivingTime: 6.5,
     hasViolation: false,
+    branch: "São Paulo",
   },
   {
     id: "tr2",
     vehicleId: "2",
     vehiclePlate: "DEF-5678",
+    driverId: "d2",
     driverName: "Carlos Silva",
     date: "2026-01-07",
-    startKm: 179200,
+    startKm: 179500,
     endKm: 180000,
-    distance: 800,
-    maxSpeed: 98, // VIOLAÇÃO - acima de 90km/h
-    drivingTime: 9.2,
+    distance: 500,
+    maxSpeed: 98,
+    drivingTime: 5.8,
     hasViolation: true,
+    branch: "São Paulo",
   },
   {
     id: "tr3",
     vehicleId: "3",
     vehiclePlate: "GHI-9012",
-    driverName: "Pedro Santos",
+    driverId: "d3",
+    driverName: "Roberto Mendes",
     date: "2026-01-06",
     startKm: 44500,
     endKm: 45000,
     distance: 500,
     maxSpeed: 82,
-    drivingTime: 5.8,
+    drivingTime: 7.2,
     hasViolation: false,
+    branch: "Recife",
   },
   {
     id: "tr4",
     vehicleId: "1",
     vehiclePlate: "ABC-1234",
+    driverId: "d1",
     driverName: "João Pereira",
     date: "2026-01-06",
     startKm: 124000,
@@ -1159,101 +1301,89 @@ export const mockTachographReadings: TachographReading[] = [
     maxSpeed: 88,
     drivingTime: 6.0,
     hasViolation: false,
+    branch: "São Paulo",
   },
   {
     id: "tr5",
     vehicleId: "4",
     vehiclePlate: "JKL-3456",
-    driverName: "Roberto Mendes",
+    driverId: "d4",
+    driverName: "Antonio Costa",
     date: "2026-01-05",
-    startKm: 219000,
+    startKm: 219500,
     endKm: 220000,
-    distance: 1000,
-    maxSpeed: 105, // VIOLAÇÃO GRAVE
-    drivingTime: 11.5,
+    distance: 500,
+    maxSpeed: 95,
+    drivingTime: 5.5,
     hasViolation: true,
-    notes: "Motorista advertido sobre excesso de velocidade",
+    branch: "Recife",
   },
   {
     id: "tr6",
     vehicleId: "5",
     vehiclePlate: "MNO-7891",
-    driverName: "Antonio Costa",
-    date: "2026-01-05",
-    startKm: 97200,
+    driverId: "d5",
+    driverName: "Marcos Oliveira",
+    date: "2026-01-07",
+    startKm: 97500,
     endKm: 98000,
-    distance: 800,
-    maxSpeed: 87,
-    drivingTime: 8.5,
+    distance: 500,
+    maxSpeed: 78,
+    drivingTime: 7.8,
     hasViolation: false,
+    branch: "Piauí",
   },
   {
     id: "tr7",
-    vehicleId: "2",
-    vehiclePlate: "DEF-5678",
-    driverName: "Carlos Silva",
-    date: "2026-01-04",
-    startKm: 178500,
-    endKm: 179200,
-    distance: 700,
-    maxSpeed: 92, // VIOLAÇÃO
-    drivingTime: 7.8,
+    vehicleId: "6",
+    vehiclePlate: "PQR-2345",
+    driverId: "d6",
+    driverName: "Paulo Santos",
+    date: "2026-01-06",
+    startKm: 155500,
+    endKm: 156000,
+    distance: 500,
+    maxSpeed: 92,
+    drivingTime: 6.2,
     hasViolation: true,
+    branch: "Piauí",
   },
   {
     id: "tr8",
-    vehicleId: "6",
-    vehiclePlate: "PQR-2345",
-    driverName: "Fernando Lima",
-    date: "2026-01-04",
-    startKm: 155200,
-    endKm: 156000,
-    distance: 800,
-    maxSpeed: 89,
-    drivingTime: 8.0,
-    hasViolation: false,
-  },
-  {
-    id: "tr9",
-    vehicleId: "3",
-    vehiclePlate: "GHI-9012",
-    driverName: "Pedro Santos",
-    date: "2026-01-03",
-    startKm: 44000,
-    endKm: 44500,
+    vehicleId: "2",
+    vehiclePlate: "DEF-5678",
+    driverId: "d2",
+    driverName: "Carlos Silva",
+    date: "2026-01-05",
+    startKm: 179000,
+    endKm: 179500,
     distance: 500,
-    maxSpeed: 78,
-    drivingTime: 5.5,
-    hasViolation: false,
-  },
-  {
-    id: "tr10",
-    vehicleId: "1",
-    vehiclePlate: "ABC-1234",
-    driverName: "Marcos Oliveira",
-    date: "2026-01-03",
-    startKm: 123400,
-    endKm: 124000,
-    distance: 600,
-    maxSpeed: 91, // VIOLAÇÃO
+    maxSpeed: 87,
     drivingTime: 6.8,
-    hasViolation: true,
+    hasViolation: false,
+    branch: "São Paulo",
   },
 ]
 
-// Função para calcular estatísticas do Tacógrafo
-export function getTachographStats() {
-  const calibrationsExpiring = mockTachographCalibrations.filter((c) => c.status === "Vencendo").length
-  const calibrationsExpired = mockTachographCalibrations.filter((c) => c.status === "Vencido").length
-  const totalViolations = mockTachographReadings.filter((r) => r.hasViolation).length
-  const totalReadings = mockTachographReadings.length
-  const violationRate = Math.round((totalViolations / totalReadings) * 100)
+// Função para verificar status de calibração
+export function getCalibrationStatus(nextCalibrationDate: string): {
+  status: "ok" | "warning" | "expired"
+  daysRemaining: number
+} {
+  const today = new Date()
+  const calibrationDate = new Date(nextCalibrationDate)
+  const diffTime = calibrationDate.getTime() - today.getTime()
+  const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-  return {
-    calibrationsExpiring,
-    calibrationsExpired,
-    totalViolations,
-    totalReadings,
-    violationRate,
-  }
+  if (daysRemaining < 0) return { status: "expired", daysRemaining }
+  if (daysRemaining <= 30) return { status: "warning", daysRemaining }
+  return { status: "ok", daysRemaining }
 }
+
+// ========== FILTER HELPERS ==========
+export function filterByBranch<T extends { branch: Branch }>(data: T[], branch: Branch | "Todas"): T[] {
+  if (branch === "Todas") return data
+  return data.filter((item) => item.branch === branch)
+}
+
+export const branches: (Branch | "Todas")[] = ["Todas", "São Paulo", "Recife", "Piauí"]

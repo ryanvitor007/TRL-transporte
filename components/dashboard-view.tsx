@@ -12,18 +12,52 @@ import {
   getTireHealthColor,
   getPlateRestriction,
   getVehiclesInRotation,
+  filterByBranch,
 } from "@/lib/mock-data"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { useApp } from "@/contexts/app-context"
 
 export function DashboardView() {
-  const activeVehicles = mockVehicles.filter((v) => v.status === "Ativo").length
-  const inShopVehicles = mockVehicles.filter((v) => v.status === "Em Oficina").length
-  const documentIssues = mockVehicles.filter((v) => v.status === "Problema Documental").length
+  const { selectedBranch } = useApp()
 
-  const expiringDocuments = mockDocuments.filter((d) => d.status === "Vencendo" || d.status === "Vencido")
-  const urgentMaintenances = mockMaintenances.filter((m) => m.status === "Urgente")
+  const filteredVehicles = filterByBranch(mockVehicles, selectedBranch)
+  const filteredDocuments = filterByBranch(mockDocuments, selectedBranch)
+  const filteredMaintenances = filterByBranch(mockMaintenances, selectedBranch)
+  const filteredTires = filterByBranch(mockVehicleTires, selectedBranch)
 
-  const criticalTires = mockVehicleTires.flatMap((v) =>
+  // Aggregate monthly costs by branch
+  const aggregateMonthlyCosts = () => {
+    const filtered = filterByBranch(mockMonthlyCosts, selectedBranch)
+    const grouped = filtered.reduce(
+      (acc, cost) => {
+        if (!acc[cost.month]) {
+          acc[cost.month] = { month: cost.month, fuel: 0, maintenance: 0, tires: 0, insurance: 0, total: 0 }
+        }
+        acc[cost.month].fuel += cost.fuel
+        acc[cost.month].maintenance += cost.maintenance
+        acc[cost.month].tires += cost.tires
+        acc[cost.month].insurance += cost.insurance
+        acc[cost.month].total += cost.total
+        return acc
+      },
+      {} as Record<
+        string,
+        { month: string; fuel: number; maintenance: number; tires: number; insurance: number; total: number }
+      >,
+    )
+    return Object.values(grouped)
+  }
+
+  const monthlyCosts = aggregateMonthlyCosts()
+
+  const activeVehicles = filteredVehicles.filter((v) => v.status === "Ativo").length
+  const inShopVehicles = filteredVehicles.filter((v) => v.status === "Em Oficina").length
+  const documentIssues = filteredVehicles.filter((v) => v.status === "Problema Documental").length
+
+  const expiringDocuments = filteredDocuments.filter((d) => d.status === "Vencendo" || d.status === "Vencido")
+  const urgentMaintenances = filteredMaintenances.filter((m) => m.status === "Urgente")
+
+  const criticalTires = filteredTires.flatMap((v) =>
     v.tires
       .filter((t) => getTireHealthColor(t.treadDepth) === "red")
       .map((t) => ({
@@ -34,11 +68,16 @@ export function DashboardView() {
       })),
   )
 
-  const currentMonthCost = mockMonthlyCosts[mockMonthlyCosts.length - 1]?.total || 0
-  const fleetAvailability = Math.round((activeVehicles / mockVehicles.length) * 100)
+  const currentMonthCost = monthlyCosts[monthlyCosts.length - 1]?.total || 0
+  const fleetAvailability =
+    filteredVehicles.length > 0 ? Math.round((activeVehicles / filteredVehicles.length) * 100) : 0
 
   const { blockedEndings, dayName } = getPlateRestriction()
-  const vehiclesInRotation = getVehiclesInRotation(mockVehicles)
+  // Only show rotation for São Paulo branch
+  const vehiclesInRotation =
+    selectedBranch === "São Paulo" || selectedBranch === "Todas"
+      ? getVehiclesInRotation(filterByBranch(mockVehicles, "São Paulo"))
+      : []
 
   const alerts = [
     ...expiringDocuments.map((doc) => ({
@@ -68,7 +107,10 @@ export function DashboardView() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">Visão geral da sua frota - {dayName}</p>
+        <p className="text-muted-foreground">
+          Visão geral da sua frota - {dayName}
+          {selectedBranch !== "Todas" && ` - ${selectedBranch}`}
+        </p>
       </div>
 
       {/* Métricas principais */}
@@ -79,7 +121,7 @@ export function DashboardView() {
             <Car className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{mockVehicles.length}</div>
+            <div className="text-3xl font-bold">{filteredVehicles.length}</div>
             <div className="mt-1 flex items-center gap-2 text-sm">
               <span className="flex items-center text-green-600">
                 <TrendingUp className="mr-1 h-4 w-4" />
@@ -113,7 +155,7 @@ export function DashboardView() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Rodízio Hoje</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Rodízio Hoje (SP)</CardTitle>
             <Ban className="h-5 w-5 text-destructive" />
           </CardHeader>
           <CardContent>
@@ -182,7 +224,7 @@ export function DashboardView() {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockMonthlyCosts}>
+                <AreaChart data={monthlyCosts}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="month" className="text-xs" />
                   <YAxis tickFormatter={(value) => `${value / 1000}k`} className="text-xs" />
@@ -204,47 +246,49 @@ export function DashboardView() {
         </Card>
       </div>
 
-      {/* Rodízio */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Ban className="h-5 w-5 text-amber-500" />
-            Rodízio Municipal - São Paulo
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 rounded-lg bg-amber-50 p-4 dark:bg-amber-950/30">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-              {blockedEndings.length > 0 ? (
-                <>
-                  Hoje ({dayName}), veículos com placa final <strong>{blockedEndings.join(" e ")}</strong> não podem
-                  circular no horário de pico.
-                </>
-              ) : (
-                <>Hoje ({dayName}) não há restrição de rodízio.</>
-              )}
-            </p>
-          </div>
-
-          {vehiclesInRotation.length > 0 ? (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {vehiclesInRotation.map((vehicle) => (
-                <div key={vehicle.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <p className="font-medium">{vehicle.model}</p>
-                    <p className="text-sm text-muted-foreground">{vehicle.plate}</p>
-                  </div>
-                  <Badge variant="outline" className="border-amber-500 text-amber-600">
-                    Bloqueado
-                  </Badge>
-                </div>
-              ))}
+      {/* Rodízio - Only show for SP branch or All */}
+      {(selectedBranch === "São Paulo" || selectedBranch === "Todas") && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Ban className="h-5 w-5 text-amber-500" />
+              Rodízio Municipal - São Paulo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 rounded-lg bg-amber-50 p-4 dark:bg-amber-950/30">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                {blockedEndings.length > 0 ? (
+                  <>
+                    Hoje ({dayName}), veículos com placa final <strong>{blockedEndings.join(" e ")}</strong> não podem
+                    circular no horário de pico.
+                  </>
+                ) : (
+                  <>Hoje ({dayName}) não há restrição de rodízio.</>
+                )}
+              </p>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Nenhum veículo da frota está no rodízio hoje.</p>
-          )}
-        </CardContent>
-      </Card>
+
+            {vehiclesInRotation.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {vehiclesInRotation.map((vehicle) => (
+                  <div key={vehicle.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <p className="font-medium">{vehicle.model}</p>
+                      <p className="text-sm text-muted-foreground">{vehicle.plate}</p>
+                    </div>
+                    <Badge variant="outline" className="border-amber-500 text-amber-600">
+                      Bloqueado
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nenhum veículo da frota está no rodízio hoje.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

@@ -3,9 +3,12 @@
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Wrench, Calendar, Gauge, AlertCircle, Clock, CheckCircle } from "lucide-react"
-import { mockMaintenances, type Maintenance } from "@/lib/mock-data"
+import { Wrench, Calendar, Gauge, AlertCircle, Clock, CheckCircle, GitCompare } from "lucide-react"
+import { mockMaintenances, filterByBranch, type Maintenance } from "@/lib/mock-data"
+import { useApp } from "@/contexts/app-context"
+import { ComparisonPanel } from "@/components/comparison-panel"
 
 const statusConfig: Record<Maintenance["status"], { color: string; icon: typeof AlertCircle }> = {
   Urgente: {
@@ -24,19 +27,29 @@ const statusConfig: Record<Maintenance["status"], { color: string; icon: typeof 
 
 export function MaintenanceView() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const { selectedBranch, comparison, toggleComparison } = useApp()
 
-  const filteredMaintenances = mockMaintenances.filter((m) => statusFilter === "all" || m.status === statusFilter)
+  const branchFiltered = filterByBranch(mockMaintenances, selectedBranch)
+  const filteredMaintenances = branchFiltered.filter((m) => statusFilter === "all" || m.status === statusFilter)
 
-  const urgentCount = mockMaintenances.filter((m) => m.status === "Urgente").length
-  const scheduledCount = mockMaintenances.filter((m) => m.status === "Agendada").length
-  const completedCount = mockMaintenances.filter((m) => m.status === "Concluída").length
+  const urgentCount = branchFiltered.filter((m) => m.status === "Urgente").length
+  const scheduledCount = branchFiltered.filter((m) => m.status === "Agendada").length
+  const completedCount = branchFiltered.filter((m) => m.status === "Concluída").length
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Manutenção</h1>
-        <p className="text-muted-foreground">Acompanhe as manutenções programadas e histórico</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Manutenção</h1>
+          <p className="text-muted-foreground">Acompanhe as manutenções programadas e histórico</p>
+        </div>
+        <Button variant={comparison.isActive ? "default" : "outline"} onClick={toggleComparison} className="gap-2">
+          <GitCompare className="h-4 w-4" />
+          Comparação
+        </Button>
       </div>
+
+      <ComparisonPanel />
 
       {/* Resumo */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -113,6 +126,9 @@ export function MaintenanceView() {
                         <Badge className={config.color}>
                           <StatusIcon className="mr-1 h-3 w-3" />
                           {maintenance.status}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {maintenance.branch}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
