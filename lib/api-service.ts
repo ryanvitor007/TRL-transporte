@@ -154,3 +154,26 @@ export async function consultarVeiculoAPI(placa: string, cpfCnpj?: string): Prom
     uf: "SP",
   }
 }
+
+const API_URL = 'http://localhost:3001';
+
+// Função para buscar a lista de carros do banco
+export async function buscarFrotaAPI() {
+  const response = await fetch(`${API_URL}/vehicles`);
+  if (!response.ok) throw new Error('Erro ao buscar frota');
+  return response.json();
+}
+
+// Função para salvar o carro de verdade
+export async function salvarVeiculoAPI(dadosVeiculo: any) {
+  const response = await fetch(`${API_URL}/vehicles`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(dadosVeiculo),
+  });
+
+  if (!response.ok) throw new Error('Erro ao salvar veículo');
+  return response.json();
+}

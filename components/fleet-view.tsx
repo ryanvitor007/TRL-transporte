@@ -1,17 +1,40 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { consultarVeiculoAPI } from "@/lib/api-service"
-import { useToastNotification } from "@/contexts/toast-context"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState, useEffect } from "react";
+import {
+  consultarVeiculoAPI,
+  salvarVeiculoAPI,
+  buscarFrotaAPI,
+} from "@/lib/api-service";
+import { useToastNotification } from "@/contexts/toast-context";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus,
   Search,
@@ -25,39 +48,63 @@ import {
   XCircle,
   ExternalLink,
   Loader2,
-} from "lucide-react"
-import { mockVehicles, type Vehicle, getVehicleDocuments } from "@/lib/mock-data"
+} from "lucide-react";
+import {
+  mockVehicles,
+  type Vehicle,
+  getVehicleDocuments,
+} from "@/lib/mock-data";
 
 const statusColors: Record<Vehicle["status"], string> = {
   Ativo: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  "Em Oficina": "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  "Problema Documental": "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-}
+  "Em Oficina":
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  "Problema Documental":
+    "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+};
 
 interface NewVehicleForm {
-  placa: string
-  modelo: string
-  ano: string
-  quilometragem: string
-  status: string
-  renavam: string
-  chassi: string
-  cor: string
-  combustivel: string
+  placa: string;
+  modelo: string;
+  ano: string;
+  quilometragem: string;
+  status: string;
+  renavam: string;
+  chassi: string;
+  cor: string;
+  combustivel: string;
 }
 
 export function FleetView() {
-  const toast = useToastNotification()
+  const toast = useToastNotification();
+  const [loadingDetran, setLoadingDetran] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
 
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
-  const [isDocModalOpen, setIsDocModalOpen] = useState(false)
+  // MUDANÇA 1: Estado para guardar os veículos do banco (começa vazio)
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
-  const [searchPlate, setSearchPlate] = useState("")
-  const [isSearching, setIsSearching] = useState(false)
-  const [showForm, setShowForm] = useState(false)
+  // MUDANÇA 2: Efeito para carregar os dados assim que a tela abre
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
+    try {
+      const dados = await buscarFrotaAPI();
+      setVehicles(dados);
+    } catch (error) {
+      console.error("Erro ao carregar frota:", error);
+      toast.error("Erro", "Não foi possível carregar a lista de veículos.");
+    }
+  };
+
+  const [searchPlate, setSearchPlate] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [newVehicle, setNewVehicle] = useState<NewVehicleForm>({
     placa: "",
     modelo: "",
@@ -68,31 +115,35 @@ export function FleetView() {
     chassi: "",
     cor: "",
     combustivel: "",
-  })
+  });
 
   const filteredVehicles = mockVehicles.filter((vehicle) => {
     const matchesSearch =
       vehicle.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || vehicle.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+      vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || vehicle.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const handleVehicleClick = (vehicle: Vehicle) => {
-    setSelectedVehicle(vehicle)
-    setIsDocModalOpen(true)
-  }
+    setSelectedVehicle(vehicle);
+    setIsDocModalOpen(true);
+  };
 
   const handleBuscarVeiculo = async () => {
     if (!searchPlate.trim()) {
-      toast.error("Placa obrigatória", "Digite a placa do veículo para buscar.")
-      return
+      toast.error(
+        "Placa obrigatória",
+        "Digite a placa do veículo para buscar."
+      );
+      return;
     }
 
-    setIsSearching(true)
+    setIsSearching(true);
 
     try {
-      const dadosVeiculo = await consultarVeiculoAPI(searchPlate)
+      const dadosVeiculo = await consultarVeiculoAPI(searchPlate);
 
       // Preenche o formulário com os dados retornados
       setNewVehicle({
@@ -105,13 +156,19 @@ export function FleetView() {
         chassi: dadosVeiculo.chassi,
         cor: dadosVeiculo.cor,
         combustivel: dadosVeiculo.combustivel,
-      })
+      });
 
-      setShowForm(true)
-      toast.success("Veículo encontrado!", `Dados do ${dadosVeiculo.marca_modelo} carregados com sucesso.`)
+      setShowForm(true);
+      toast.success(
+        "Veículo encontrado!",
+        `Dados do ${dadosVeiculo.marca_modelo} carregados com sucesso.`
+      );
     } catch (error) {
-      console.error(error)
-      toast.error("Erro na busca", "Não foi possível encontrar o veículo. Preencha manualmente.")
+      console.error(error);
+      toast.error(
+        "Erro na busca",
+        "Não foi possível encontrar o veículo. Preencha manualmente."
+      );
       // Permite preencher manualmente em caso de erro
       setNewVehicle({
         placa: searchPlate,
@@ -123,31 +180,42 @@ export function FleetView() {
         chassi: "",
         cor: "",
         combustivel: "",
-      })
-      setShowForm(true)
+      });
+      setShowForm(true);
     } finally {
-      setIsSearching(false)
+      setIsSearching(false);
     }
-  }
+  };
+const handleConfirmarVeiculo = async () => {
+    try {
+      // Monta o objeto com os dados do formulário
+      const novoCarro = {
+        placa: formData.placa, // (Use as variáveis do seu formulário)
+        modelo: formData.modelo,
+        ano: Number(formData.ano),
+        km_atual: Number(formData.km_atual) || 0,
+        renavam: formData.renavam || "",
+        status: "Ativo"
+      };
 
-  const handleConfirmarVeiculo = () => {
-    if (!newVehicle.modelo || !newVehicle.placa) {
-      toast.error("Campos obrigatórios", "Modelo e Placa são obrigatórios.")
-      return
+      // 1. Salva no Banco de Dados
+      await salvarVeiculoAPI(novoCarro);
+
+      // 2. Atualiza a lista na tela sem precisar dar F5
+      await carregarDados();
+
+      toast.success("Sucesso", "Veículo salvo no banco de dados!");
+      setIsOpen(false); // Fecha o modal
+      
+    } catch (error) {
+      toast.error("Erro", "Falha ao salvar o veículo.");
     }
-
-    // Aqui seria a chamada para salvar no banco de dados
-    // Por enquanto, apenas exibe uma mensagem de sucesso
-    toast.success("Veículo adicionado!", `${newVehicle.modelo} foi cadastrado com sucesso.`)
-
-    // Reseta o formulário e fecha o modal
-    handleCloseModal()
-  }
+  };
 
   const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setShowForm(false)
-    setSearchPlate("")
+    setIsModalOpen(false);
+    setShowForm(false);
+    setSearchPlate("");
     setNewVehicle({
       placa: "",
       modelo: "",
@@ -158,10 +226,12 @@ export function FleetView() {
       chassi: "",
       cor: "",
       combustivel: "",
-    })
-  }
+    });
+  };
 
-  const vehicleDocuments = selectedVehicle ? getVehicleDocuments(selectedVehicle.id) : null
+  const vehicleDocuments = selectedVehicle
+    ? getVehicleDocuments(selectedVehicle.id)
+    : null;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -173,7 +243,7 @@ export function FleetView() {
             <CheckCircle2 className="mr-1 h-3 w-3" />
             {status}
           </Badge>
-        )
+        );
       case "Pendente":
       case "Vencendo":
       case "Parcelado":
@@ -182,31 +252,35 @@ export function FleetView() {
             <AlertTriangle className="mr-1 h-3 w-3" />
             {status}
           </Badge>
-        )
+        );
       case "Vencido":
         return (
           <Badge className="bg-red-100 text-red-800">
             <XCircle className="mr-1 h-3 w-3" />
             {status}
           </Badge>
-        )
+        );
       default:
-        return <Badge>{status}</Badge>
+        return <Badge>{status}</Badge>;
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Inventário da Frota</h1>
-          <p className="text-muted-foreground">Gerencie todos os veículos da sua frota</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            Inventário da Frota
+          </h1>
+          <p className="text-muted-foreground">
+            Gerencie todos os veículos da sua frota
+          </p>
         </div>
         <Dialog
           open={isModalOpen}
           onOpenChange={(open) => {
-            if (!open) handleCloseModal()
-            else setIsModalOpen(true)
+            if (!open) handleCloseModal();
+            else setIsModalOpen(true);
           }}
         >
           <DialogTrigger asChild>
@@ -215,9 +289,15 @@ export function FleetView() {
               Adicionar Veículo
             </Button>
           </DialogTrigger>
-          <DialogContent className={showForm ? "sm:max-w-[600px]" : "sm:max-w-[425px]"}>
+          <DialogContent
+            className={showForm ? "sm:max-w-[600px]" : "sm:max-w-[425px]"}
+          >
             <DialogHeader>
-              <DialogTitle>{showForm ? "Confirmar Dados do Veículo" : "Adicionar Novo Veículo"}</DialogTitle>
+              <DialogTitle>
+                {showForm
+                  ? "Confirmar Dados do Veículo"
+                  : "Adicionar Novo Veículo"}
+              </DialogTitle>
             </DialogHeader>
 
             {!showForm ? (
@@ -229,13 +309,16 @@ export function FleetView() {
                     id="searchPlate"
                     placeholder="Ex: ABC-1234 ou ABC1D23"
                     value={searchPlate}
-                    onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
+                    onChange={(e) =>
+                      setSearchPlate(e.target.value.toUpperCase())
+                    }
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") handleBuscarVeiculo()
+                      if (e.key === "Enter") handleBuscarVeiculo();
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Digite a placa para buscar automaticamente os dados do veículo no DETRAN
+                    Digite a placa para buscar automaticamente os dados do
+                    veículo no DETRAN
                   </p>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -266,7 +349,9 @@ export function FleetView() {
                     <Input
                       id="placa"
                       value={newVehicle.placa}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, placa: e.target.value })}
+                      onChange={(e) =>
+                        setNewVehicle({ ...newVehicle, placa: e.target.value })
+                      }
                     />
                   </div>
                   <div className="grid gap-2">
@@ -274,7 +359,9 @@ export function FleetView() {
                     <Input
                       id="modelo"
                       value={newVehicle.modelo}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, modelo: e.target.value })}
+                      onChange={(e) =>
+                        setNewVehicle({ ...newVehicle, modelo: e.target.value })
+                      }
                     />
                   </div>
                 </div>
@@ -286,7 +373,9 @@ export function FleetView() {
                       id="ano"
                       type="number"
                       value={newVehicle.ano}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, ano: e.target.value })}
+                      onChange={(e) =>
+                        setNewVehicle({ ...newVehicle, ano: e.target.value })
+                      }
                     />
                   </div>
                   <div className="grid gap-2">
@@ -294,7 +383,9 @@ export function FleetView() {
                     <Input
                       id="cor"
                       value={newVehicle.cor}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, cor: e.target.value })}
+                      onChange={(e) =>
+                        setNewVehicle({ ...newVehicle, cor: e.target.value })
+                      }
                     />
                   </div>
                   <div className="grid gap-2">
@@ -302,7 +393,12 @@ export function FleetView() {
                     <Input
                       id="combustivel"
                       value={newVehicle.combustivel}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, combustivel: e.target.value })}
+                      onChange={(e) =>
+                        setNewVehicle({
+                          ...newVehicle,
+                          combustivel: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
@@ -313,7 +409,12 @@ export function FleetView() {
                     <Input
                       id="renavam"
                       value={newVehicle.renavam}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, renavam: e.target.value })}
+                      onChange={(e) =>
+                        setNewVehicle({
+                          ...newVehicle,
+                          renavam: e.target.value,
+                        })
+                      }
                       className="font-mono"
                     />
                   </div>
@@ -322,7 +423,9 @@ export function FleetView() {
                     <Input
                       id="chassi"
                       value={newVehicle.chassi}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, chassi: e.target.value })}
+                      onChange={(e) =>
+                        setNewVehicle({ ...newVehicle, chassi: e.target.value })
+                      }
                       className="font-mono text-sm"
                     />
                   </div>
@@ -335,14 +438,21 @@ export function FleetView() {
                       id="quilometragem"
                       type="number"
                       value={newVehicle.quilometragem}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, quilometragem: e.target.value })}
+                      onChange={(e) =>
+                        setNewVehicle({
+                          ...newVehicle,
+                          quilometragem: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="status">Status</Label>
                     <Select
                       value={newVehicle.status}
-                      onValueChange={(value) => setNewVehicle({ ...newVehicle, status: value })}
+                      onValueChange={(value) =>
+                        setNewVehicle({ ...newVehicle, status: value })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o status" />
@@ -350,7 +460,9 @@ export function FleetView() {
                       <SelectContent>
                         <SelectItem value="Ativo">Ativo</SelectItem>
                         <SelectItem value="Em Oficina">Em Oficina</SelectItem>
-                        <SelectItem value="Problema Documental">Problema Documental</SelectItem>
+                        <SelectItem value="Problema Documental">
+                          Problema Documental
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -360,7 +472,10 @@ export function FleetView() {
                   <Button variant="outline" onClick={() => setShowForm(false)}>
                     Voltar
                   </Button>
-                  <Button onClick={handleConfirmarVeiculo} className="bg-green-600 hover:bg-green-700">
+                  <Button
+                    onClick={handleConfirmarVeiculo}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Confirmar e Adicionar Veículo
                   </Button>
@@ -392,7 +507,9 @@ export function FleetView() {
                 <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="Ativo">Ativo</SelectItem>
                 <SelectItem value="Em Oficina">Em Oficina</SelectItem>
-                <SelectItem value="Problema Documental">Problema Documental</SelectItem>
+                <SelectItem value="Problema Documental">
+                  Problema Documental
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -427,14 +544,24 @@ export function FleetView() {
                     className="cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleVehicleClick(vehicle)}
                   >
-                    <TableCell className="font-medium">{vehicle.model}</TableCell>
+                    <TableCell className="font-medium">
+                      {vehicle.model}
+                    </TableCell>
                     <TableCell>{vehicle.plate}</TableCell>
                     <TableCell>{vehicle.year}</TableCell>
-                    <TableCell>{vehicle.mileage.toLocaleString("pt-BR")} km</TableCell>
                     <TableCell>
-                      <Badge className={statusColors[vehicle.status]}>{vehicle.status}</Badge>
+                      {vehicle.mileage.toLocaleString("pt-BR")} km
                     </TableCell>
-                    <TableCell>{new Date(vehicle.nextMaintenance).toLocaleDateString("pt-BR")}</TableCell>
+                    <TableCell>
+                      <Badge className={statusColors[vehicle.status]}>
+                        {vehicle.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(vehicle.nextMaintenance).toLocaleDateString(
+                        "pt-BR"
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -457,7 +584,8 @@ export function FleetView() {
                     {selectedVehicle?.model} - {selectedVehicle?.plate}
                   </DialogTitle>
                   <p className="text-sm text-muted-foreground">
-                    Ano {selectedVehicle?.year} • {selectedVehicle?.mileage.toLocaleString("pt-BR")} km
+                    Ano {selectedVehicle?.year} •{" "}
+                    {selectedVehicle?.mileage.toLocaleString("pt-BR")} km
                   </p>
                 </div>
               </div>
@@ -488,22 +616,38 @@ export function FleetView() {
                       <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="text-sm text-muted-foreground">RENAVAM</p>
-                            <p className="font-mono font-medium">{vehicleDocuments.renavam}</p>
+                            <p className="text-sm text-muted-foreground">
+                              RENAVAM
+                            </p>
+                            <p className="font-mono font-medium">
+                              {vehicleDocuments.renavam}
+                            </p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Chassi</p>
-                            <p className="font-mono font-medium text-sm">{vehicleDocuments.chassi}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Chassi
+                            </p>
+                            <p className="font-mono font-medium text-sm">
+                              {vehicleDocuments.chassi}
+                            </p>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="text-sm text-muted-foreground">Placa</p>
-                            <p className="font-medium">{vehicleDocuments.vehiclePlate}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Placa
+                            </p>
+                            <p className="font-medium">
+                              {vehicleDocuments.vehiclePlate}
+                            </p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">CRLV</p>
-                            <p className="font-mono font-medium">{vehicleDocuments.crlv}</p>
+                            <p className="text-sm text-muted-foreground">
+                              CRLV
+                            </p>
+                            <p className="font-mono font-medium">
+                              {vehicleDocuments.crlv}
+                            </p>
                           </div>
                         </div>
                       </CardContent>
@@ -511,7 +655,9 @@ export function FleetView() {
 
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-lg">Resumo de Status</CardTitle>
+                        <CardTitle className="text-lg">
+                          Resumo de Status
+                        </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex items-center justify-between">
@@ -520,7 +666,9 @@ export function FleetView() {
                         </div>
                         <div className="flex items-center justify-between">
                           <span>Licenciamento</span>
-                          {getStatusBadge(vehicleDocuments.licenciamento.status)}
+                          {getStatusBadge(
+                            vehicleDocuments.licenciamento.status
+                          )}
                         </div>
                         <div className="flex items-center justify-between">
                           <span>Seguro</span>
@@ -557,30 +705,51 @@ export function FleetView() {
                     <CardContent>
                       <div className="grid gap-6 md:grid-cols-3">
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Valor Total</p>
+                          <p className="text-sm text-muted-foreground">
+                            Valor Total
+                          </p>
                           <p className="text-2xl font-bold text-primary">
-                            R$ {vehicleDocuments.ipva.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            R${" "}
+                            {vehicleDocuments.ipva.valor.toLocaleString(
+                              "pt-BR",
+                              { minimumFractionDigits: 2 }
+                            )}
                           </p>
                         </div>
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Status</p>
-                          <div>{getStatusBadge(vehicleDocuments.ipva.status)}</div>
+                          <p className="text-sm text-muted-foreground">
+                            Status
+                          </p>
+                          <div>
+                            {getStatusBadge(vehicleDocuments.ipva.status)}
+                          </div>
                         </div>
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Vencimento</p>
+                          <p className="text-sm text-muted-foreground">
+                            Vencimento
+                          </p>
                           <p className="font-medium">
-                            {new Date(vehicleDocuments.ipva.vencimento).toLocaleDateString("pt-BR")}
+                            {new Date(
+                              vehicleDocuments.ipva.vencimento
+                            ).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
                       </div>
                       <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Parcelas</p>
+                        <p className="text-sm text-muted-foreground">
+                          Parcelas
+                        </p>
                         <p className="font-medium">
-                          {vehicleDocuments.ipva.parcelasPagas} de {vehicleDocuments.ipva.parcelas} pagas
+                          {vehicleDocuments.ipva.parcelasPagas} de{" "}
+                          {vehicleDocuments.ipva.parcelas} pagas
                         </p>
                       </div>
                       <div className="mt-4">
-                        <Button variant="outline" className="w-full bg-transparent" asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full bg-transparent"
+                          asChild
+                        >
                           <a
                             href="https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/pagamentoIPVA"
                             target="_blank"
@@ -607,32 +776,58 @@ export function FleetView() {
                     <CardContent>
                       <div className="grid gap-6 md:grid-cols-3">
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Número CRLV</p>
-                          <p className="font-mono text-lg font-medium">{vehicleDocuments.crlv}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Número CRLV
+                          </p>
+                          <p className="font-mono text-lg font-medium">
+                            {vehicleDocuments.crlv}
+                          </p>
                         </div>
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Status</p>
-                          <div>{getStatusBadge(vehicleDocuments.licenciamento.status)}</div>
+                          <p className="text-sm text-muted-foreground">
+                            Status
+                          </p>
+                          <div>
+                            {getStatusBadge(
+                              vehicleDocuments.licenciamento.status
+                            )}
+                          </div>
                         </div>
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Validade</p>
+                          <p className="text-sm text-muted-foreground">
+                            Validade
+                          </p>
                           <p className="font-medium">
-                            {new Date(vehicleDocuments.licenciamento.vencimento).toLocaleDateString("pt-BR")}
+                            {new Date(
+                              vehicleDocuments.licenciamento.vencimento
+                            ).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
                       </div>
                       <div className="mt-6 grid gap-4 md:grid-cols-2">
                         <div className="p-4 bg-muted/50 rounded-lg">
-                          <p className="text-sm text-muted-foreground">RENAVAM</p>
-                          <p className="font-mono font-medium">{vehicleDocuments.renavam}</p>
+                          <p className="text-sm text-muted-foreground">
+                            RENAVAM
+                          </p>
+                          <p className="font-mono font-medium">
+                            {vehicleDocuments.renavam}
+                          </p>
                         </div>
                         <div className="p-4 bg-muted/50 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Chassi</p>
-                          <p className="font-mono font-medium text-sm">{vehicleDocuments.chassi}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Chassi
+                          </p>
+                          <p className="font-mono font-medium text-sm">
+                            {vehicleDocuments.chassi}
+                          </p>
                         </div>
                       </div>
                       <div className="mt-4">
-                        <Button variant="outline" className="w-full bg-transparent" asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full bg-transparent"
+                          asChild
+                        >
                           <a
                             href="https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/licenciamentoAnual"
                             target="_blank"
@@ -659,34 +854,58 @@ export function FleetView() {
                     <CardContent>
                       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Seguradora</p>
-                          <p className="font-medium text-lg">{vehicleDocuments.seguro.seguradora}</p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Apólice</p>
-                          <p className="font-mono font-medium">{vehicleDocuments.seguro.apolice}</p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Cobertura</p>
-                          <p className="font-medium">
-                            R${" "}
-                            {vehicleDocuments.seguro.cobertura.toLocaleString("pt-BR", {
-                              minimumFractionDigits: 2,
-                            })}
+                          <p className="text-sm text-muted-foreground">
+                            Seguradora
+                          </p>
+                          <p className="font-medium text-lg">
+                            {vehicleDocuments.seguro.seguradora}
                           </p>
                         </div>
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Status</p>
-                          <div>{getStatusBadge(vehicleDocuments.seguro.status)}</div>
+                          <p className="text-sm text-muted-foreground">
+                            Apólice
+                          </p>
+                          <p className="font-mono font-medium">
+                            {vehicleDocuments.seguro.apolice}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            Cobertura
+                          </p>
+                          <p className="font-medium">
+                            R${" "}
+                            {vehicleDocuments.seguro.cobertura.toLocaleString(
+                              "pt-BR",
+                              {
+                                minimumFractionDigits: 2,
+                              }
+                            )}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            Status
+                          </p>
+                          <div>
+                            {getStatusBadge(vehicleDocuments.seguro.status)}
+                          </div>
                         </div>
                       </div>
                       <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="text-sm text-muted-foreground">Vigência</p>
+                            <p className="text-sm text-muted-foreground">
+                              Vigência
+                            </p>
                             <p className="font-medium">
-                              {new Date(vehicleDocuments.seguro.vigenciaInicio).toLocaleDateString("pt-BR")} até{" "}
-                              {new Date(vehicleDocuments.seguro.vigenciaFim).toLocaleDateString("pt-BR")}
+                              {new Date(
+                                vehicleDocuments.seguro.vigenciaInicio
+                              ).toLocaleDateString("pt-BR")}{" "}
+                              até{" "}
+                              {new Date(
+                                vehicleDocuments.seguro.vigenciaFim
+                              ).toLocaleDateString("pt-BR")}
                             </p>
                           </div>
                         </div>
@@ -709,37 +928,63 @@ export function FleetView() {
                         <>
                           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                             <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Número da Tag</p>
-                              <p className="font-mono text-lg font-medium">{vehicleDocuments.semParar.tag}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Número da Tag
+                              </p>
+                              <p className="font-mono text-lg font-medium">
+                                {vehicleDocuments.semParar.tag}
+                              </p>
                             </div>
                             <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Saldo Atual</p>
+                              <p className="text-sm text-muted-foreground">
+                                Saldo Atual
+                              </p>
                               <p className="text-2xl font-bold text-green-600">
                                 R${" "}
-                                {vehicleDocuments.semParar.saldo.toLocaleString("pt-BR", {
-                                  minimumFractionDigits: 2,
-                                })}
+                                {vehicleDocuments.semParar.saldo.toLocaleString(
+                                  "pt-BR",
+                                  {
+                                    minimumFractionDigits: 2,
+                                  }
+                                )}
                               </p>
                             </div>
                             <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Gasto Médio/Mês</p>
+                              <p className="text-sm text-muted-foreground">
+                                Gasto Médio/Mês
+                              </p>
                               <p className="font-medium">
                                 R${" "}
-                                {vehicleDocuments.semParar.mediaMensal.toLocaleString("pt-BR", {
-                                  minimumFractionDigits: 2,
-                                })}
+                                {vehicleDocuments.semParar.mediaMensal.toLocaleString(
+                                  "pt-BR",
+                                  {
+                                    minimumFractionDigits: 2,
+                                  }
+                                )}
                               </p>
                             </div>
                             <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Último Uso</p>
+                              <p className="text-sm text-muted-foreground">
+                                Último Uso
+                              </p>
                               <p className="font-medium">
-                                {new Date(vehicleDocuments.semParar.ultimoUso).toLocaleDateString("pt-BR")}
+                                {new Date(
+                                  vehicleDocuments.semParar.ultimoUso
+                                ).toLocaleDateString("pt-BR")}
                               </p>
                             </div>
                           </div>
                           <div className="mt-4">
-                            <Button variant="outline" className="w-full bg-transparent" asChild>
-                              <a href="https://www.semparar.com.br" target="_blank" rel="noopener noreferrer">
+                            <Button
+                              variant="outline"
+                              className="w-full bg-transparent"
+                              asChild
+                            >
+                              <a
+                                href="https://www.semparar.com.br"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 <ExternalLink className="mr-2 h-4 w-4" />
                                 Acessar Portal Sem Parar
                               </a>
@@ -749,9 +994,19 @@ export function FleetView() {
                       ) : (
                         <div className="text-center py-8">
                           <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                          <p className="text-muted-foreground">Este veículo não possui tag Sem Parar ativa</p>
-                          <Button className="mt-4 bg-transparent" variant="outline" asChild>
-                            <a href="https://www.semparar.com.br" target="_blank" rel="noopener noreferrer">
+                          <p className="text-muted-foreground">
+                            Este veículo não possui tag Sem Parar ativa
+                          </p>
+                          <Button
+                            className="mt-4 bg-transparent"
+                            variant="outline"
+                            asChild
+                          >
+                            <a
+                              href="https://www.semparar.com.br"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               Contratar Sem Parar
                             </a>
                           </Button>
@@ -766,5 +1021,5 @@ export function FleetView() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
