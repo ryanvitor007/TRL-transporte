@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { consultarVeiculoAPI } from '@/lib/api-service'; 
-import { useToastNotification } from '@/contexts/toast-context';
+import { consultarVeiculoAPI } from "@/lib/api-service"
+import { useToastNotification } from "@/contexts/toast-context"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   XCircle,
   ExternalLink,
+  Loader2,
 } from "lucide-react"
 import { mockVehicles, type Vehicle, getVehicleDocuments } from "@/lib/mock-data"
 
@@ -33,36 +34,41 @@ const statusColors: Record<Vehicle["status"], string> = {
   "Problema Documental": "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 }
 
+interface NewVehicleForm {
+  placa: string
+  modelo: string
+  ano: string
+  quilometragem: string
+  status: string
+  renavam: string
+  chassi: string
+  cor: string
+  combustivel: string
+}
+
 export function FleetView() {
-  
-  const toast = useToastNotification(); 
-  const [loadingDetran, setLoadingDetran] = useState(false);
-
-  const handleSincronizarDetran = async (placa: string) => {
-    setLoadingDetran(true);
-    // toast.info removido pois seu sistema só suporta success/error por enquanto
-
-    try {
-      const dadosReais = await consultarVeiculoAPI(placa, '12345678900'); 
-      console.log("Dados Recebidos:", dadosReais);
-
-      // 2. Uso correto: toast.success("Título", "Descrição")
-      toast.success("Veículo Atualizado", `Os dados do ${dadosReais.marca_modelo} foram sincronizados.`);
-      
-    } catch (error) {
-      console.error(error);
-      // 3. Uso correto: toast.error("Título")
-      toast.error("Erro na Conexão", "Não foi possível conectar ao Detran.");
-    } finally {
-      setLoadingDetran(false);
-    }
-  };
+  const toast = useToastNotification()
 
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
   const [isDocModalOpen, setIsDocModalOpen] = useState(false)
+
+  const [searchPlate, setSearchPlate] = useState("")
+  const [isSearching, setIsSearching] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [newVehicle, setNewVehicle] = useState<NewVehicleForm>({
+    placa: "",
+    modelo: "",
+    ano: "",
+    quilometragem: "",
+    status: "Ativo",
+    renavam: "",
+    chassi: "",
+    cor: "",
+    combustivel: "",
+  })
 
   const filteredVehicles = mockVehicles.filter((vehicle) => {
     const matchesSearch =
@@ -75,6 +81,84 @@ export function FleetView() {
   const handleVehicleClick = (vehicle: Vehicle) => {
     setSelectedVehicle(vehicle)
     setIsDocModalOpen(true)
+  }
+
+  const handleBuscarVeiculo = async () => {
+    if (!searchPlate.trim()) {
+      toast.error("Placa obrigatória", "Digite a placa do veículo para buscar.")
+      return
+    }
+
+    setIsSearching(true)
+
+    try {
+      const dadosVeiculo = await consultarVeiculoAPI(searchPlate)
+
+      // Preenche o formulário com os dados retornados
+      setNewVehicle({
+        placa: dadosVeiculo.placa,
+        modelo: dadosVeiculo.marca_modelo,
+        ano: String(dadosVeiculo.ano_modelo),
+        quilometragem: "0",
+        status: "Ativo",
+        renavam: dadosVeiculo.renavam,
+        chassi: dadosVeiculo.chassi,
+        cor: dadosVeiculo.cor,
+        combustivel: dadosVeiculo.combustivel,
+      })
+
+      setShowForm(true)
+      toast.success("Veículo encontrado!", `Dados do ${dadosVeiculo.marca_modelo} carregados com sucesso.`)
+    } catch (error) {
+      console.error(error)
+      toast.error("Erro na busca", "Não foi possível encontrar o veículo. Preencha manualmente.")
+      // Permite preencher manualmente em caso de erro
+      setNewVehicle({
+        placa: searchPlate,
+        modelo: "",
+        ano: "",
+        quilometragem: "0",
+        status: "Ativo",
+        renavam: "",
+        chassi: "",
+        cor: "",
+        combustivel: "",
+      })
+      setShowForm(true)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleConfirmarVeiculo = () => {
+    if (!newVehicle.modelo || !newVehicle.placa) {
+      toast.error("Campos obrigatórios", "Modelo e Placa são obrigatórios.")
+      return
+    }
+
+    // Aqui seria a chamada para salvar no banco de dados
+    // Por enquanto, apenas exibe uma mensagem de sucesso
+    toast.success("Veículo adicionado!", `${newVehicle.modelo} foi cadastrado com sucesso.`)
+
+    // Reseta o formulário e fecha o modal
+    handleCloseModal()
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setShowForm(false)
+    setSearchPlate("")
+    setNewVehicle({
+      placa: "",
+      modelo: "",
+      ano: "",
+      quilometragem: "",
+      status: "Ativo",
+      renavam: "",
+      chassi: "",
+      cor: "",
+      combustivel: "",
+    })
   }
 
   const vehicleDocuments = selectedVehicle ? getVehicleDocuments(selectedVehicle.id) : null
@@ -118,56 +202,171 @@ export function FleetView() {
           <h1 className="text-2xl font-bold text-foreground">Inventário da Frota</h1>
           <p className="text-muted-foreground">Gerencie todos os veículos da sua frota</p>
         </div>
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <Dialog
+          open={isModalOpen}
+          onOpenChange={(open) => {
+            if (!open) handleCloseModal()
+            else setIsModalOpen(true)
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Adicionar Veículo
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className={showForm ? "sm:max-w-[600px]" : "sm:max-w-[425px]"}>
             <DialogHeader>
-              <DialogTitle>Adicionar Novo Veículo</DialogTitle>
+              <DialogTitle>{showForm ? "Confirmar Dados do Veículo" : "Adicionar Novo Veículo"}</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="model">Modelo</Label>
-                <Input id="model" placeholder="Ex: Volvo FH 540" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="plate">Placa</Label>
-                <Input id="plate" placeholder="Ex: ABC-1234" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+
+            {!showForm ? (
+              // Estado inicial: apenas campo de busca
+              <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="year">Ano</Label>
-                  <Input id="year" type="number" placeholder="2024" />
+                  <Label htmlFor="searchPlate">Placa do Veículo</Label>
+                  <Input
+                    id="searchPlate"
+                    placeholder="Ex: ABC-1234 ou ABC1D23"
+                    value={searchPlate}
+                    onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleBuscarVeiculo()
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Digite a placa para buscar automaticamente os dados do veículo no DETRAN
+                  </p>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="mileage">Quilometragem</Label>
-                  <Input id="mileage" type="number" placeholder="0" />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={handleCloseModal}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleBuscarVeiculo} disabled={isSearching}>
+                    {isSearching ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Buscando...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        Buscar Dados
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Ativo">Ativo</SelectItem>
-                    <SelectItem value="Em Oficina">Em Oficina</SelectItem>
-                    <SelectItem value="Problema Documental">Problema Documental</SelectItem>
-                  </SelectContent>
-                </Select>
+            ) : (
+              // Estado após busca: formulário preenchido
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="placa">Placa</Label>
+                    <Input
+                      id="placa"
+                      value={newVehicle.placa}
+                      onChange={(e) => setNewVehicle({ ...newVehicle, placa: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="modelo">Modelo</Label>
+                    <Input
+                      id="modelo"
+                      value={newVehicle.modelo}
+                      onChange={(e) => setNewVehicle({ ...newVehicle, modelo: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="ano">Ano</Label>
+                    <Input
+                      id="ano"
+                      type="number"
+                      value={newVehicle.ano}
+                      onChange={(e) => setNewVehicle({ ...newVehicle, ano: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="cor">Cor</Label>
+                    <Input
+                      id="cor"
+                      value={newVehicle.cor}
+                      onChange={(e) => setNewVehicle({ ...newVehicle, cor: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="combustivel">Combustível</Label>
+                    <Input
+                      id="combustivel"
+                      value={newVehicle.combustivel}
+                      onChange={(e) => setNewVehicle({ ...newVehicle, combustivel: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="renavam">RENAVAM</Label>
+                    <Input
+                      id="renavam"
+                      value={newVehicle.renavam}
+                      onChange={(e) => setNewVehicle({ ...newVehicle, renavam: e.target.value })}
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="chassi">Chassi</Label>
+                    <Input
+                      id="chassi"
+                      value={newVehicle.chassi}
+                      onChange={(e) => setNewVehicle({ ...newVehicle, chassi: e.target.value })}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="quilometragem">Quilometragem</Label>
+                    <Input
+                      id="quilometragem"
+                      type="number"
+                      value={newVehicle.quilometragem}
+                      onChange={(e) => setNewVehicle({ ...newVehicle, quilometragem: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={newVehicle.status}
+                      onValueChange={(value) => setNewVehicle({ ...newVehicle, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Ativo">Ativo</SelectItem>
+                        <SelectItem value="Em Oficina">Em Oficina</SelectItem>
+                        <SelectItem value="Problema Documental">Problema Documental</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setShowForm(false)}>
+                    Voltar
+                  </Button>
+                  <Button onClick={handleConfirmarVeiculo} className="bg-green-600 hover:bg-green-700">
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Confirmar e Adicionar Veículo
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={() => setIsModalOpen(false)}>Salvar</Button>
-            </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -244,6 +443,7 @@ export function FleetView() {
         </CardContent>
       </Card>
 
+      {/* Modal de Documentos do Veículo - mantido igual */}
       <Dialog open={isDocModalOpen} onOpenChange={setIsDocModalOpen}>
         <DialogContent className="max-w-[85vw] h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0 border-b pb-4">
@@ -467,22 +667,29 @@ export function FleetView() {
                           <p className="font-mono font-medium">{vehicleDocuments.seguro.apolice}</p>
                         </div>
                         <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Cobertura</p>
+                          <p className="font-medium">
+                            R${" "}
+                            {vehicleDocuments.seguro.cobertura.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">Status</p>
                           <div>{getStatusBadge(vehicleDocuments.seguro.status)}</div>
                         </div>
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Valor de Cobertura</p>
-                          <p className="text-xl font-bold text-green-600">
-                            R$ {vehicleDocuments.seguro.cobertura.toLocaleString("pt-BR")}
-                          </p>
-                        </div>
                       </div>
-                      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm text-blue-800">
-                          <Shield className="inline mr-2 h-4 w-4" />
-                          Vigência: {new Date(vehicleDocuments.seguro.vigenciaInicio).toLocaleDateString("pt-BR")} até{" "}
-                          {new Date(vehicleDocuments.seguro.vigenciaFim).toLocaleDateString("pt-BR")}
-                        </p>
+                      <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Vigência</p>
+                            <p className="font-medium">
+                              {new Date(vehicleDocuments.seguro.vigenciaInicio).toLocaleDateString("pt-BR")} até{" "}
+                              {new Date(vehicleDocuments.seguro.vigenciaFim).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -494,62 +701,62 @@ export function FleetView() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <CreditCard className="h-5 w-5 text-primary" />
-                        Sem Parar
+                        Sem Parar / Tag de Pedágio
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Tag</p>
-                          <p className="font-mono font-medium">{vehicleDocuments.semParar.tag}</p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Saldo Atual</p>
-                          <p className="text-2xl font-bold text-primary">
-                            R$ {vehicleDocuments.semParar.saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Média Mensal</p>
-                          <p className="font-medium">
-                            R${" "}
-                            {vehicleDocuments.semParar.mediaGastoMensal.toLocaleString("pt-BR", {
-                              minimumFractionDigits: 2,
-                            })}
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Último Uso</p>
-                          <p className="font-medium">
-                            {new Date(vehicleDocuments.semParar.ultimoUso).toLocaleDateString("pt-BR")}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-6">
-                        {vehicleDocuments.semParar.ativo ? (
-                          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                            <p className="text-sm text-green-800">
-                              <CheckCircle2 className="inline mr-2 h-4 w-4" />
-                              Tag ativa e funcionando normalmente
-                            </p>
+                      {vehicleDocuments.semParar.ativo ? (
+                        <>
+                          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                            <div className="space-y-2">
+                              <p className="text-sm text-muted-foreground">Número da Tag</p>
+                              <p className="font-mono text-lg font-medium">{vehicleDocuments.semParar.tag}</p>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-sm text-muted-foreground">Saldo Atual</p>
+                              <p className="text-2xl font-bold text-green-600">
+                                R${" "}
+                                {vehicleDocuments.semParar.saldo.toLocaleString("pt-BR", {
+                                  minimumFractionDigits: 2,
+                                })}
+                              </p>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-sm text-muted-foreground">Gasto Médio/Mês</p>
+                              <p className="font-medium">
+                                R${" "}
+                                {vehicleDocuments.semParar.mediaMensal.toLocaleString("pt-BR", {
+                                  minimumFractionDigits: 2,
+                                })}
+                              </p>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-sm text-muted-foreground">Último Uso</p>
+                              <p className="font-medium">
+                                {new Date(vehicleDocuments.semParar.ultimoUso).toLocaleDateString("pt-BR")}
+                              </p>
+                            </div>
                           </div>
-                        ) : (
-                          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                            <p className="text-sm text-red-800">
-                              <XCircle className="inline mr-2 h-4 w-4" />
-                              Tag inativa - verifique o saldo ou entre em contato com o suporte
-                            </p>
+                          <div className="mt-4">
+                            <Button variant="outline" className="w-full bg-transparent" asChild>
+                              <a href="https://www.semparar.com.br" target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                Acessar Portal Sem Parar
+                              </a>
+                            </Button>
                           </div>
-                        )}
-                      </div>
-                      <div className="mt-4">
-                        <Button variant="outline" className="w-full bg-transparent" asChild>
-                          <a href="https://www.semparar.com.br" target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="mr-2 h-4 w-4" />
-                            Acessar Portal Sem Parar
-                          </a>
-                        </Button>
-                      </div>
+                        </>
+                      ) : (
+                        <div className="text-center py-8">
+                          <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                          <p className="text-muted-foreground">Este veículo não possui tag Sem Parar ativa</p>
+                          <Button className="mt-4 bg-transparent" variant="outline" asChild>
+                            <a href="https://www.semparar.com.br" target="_blank" rel="noopener noreferrer">
+                              Contratar Sem Parar
+                            </a>
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
