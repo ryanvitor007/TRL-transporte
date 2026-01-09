@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { consultarVeiculoAPI } from '@/lib/api-service'; 
-import { useToast } from '@/contexts/toast-context'; 
+import { useToastNotification } from '@/contexts/toast-context';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +34,30 @@ const statusColors: Record<Vehicle["status"], string> = {
 }
 
 export function FleetView() {
+  
+  const toast = useToastNotification(); 
+  const [loadingDetran, setLoadingDetran] = useState(false);
+
+  const handleSincronizarDetran = async (placa: string) => {
+    setLoadingDetran(true);
+    // toast.info removido pois seu sistema só suporta success/error por enquanto
+
+    try {
+      const dadosReais = await consultarVeiculoAPI(placa, '12345678900'); 
+      console.log("Dados Recebidos:", dadosReais);
+
+      // 2. Uso correto: toast.success("Título", "Descrição")
+      toast.success("Veículo Atualizado", `Os dados do ${dadosReais.marca_modelo} foram sincronizados.`);
+      
+    } catch (error) {
+      console.error(error);
+      // 3. Uso correto: toast.error("Título")
+      toast.error("Erro na Conexão", "Não foi possível conectar ao Detran.");
+    } finally {
+      setLoadingDetran(false);
+    }
+  };
+
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -86,35 +110,6 @@ export function FleetView() {
         return <Badge>{status}</Badge>
     }
   }
-
-  export function FleetView() {
-  const { toast } = useToast(); // Hook de notificação
-  const [loadingDetran, setLoadingDetran] = useState(false);
-
-  // Função que conecta o botão visual à API real
-  const handleSincronizarDetran = async (placa: string) => {
-    setLoadingDetran(true);
-    toast.info("Conectando ao Detran-SP...", 2000); // Aviso visual
-
-    try {
-      // Chama o nosso Back-end na porta 3001
-      const dadosReais = await consultarVeiculoAPI(placa, '12345678900'); 
-      
-      console.log("Dados Recebidos do Governo:", dadosReais);
-
-      toast.success(`Veículo ${dadosReais.marca_modelo} atualizado!`);
-      
-      // AQUI SERIA ONDE ATUALIZARÍAMOS A TABELA VISUAL
-      // Como não queremos mexer no layout agora, apenas mostramos o sucesso.
-      
-    } catch (error) {
-      toast.error("Falha na conexão com Detran.");
-    } finally {
-      setLoadingDetran(false);
-    }
-  };
-
-  // ... o resto do código continua igual ...
 
   return (
     <div className="space-y-6">
