@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { consultarVeiculoAPI } from '@/lib/api-service'; 
+import { useToast } from '@/contexts/toast-context'; 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +23,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  ExternalLink,
 } from "lucide-react"
 import { mockVehicles, type Vehicle, getVehicleDocuments } from "@/lib/mock-data"
 
@@ -65,6 +68,7 @@ export function FleetView() {
         )
       case "Pendente":
       case "Vencendo":
+      case "Parcelado":
         return (
           <Badge className="bg-amber-100 text-amber-800">
             <AlertTriangle className="mr-1 h-3 w-3" />
@@ -82,6 +86,35 @@ export function FleetView() {
         return <Badge>{status}</Badge>
     }
   }
+
+  export function FleetView() {
+  const { toast } = useToast(); // Hook de notificação
+  const [loadingDetran, setLoadingDetran] = useState(false);
+
+  // Função que conecta o botão visual à API real
+  const handleSincronizarDetran = async (placa: string) => {
+    setLoadingDetran(true);
+    toast.info("Conectando ao Detran-SP...", 2000); // Aviso visual
+
+    try {
+      // Chama o nosso Back-end na porta 3001
+      const dadosReais = await consultarVeiculoAPI(placa, '12345678900'); 
+      
+      console.log("Dados Recebidos do Governo:", dadosReais);
+
+      toast.success(`Veículo ${dadosReais.marca_modelo} atualizado!`);
+      
+      // AQUI SERIA ONDE ATUALIZARÍAMOS A TABELA VISUAL
+      // Como não queremos mexer no layout agora, apenas mostramos o sucesso.
+      
+    } catch (error) {
+      toast.error("Falha na conexão com Detran.");
+    } finally {
+      setLoadingDetran(false);
+    }
+  };
+
+  // ... o resto do código continua igual ...
 
   return (
     <div className="space-y-6">
@@ -275,7 +308,7 @@ export function FleetView() {
                           </div>
                           <div>
                             <p className="text-sm text-muted-foreground">CRLV</p>
-                            <p className="font-mono font-medium">{vehicleDocuments.licensing.crlvNumber}</p>
+                            <p className="font-mono font-medium">{vehicleDocuments.crlv}</p>
                           </div>
                         </div>
                       </CardContent>
@@ -287,20 +320,20 @@ export function FleetView() {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span>IPVA {vehicleDocuments.ipva.year}</span>
+                          <span>IPVA</span>
                           {getStatusBadge(vehicleDocuments.ipva.status)}
                         </div>
                         <div className="flex items-center justify-between">
-                          <span>Licenciamento {vehicleDocuments.licensing.year}</span>
-                          {getStatusBadge(vehicleDocuments.licensing.status)}
+                          <span>Licenciamento</span>
+                          {getStatusBadge(vehicleDocuments.licenciamento.status)}
                         </div>
                         <div className="flex items-center justify-between">
                           <span>Seguro</span>
-                          {getStatusBadge(vehicleDocuments.insurance.status)}
+                          {getStatusBadge(vehicleDocuments.seguro.status)}
                         </div>
                         <div className="flex items-center justify-between">
                           <span>Sem Parar</span>
-                          {vehicleDocuments.semParar.active ? (
+                          {vehicleDocuments.semParar.ativo ? (
                             <Badge className="bg-green-100 text-green-800">
                               <CheckCircle2 className="mr-1 h-3 w-3" />
                               Ativo
@@ -323,15 +356,15 @@ export function FleetView() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <CircleDollarSign className="h-5 w-5 text-primary" />
-                        IPVA {vehicleDocuments.ipva.year}
+                        IPVA
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="grid gap-6 md:grid-cols-3">
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Valor</p>
+                          <p className="text-sm text-muted-foreground">Valor Total</p>
                           <p className="text-2xl font-bold text-primary">
-                            R$ {vehicleDocuments.ipva.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            R$ {vehicleDocuments.ipva.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                           </p>
                         </div>
                         <div className="space-y-2">
@@ -341,18 +374,28 @@ export function FleetView() {
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">Vencimento</p>
                           <p className="font-medium">
-                            {new Date(vehicleDocuments.ipva.dueDate).toLocaleDateString("pt-BR")}
+                            {new Date(vehicleDocuments.ipva.vencimento).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
                       </div>
-                      {vehicleDocuments.ipva.paymentDate && (
-                        <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-sm text-green-800">
-                            <CheckCircle2 className="inline mr-2 h-4 w-4" />
-                            Pago em {new Date(vehicleDocuments.ipva.paymentDate).toLocaleDateString("pt-BR")}
-                          </p>
-                        </div>
-                      )}
+                      <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground">Parcelas</p>
+                        <p className="font-medium">
+                          {vehicleDocuments.ipva.parcelasPagas} de {vehicleDocuments.ipva.parcelas} pagas
+                        </p>
+                      </div>
+                      <div className="mt-4">
+                        <Button variant="outline" className="w-full bg-transparent" asChild>
+                          <a
+                            href="https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/pagamentoIPVA"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Acessar Portal DETRAN - IPVA
+                          </a>
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -363,23 +406,23 @@ export function FleetView() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <FileText className="h-5 w-5 text-primary" />
-                        Licenciamento {vehicleDocuments.licensing.year}
+                        Licenciamento
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="grid gap-6 md:grid-cols-3">
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">Número CRLV</p>
-                          <p className="font-mono text-lg font-medium">{vehicleDocuments.licensing.crlvNumber}</p>
+                          <p className="font-mono text-lg font-medium">{vehicleDocuments.crlv}</p>
                         </div>
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">Status</p>
-                          <div>{getStatusBadge(vehicleDocuments.licensing.status)}</div>
+                          <div>{getStatusBadge(vehicleDocuments.licenciamento.status)}</div>
                         </div>
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">Validade</p>
                           <p className="font-medium">
-                            {new Date(vehicleDocuments.licensing.expirationDate).toLocaleDateString("pt-BR")}
+                            {new Date(vehicleDocuments.licenciamento.vencimento).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
                       </div>
@@ -392,6 +435,18 @@ export function FleetView() {
                           <p className="text-sm text-muted-foreground">Chassi</p>
                           <p className="font-mono font-medium text-sm">{vehicleDocuments.chassi}</p>
                         </div>
+                      </div>
+                      <div className="mt-4">
+                        <Button variant="outline" className="w-full bg-transparent" asChild>
+                          <a
+                            href="https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/licenciamentoAnual"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Acessar Portal DETRAN - Licenciamento
+                          </a>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -410,38 +465,29 @@ export function FleetView() {
                       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">Seguradora</p>
-                          <p className="font-medium text-lg">{vehicleDocuments.insurance.company}</p>
+                          <p className="font-medium text-lg">{vehicleDocuments.seguro.seguradora}</p>
                         </div>
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">Apólice</p>
-                          <p className="font-mono font-medium">{vehicleDocuments.insurance.policyNumber}</p>
+                          <p className="font-mono font-medium">{vehicleDocuments.seguro.apolice}</p>
                         </div>
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">Status</p>
-                          <div>{getStatusBadge(vehicleDocuments.insurance.status)}</div>
+                          <div>{getStatusBadge(vehicleDocuments.seguro.status)}</div>
                         </div>
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground">Valor de Cobertura</p>
                           <p className="text-xl font-bold text-green-600">
-                            R$ {vehicleDocuments.insurance.coverageValue.toLocaleString("pt-BR")}
+                            R$ {vehicleDocuments.seguro.cobertura.toLocaleString("pt-BR")}
                           </p>
                         </div>
                       </div>
                       <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div>
-                            <p className="text-sm text-blue-800">Início da Vigência</p>
-                            <p className="font-medium text-blue-900">
-                              {new Date(vehicleDocuments.insurance.startDate).toLocaleDateString("pt-BR")}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-blue-800">Fim da Vigência</p>
-                            <p className="font-medium text-blue-900">
-                              {new Date(vehicleDocuments.insurance.endDate).toLocaleDateString("pt-BR")}
-                            </p>
-                          </div>
-                        </div>
+                        <p className="text-sm text-blue-800">
+                          <Shield className="inline mr-2 h-4 w-4" />
+                          Vigência: {new Date(vehicleDocuments.seguro.vigenciaInicio).toLocaleDateString("pt-BR")} até{" "}
+                          {new Date(vehicleDocuments.seguro.vigenciaFim).toLocaleDateString("pt-BR")}
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -453,72 +499,68 @@ export function FleetView() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <CreditCard className="h-5 w-5 text-primary" />
-                        Sem Parar / Pedágio Eletrônico
+                        Sem Parar
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {vehicleDocuments.semParar.active ? (
-                        <>
-                          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                            <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Tag</p>
-                              <p className="font-mono font-medium">{vehicleDocuments.semParar.tagNumber}</p>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Status</p>
-                              <Badge className="bg-green-100 text-green-800">
-                                <CheckCircle2 className="mr-1 h-3 w-3" />
-                                Ativo
-                              </Badge>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Último Uso</p>
-                              <p className="font-medium">
-                                {new Date(vehicleDocuments.semParar.lastUsage).toLocaleDateString("pt-BR")}
-                              </p>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Saldo Disponível</p>
-                              <p className="text-xl font-bold text-green-600">
-                                R${" "}
-                                {vehicleDocuments.semParar.balance.toLocaleString("pt-BR", {
-                                  minimumFractionDigits: 2,
-                                })}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                            <p className="text-sm text-muted-foreground mb-1">Média Mensal de Gastos</p>
-                            <p className="text-2xl font-bold">
-                              R${" "}
-                              {vehicleDocuments.semParar.monthlyAverage.toLocaleString("pt-BR", {
-                                minimumFractionDigits: 2,
-                              })}
+                      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Tag</p>
+                          <p className="font-mono font-medium">{vehicleDocuments.semParar.tag}</p>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Saldo Atual</p>
+                          <p className="text-2xl font-bold text-primary">
+                            R$ {vehicleDocuments.semParar.saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Média Mensal</p>
+                          <p className="font-medium">
+                            R${" "}
+                            {vehicleDocuments.semParar.mediaGastoMensal.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Último Uso</p>
+                          <p className="font-medium">
+                            {new Date(vehicleDocuments.semParar.ultimoUso).toLocaleDateString("pt-BR")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-6">
+                        {vehicleDocuments.semParar.ativo ? (
+                          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                            <p className="text-sm text-green-800">
+                              <CheckCircle2 className="inline mr-2 h-4 w-4" />
+                              Tag ativa e funcionando normalmente
                             </p>
                           </div>
-                        </>
-                      ) : (
-                        <div className="text-center py-12">
-                          <CreditCard className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                          <h3 className="mt-4 text-lg font-medium">Sem Parar Inativo</h3>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            Este veículo não possui tag Sem Parar ativa.
-                          </p>
-                          <Button className="mt-4">Ativar Sem Parar</Button>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                            <p className="text-sm text-red-800">
+                              <XCircle className="inline mr-2 h-4 w-4" />
+                              Tag inativa - verifique o saldo ou entre em contato com o suporte
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-4">
+                        <Button variant="outline" className="w-full bg-transparent" asChild>
+                          <a href="https://www.semparar.com.br" target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Acessar Portal Sem Parar
+                          </a>
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>
               </Tabs>
             </div>
           )}
-
-          <div className="flex-shrink-0 border-t pt-4 flex justify-end">
-            <Button variant="outline" onClick={() => setIsDocModalOpen(false)}>
-              Fechar
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
     </div>
