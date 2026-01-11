@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   consultarVeiculoAPI,
   salvarVeiculoAPI,
@@ -54,6 +54,7 @@ import {
   Upload,
   Clock,
   Wallet,
+  Info,
 } from "lucide-react";
 import { type Vehicle, getVehicleDocuments } from "@/lib/mock-data";
 
@@ -79,6 +80,7 @@ interface NewVehicleForm {
 
 export function FleetView() {
   const toast = useToastNotification();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -97,34 +99,69 @@ export function FleetView() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
+  // Interface para os dados do arquivo importado
+  interface ImportMetadata {
+    fileName: string;
+    uploadDate: string;
+    referencePeriod: string; // Ex: "Maio de 2026"
+  }
+
+  // Estado para guardar os metadados da importação
+  const [importInfo, setImportInfo] = useState<ImportMetadata | null>(null);
+
   // Função para processar o arquivo CSV e extrair dados de saldo e gastos
+  // Função para ler CSV e detectar Mês de Referência
+  // Função para ler CSV e detectar Mês de Referência
   const processarCSV = async (file: File) => {
     const text = await file.text();
-    const lines = text.split("\n");
+    const lines = text.split('\n');
     const novasAtualizacoes: typeof tagUpdates = {};
     let carrosAtualizados = 0;
+    
+    // CORREÇÃO CRÍTICA AQUI: Adicionado ": Date | null"
+    let dataDetectada: Date | null = null;
+    const regexData = /(\d{2})[\/-](\d{2})[\/-](\d{4})/; 
 
-    // Simula a leitura: Espera formato "PLACA;VALOR" ou apenas procura placas conhecidas
-    lines.forEach((line) => {
-      // Limpeza básica
-      const content = line.toUpperCase().replace(/[^A-Z0-9.,;]/g, "");
+    lines.forEach(line => {
+      const content = line.toUpperCase().replace(/[^A-Z0-9.,;\/-]/g, '');
+      
+      // 1. Tenta detectar a data se ainda não achou
+      if (!dataDetectada) {
+        const match = line.match(regexData);
+        if (match) {
+          const dia = parseInt(match[1]);
+          const mes = parseInt(match[2]) - 1;
+          const ano = parseInt(match[3]);
+          dataDetectada = new Date(ano, mes, dia);
+        }
+      }
 
-      // Tenta achar placas da nossa frota nesta linha
-      vehicles.forEach((vehicle) => {
-        if (content.includes(vehicle.placa.replace("-", ""))) {
-          // Se achou a placa no arquivo, simula um valor novo (na vida real, leríamos a coluna de valor)
-          // Aqui geramos um valor aleatório para demonstrar a atualização "ao vivo"
+      // 2. Busca Placas
+      vehicles.forEach(vehicle => {
+        if (content.includes(vehicle.placa.replace('-', ''))) {
           novasAtualizacoes[vehicle.placa] = {
-            balance: Math.random() * 500, // Simula saldo novo
-            monthlySpend: Math.random() * 200, // Simula gasto novo
-            lastUpdate: new Date().toISOString(),
+            balance: Math.random() * 500, 
+            monthlySpend: Math.random() * 200, 
+            lastUpdate: new Date().toISOString()
           };
           carrosAtualizados++;
         }
       });
     });
 
-    return { updates: novasAtualizacoes, count: carrosAtualizados };
+    const periodoFormatado = dataDetectada
+      ? new Date(dataDetectada).toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+      : "Período não identificado";
+
+    return { 
+      updates: novasAtualizacoes, 
+      count: carrosAtualizados,
+      metadata: {
+        fileName: file.name,
+        uploadDate: new Date().toLocaleString('pt-BR'),
+        referencePeriod: periodoFormatado.charAt(0).toUpperCase() + periodoFormatado.slice(1)
+      }
+    };
   };
 
   useEffect(() => {
@@ -354,38 +391,28 @@ export function FleetView() {
 
   const handleProcessFile = useCallback(async () => {
     if (uploadedFile) {
-      toast.success(
-        "Lendo Arquivo...",
-        "Analisando placas e valores do extrato..."
-      );
-
+      toast.success("Lendo Arquivo...", "Analisando datas e placas...");
+      
       try {
-        // 1. Processa o arquivo
-        const { updates, count } = await processarCSV(uploadedFile);
+        const { updates, count, metadata } = await processarCSV(uploadedFile);
+        
+        setTagUpdates(prev => ({ ...prev, ...updates }));
+        setImportInfo(metadata); 
 
-        // 2. Salva na memória do Front-end
-        setTagUpdates((prev) => ({ ...prev, ...updates }));
-
-        // 3. Feedback
         if (count > 0) {
-          toast.success(
-            "Processamento Concluído",
-            `${count} veículos foram atualizados automaticamente com base neste extrato!`
-          );
+          toast.success("Importação Concluída", `Extrato de ${metadata.referencePeriod} processado com sucesso.`);
         } else {
-          toast.error(
-            "Aviso",
-            "Nenhuma placa da sua frota foi encontrada neste arquivo."
-          );
+          // CORREÇÃO: Trocado de .warning para .error (com título de Atenção)
+          toast.error("Atenção", "Nenhuma placa correspondente encontrada no arquivo.");
         }
       } catch (error) {
         console.error(error);
-        toast.error("Erro", "Falha ao ler o arquivo. Verifique o formato.");
+        toast.error("Erro", "Falha ao ler o arquivo.");
       } finally {
         setUploadedFile(null);
       }
     }
-  }, [uploadedFile, vehicles, toast]); // Adicione vehicles nas dependências
+  }, [uploadedFile, vehicles, toast]);
 
   // CORREÇÃO: Fallback configurado como "Ativo" para mostrar os campos mesmo em carros novos
   const vehicleDocuments = selectedVehicle
@@ -443,16 +470,7 @@ export function FleetView() {
               updateMethod: "Sistema",
             },
 
-        // NOVO: Status "Ativo" e provider "Tag Itaú" para exibir a interface completa
-        tollTag: {
-          provider: "Tag Itaú",
-          tag: "TAG-PROVISORIA",
-          status: "Ativo", // Força a exibição dos campos
-          balance: 0,
-          monthlySpend: 0,
-          lastUpdate: new Date().toISOString(),
-          updateMethod: "Sistema",
-        },
+
         branch: selectedVehicle.branch || "São Paulo",
         status: "Válido",
       }
@@ -928,6 +946,29 @@ export function FleetView() {
                           <span className="text-sm">Seguro</span>
                           {getStatusBadge(vehicleDocuments.seguro.status)}
                         </div>
+                      {/* --- NOVO BLOCO: Informações do Extrato Importado --- */}
+                      {importInfo && tagUpdates[vehicleDocuments.vehiclePlate] && (
+                        <div className="mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-blue-100 rounded-full text-blue-600 mt-0.5">
+                              <FileText className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-blue-900">
+                                Extrato: {importInfo.fileName}
+                              </h4>
+                              <p className="text-xs text-blue-700">
+                                Referência: <span className="font-medium">{importInfo.referencePeriod}</span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-white/50 px-3 py-1 rounded-full border border-blue-100">
+                            <Clock className="h-3 w-3" />
+                            Importado em: {importInfo.uploadDate}
+                          </div>
+                        </div>
+                      )}
+                      {/* --- Fim do Novo Bloco --- */}
                         <div className="flex items-center justify-between">
                           <span>Sem Parar / Tags</span>
                           {vehicleDocuments.tollTag?.status === "Ativo" ? (
@@ -1153,7 +1194,6 @@ export function FleetView() {
 
                 {/* INÍCIO DO BLOCO DA ABA SEM PARAR */}
                 <TabsContent value="tags" className="space-y-6">
-                  {" "}
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
@@ -1161,13 +1201,12 @@ export function FleetView() {
                           <CreditCard className="h-5 w-5 text-primary" />
                           Gestão de Tags de Pedágio
                         </CardTitle>
-                        {/* BADGES: Verifica qual provider é para mostrar a cor certa */}
+                        {/* BADGES */}
                         {vehicleDocuments.tollTag?.provider === "Tag Itaú" ? (
                           <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-0">
                             Tag Itaú
                           </Badge>
-                        ) : vehicleDocuments.tollTag?.provider ===
-                          "Sem Parar" ? (
+                        ) : vehicleDocuments.tollTag?.provider === "Sem Parar" ? (
                           <Badge className="bg-red-600 hover:bg-red-700 text-white border-0">
                             Sem Parar
                           </Badge>
@@ -1178,108 +1217,136 @@ export function FleetView() {
                         )}
                       </div>
                     </CardHeader>
+                    
                     <CardContent>
-                      {/* CONTEÚDO PRINCIPAL: Verifica se existe tag e se o status é Ativo */}
-                      {vehicleDocuments.tollTag &&
-                      vehicleDocuments.tollTag.status === "Ativo" ? (
-                        <div className="space-y-6">
-                          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                            <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">
-                                Número da Tag
-                              </p>
-                              <p className="font-mono text-lg font-medium">
-                                {vehicleDocuments.tollTag.tag}
-                              </p>
+                      {/* --- BLOCO DE METADADOS (INFO AZUL) --- */}
+                      {importInfo && tagUpdates[vehicleDocuments.vehiclePlate] && (
+                        <div className="mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-blue-100 rounded-full text-blue-600 mt-0.5">
+                              <FileText className="h-4 w-4" />
                             </div>
-                            <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">
-                                Saldo Atual
+                            <div>
+                              <h4 className="text-sm font-semibold text-blue-900">
+                                Extrato: {importInfo.fileName}
+                              </h4>
+                              <p className="text-xs text-blue-700">
+                                Referência: <span className="font-medium">{importInfo.referencePeriod}</span>
                               </p>
-                              <p className="text-2xl font-bold text-green-600">
-                                R${" "}
-                                {Number(
-                                  vehicleDocuments.tollTag.balance
-                                ).toFixed(2)}
-                              </p>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">
-                                Gasto Mensal (Média)
-                              </p>
-                              <p className="text-lg font-medium">
-                                R${" "}
-                                {Number(
-                                  vehicleDocuments.tollTag.monthlySpend
-                                ).toFixed(2)}
-                              </p>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">
-                                Última Atualização
-                              </p>
-                              <div className="flex flex-col">
-                                <span className="font-medium">
-                                  {new Date(
-                                    vehicleDocuments.tollTag.lastUpdate
-                                  ).toLocaleDateString("pt-BR")}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  Via{" "}
-                                  {vehicleDocuments.tollTag.updateMethod ||
-                                    "Importação"}
-                                </span>
-                              </div>
                             </div>
                           </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-white/50 px-3 py-1 rounded-full border border-blue-100">
+                            <Clock className="h-3 w-3" />
+                            Importado em: {importInfo.uploadDate}
+                          </div>
+                        </div>
+                      )}
 
-                          {/* ÁREA DE IMPORTAÇÃO (CAMINHO 3) */}
-                          <div className="rounded-lg border border-dashed p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer">
-                            <div className="flex flex-col items-center gap-2">
-                              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                <FileText className="h-5 w-5 text-primary" />
+                      {/* LÓGICA DE EXIBIÇÃO: Memória vs Banco */}
+                      {vehicleDocuments.tollTag && (vehicleDocuments.tollTag.status === "Ativo" || tagUpdates[vehicleDocuments.vehiclePlate]) ? (
+                        <div className="space-y-6">
+                          {(() => {
+                            const dadosAtuais = tagUpdates[vehicleDocuments.vehiclePlate] 
+                              ? { ...vehicleDocuments.tollTag, ...tagUpdates[vehicleDocuments.vehiclePlate], updateMethod: "Extrato Importado" }
+                              : vehicleDocuments.tollTag;
+
+                            return (
+                              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                                <div className="space-y-2">
+                                  <p className="text-sm text-muted-foreground">Número da Tag</p>
+                                  <p className="font-mono text-lg font-medium">{dadosAtuais.tag}</p>
+                                </div>
+                                <div className="space-y-2">
+                                  <p className="text-sm text-muted-foreground">Saldo Atual</p>
+                                  <p className="text-2xl font-bold text-green-600">
+                                    R$ {Number(dadosAtuais.balance).toFixed(2)}
+                                  </p>
+                                </div>
+                                <div className="space-y-2">
+                                  <p className="text-sm text-muted-foreground">Gasto Mensal</p>
+                                  <p className="text-lg font-medium">
+                                    R$ {Number(dadosAtuais.monthlySpend).toFixed(2)}
+                                  </p>
+                                </div>
+                                <div className="space-y-2">
+                                  <p className="text-sm text-muted-foreground">Última Atualização</p>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {new Date(dadosAtuais.lastUpdate).toLocaleDateString("pt-BR")}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      Via {dadosAtuais.updateMethod || "Sistema"}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                              <h3 className="font-medium">
-                                Atualizar Saldo e Extrato
-                              </h3>
-                              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                                Arraste o arquivo PDF ou CSV do extrato (
-                                {vehicleDocuments.tollTag.provider}) aqui.
-                              </p>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="mt-2"
-                              >
-                                Selecionar Arquivo
-                              </Button>
+                            );
+                          })()}
+
+                          {/* ÁREA DE IMPORTAÇÃO */}
+                          <div 
+                            className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${
+                              isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:bg-muted/50"
+                            }`}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                          >
+                            <div className="flex flex-col items-center gap-2">
+                              {uploadedFile ? (
+                                <>
+                                  <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                                    <FileText className="h-6 w-6" />
+                                  </div>
+                                  <h3 className="font-medium text-green-700">{uploadedFile.name}</h3>
+                                  <p className="text-xs text-muted-foreground">Pronto para importar</p>
+                                  <div className="flex gap-2 mt-2">
+                                    <Button size="sm" variant="outline" onClick={() => setUploadedFile(null)}>Cancelar</Button>
+                                    <Button size="sm" onClick={handleProcessFile}>Confirmar Importação</Button>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <Upload className="h-5 w-5 text-primary" />
+                                  </div>
+                                  <h3 className="font-medium">Atualizar Saldo e Extrato</h3>
+                                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                                    Arraste o arquivo PDF ou CSV do extrato aqui para atualizar os gastos.
+                                  </p>
+                                  <input 
+                                    type="file" 
+                                    ref={fileInputRef}
+                                    className="hidden" 
+                                    accept=".csv,.pdf"
+                                    onChange={handleFileInput}
+                                  />
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="mt-2"
+                                    onClick={() => fileInputRef.current?.click()}
+                                  >
+                                    Selecionar Arquivo
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
                       ) : (
-                        /* ESTADO VAZIO / INATIVO */
                         <div className="text-center py-8">
                           <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                           <p className="text-muted-foreground">
-                            Este veículo não possui tag de pedágio ativa ou
-                            cadastrada.
+                            Este veículo não possui tag cadastrada.
                           </p>
-                          <div className="flex justify-center gap-4 mt-4">
-                            <Button variant="outline" className="gap-2">
-                              <Plus className="h-4 w-4" />
-                              Vincular Tag Itaú
-                            </Button>
-                            <Button variant="outline" className="gap-2">
-                              <Plus className="h-4 w-4" />
-                              Vincular Sem Parar
-                            </Button>
-                          </div>
                         </div>
                       )}
                     </CardContent>
                   </Card>
                 </TabsContent>
                 {/* FIM DA ABA SEM PARAR */}
+
               </Tabs>
             </div>
           )}
