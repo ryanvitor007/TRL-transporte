@@ -1,77 +1,100 @@
 // Mock data para simular resposta do backend
 // ATUALIZADO: Agora alinhado com o Banco de Dados (PostgreSQL/Supabase)
 
-export type Branch = "São Paulo" | "Recife" | "Piauí"
+export type Branch = "São Paulo" | "Recife" | "Piauí";
 
-// CORREÇÃO 1: 'id' agora aceita number (do banco) ou string (legado)
 export interface Vehicle {
-  id: number | string; 
-  modelo: string;      // Antes: model
-  placa: string;       // Antes: plate
-  ano: number;         // Antes: year
-  km_atual: number;    // Antes: mileage
+  id: number | string;
+  modelo: string;
+  placa: string;
+  ano: number;
+  km_atual: number;
   status: "Ativo" | "Em Oficina" | "Problema Documental";
   renavam?: string;
   data_cadastro?: string | Date;
-  
-  // Campos opcionais para manter compatibilidade
+
+  // Novos campos obrigatórios para o novo modal
+  chassi?: string;
+  proxima_manutencao?: string; // Data ISO
+  cor?: string;
+  combustivel?: string;
+
+  // Campos legados (opcionais para não quebrar outras partes)
   lastMaintenance?: string;
   nextMaintenance?: string;
   nextMaintenanceMileage?: number;
-  branch?: Branch; 
+  branch?: Branch;
 }
 
+// Nova interface para suportar Múltiplas Tags (Sem Parar / Itaú)
+// Em lib/mock-data.ts
+
+// 1. Adicione a interface TollTag se não existir
+// Em lib/mock-data.ts
+
+export interface TollTag {
+  provider: "Sem Parar" | "Tag Itaú" | "Veloe" | "Outro";
+  tag: string;
+  status: "Ativo" | "Inativo" | "Bloqueado";
+  balance: number;
+  monthlySpend: number;
+  lastUpdate: string;
+  updateMethod?: string; 
+}
+
+// 2. Substitua a interface Document inteira por esta:
 export interface Document {
-  id: string
-  vehicleId: string
-  vehiclePlate: string
-  type: "IPVA" | "Licenciamento" | "Seguro" | "CRLV"
-  expirationDate: string
-  status: "Válido" | "Vencendo" | "Vencido"
-  renavam?: string
-  valor?: number
-  parcelas?: number
-  parcelasPagas?: number
-  detranUrl?: string
-  branch: Branch 
+  id: string;
+  vehicleId: string;
+  vehiclePlate: string;
+  type: "IPVA" | "Licenciamento" | "Seguro" | "CRLV";
+  expirationDate: string;
+  status: "Válido" | "Vencendo" | "Vencido";
+  renavam?: string;
+  valor?: number;
+  parcelas?: number;
+  parcelasPagas?: number;
+  detranUrl?: string;
+  branch: Branch;
+  tollTag?: TollTag; // Novo campo para Tag de Pedágio
 }
 
 export interface Maintenance {
-  id: string
-  vehicleId: string
-  vehiclePlate: string
-  vehicleModel: string
-  type: string
-  scheduledDate: string
-  scheduledMileage: number
-  status: "Urgente" | "Agendada" | "Concluída"
-  description: string
-  branch: Branch 
+  id: string;
+  vehicleId: string;
+  vehiclePlate: string;
+  vehicleModel: string;
+  type: string;
+  scheduledDate: string;
+  scheduledMileage: number;
+  status: "Urgente" | "Agendada" | "Concluída";
+  description: string;
+  branch: Branch;
 }
 
 export interface Fine {
-  id: string
-  vehicleId: string
-  vehiclePlate: string
-  date: string
-  description: string
-  value: number
-  status: "Pendente" | "Paga" | "Recurso"
-  autoInfracao?: string
-  local?: string
-  pontos?: number
-  prazoRecurso?: string
-  detranUrl?: string
-  branch: Branch 
+  id: string;
+  vehicleId: string;
+  vehiclePlate: string;
+  date: string;
+  description: string;
+  value: number;
+  status: "Pendente" | "Paga" | "Recurso";
+  autoInfracao?: string;
+  local?: string;
+  pontos?: number;
+  prazoRecurso?: string;
+  detranUrl?: string;
+  branch: Branch;
 }
 
 export interface Driver {
-  id: string
-  name: string
-  cpf: string
-  cnh: string
-  cnhExpiry: string
-  branch: Branch
+  id: string;
+  name: string;
+  cpf: string;
+  cnh: string;
+  cnhExpiry: string;
+  branch: Branch;
 }
 
 export const mockDrivers: Driver[] = [
@@ -123,7 +146,7 @@ export const mockDrivers: Driver[] = [
     cnhExpiry: "2028-06-18",
     branch: "Piauí",
   },
-]
+];
 
 export const mockVehicles: Vehicle[] = [
   {
@@ -134,10 +157,11 @@ export const mockVehicles: Vehicle[] = [
     km_atual: 125000,
     status: "Ativo",
     renavam: "12345678900",
+    chassi: "9BWZZZ377VT004251",
+    proxima_manutencao: "2026-02-15",
     data_cadastro: "2024-01-01T10:00:00Z",
     branch: "São Paulo",
     lastMaintenance: "2025-12-15",
-    nextMaintenance: "2026-02-15",
   },
   {
     id: 2,
@@ -147,10 +171,11 @@ export const mockVehicles: Vehicle[] = [
     km_atual: 180000,
     status: "Em Oficina",
     renavam: "09876543211",
+    chassi: "9BWZZZ377VT004252",
+    proxima_manutencao: "2026-01-20",
     data_cadastro: "2024-02-15T14:30:00Z",
     branch: "São Paulo",
     lastMaintenance: "2025-11-20",
-    nextMaintenance: "2026-01-20",
   },
   {
     id: 3,
@@ -160,10 +185,11 @@ export const mockVehicles: Vehicle[] = [
     km_atual: 45000,
     status: "Ativo",
     renavam: "11223344556",
+    chassi: "9BWZZZ377VT004253",
+    proxima_manutencao: "2026-03-05",
     data_cadastro: "2024-03-10T09:00:00Z",
     branch: "Recife",
     lastMaintenance: "2026-01-05",
-    nextMaintenance: "2026-03-05",
   },
   {
     id: 4,
@@ -173,10 +199,11 @@ export const mockVehicles: Vehicle[] = [
     km_atual: 220000,
     status: "Problema Documental",
     renavam: "99887766554",
+    chassi: "9BWZZZ377VT004254",
+    proxima_manutencao: "2025-12-10",
     data_cadastro: "2023-11-05T16:20:00Z",
     branch: "Recife",
     lastMaintenance: "2025-10-10",
-    nextMaintenance: "2025-12-10",
   },
   {
     id: 5,
@@ -186,10 +213,11 @@ export const mockVehicles: Vehicle[] = [
     km_atual: 98000,
     status: "Ativo",
     renavam: "55443322110",
+    chassi: "9BWZZZ377VT004255",
+    proxima_manutencao: "2026-02-28",
     data_cadastro: "2024-05-20T11:00:00Z",
     branch: "Piauí",
     lastMaintenance: "2025-12-28",
-    nextMaintenance: "2026-02-28",
   },
   {
     id: 6,
@@ -199,12 +227,13 @@ export const mockVehicles: Vehicle[] = [
     km_atual: 156000,
     status: "Ativo",
     renavam: "66778899001",
+    chassi: "9BWZZZ377VT004256",
+    proxima_manutencao: "2026-01-30",
     data_cadastro: "2024-01-25T13:45:00Z",
     branch: "Piauí",
     lastMaintenance: "2025-11-30",
-    nextMaintenance: "2026-01-30",
   },
-]
+];
 
 export const mockDocuments: Document[] = [
   {
@@ -218,7 +247,8 @@ export const mockDocuments: Document[] = [
     valor: 4850.0,
     parcelas: 3,
     parcelasPagas: 0,
-    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/pagamentoIPVA",
+    detranUrl:
+      "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/pagamentoIPVA",
     branch: "São Paulo",
   },
   {
@@ -230,7 +260,8 @@ export const mockDocuments: Document[] = [
     status: "Válido",
     renavam: "00123456789",
     valor: 181.35,
-    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/licenciamentoAnual",
+    detranUrl:
+      "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/licenciamentoAnual",
     branch: "São Paulo",
   },
   {
@@ -253,7 +284,8 @@ export const mockDocuments: Document[] = [
     expirationDate: "2025-12-20",
     status: "Vencido",
     renavam: "00456789123",
-    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/crlve",
+    detranUrl:
+      "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/crlve",
     branch: "Recife",
   },
   {
@@ -265,7 +297,8 @@ export const mockDocuments: Document[] = [
     status: "Vencido",
     renavam: "00456789123",
     valor: 181.35,
-    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/licenciamentoAnual",
+    detranUrl:
+      "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/licenciamentoAnual",
     branch: "Recife",
   },
   {
@@ -279,10 +312,11 @@ export const mockDocuments: Document[] = [
     valor: 5200.0,
     parcelas: 3,
     parcelasPagas: 3,
-    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/pagamentoIPVA",
+    detranUrl:
+      "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/veiculos/fichaservico/pagamentoIPVA",
     branch: "Recife",
   },
-]
+];
 
 export const mockMaintenances: Maintenance[] = [
   {
@@ -345,7 +379,7 @@ export const mockMaintenances: Maintenance[] = [
     description: "Revisão do sistema de freios",
     branch: "Piauí",
   },
-]
+];
 
 export const mockFines: Fine[] = [
   {
@@ -360,7 +394,8 @@ export const mockFines: Fine[] = [
     local: "Rod. Anhanguera, km 45 - São Paulo/SP",
     pontos: 5,
     prazoRecurso: "2026-01-14",
-    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/infracoes",
+    detranUrl:
+      "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/infracoes",
     branch: "São Paulo",
   },
   {
@@ -374,7 +409,8 @@ export const mockFines: Fine[] = [
     autoInfracao: "AA00789012",
     local: "Rua Augusta, 500 - São Paulo/SP",
     pontos: 3,
-    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/infracoes",
+    detranUrl:
+      "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/infracoes",
     branch: "Recife",
   },
   {
@@ -389,15 +425,19 @@ export const mockFines: Fine[] = [
     local: "Av. Paulista, 1000 - São Paulo/SP",
     pontos: 7,
     prazoRecurso: "2026-02-04",
-    detranUrl: "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/infracoes",
+    detranUrl:
+      "https://www.detran.sp.gov.br/wps/portal/portaldetran/cidadao/infracoes",
     branch: "São Paulo",
   },
-]
+];
 
 // Função para calcular o rodízio de SP
-export function getPlateRestriction(): { blockedEndings: number[]; dayName: string } {
-  const today = new Date()
-  const dayOfWeek = today.getDay()
+export function getPlateRestriction(): {
+  blockedEndings: number[];
+  dayName: string;
+} {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
 
   const restrictions: Record<number, number[]> = {
     1: [1, 2], // Segunda-feira
@@ -407,7 +447,7 @@ export function getPlateRestriction(): { blockedEndings: number[]; dayName: stri
     5: [9, 0], // Sexta-feira
     0: [], // Domingo
     6: [], // Sábado
-  }
+  };
 
   const dayNames: Record<number, string> = {
     0: "Domingo",
@@ -417,58 +457,58 @@ export function getPlateRestriction(): { blockedEndings: number[]; dayName: stri
     4: "Quinta-feira",
     5: "Sexta-feira",
     6: "Sábado",
-  }
+  };
 
   return {
     blockedEndings: restrictions[dayOfWeek],
     dayName: dayNames[dayOfWeek],
-  }
+  };
 }
 
 export function getVehiclesInRotation(vehicles: Vehicle[]): Vehicle[] {
-  const { blockedEndings } = getPlateRestriction()
+  const { blockedEndings } = getPlateRestriction();
 
   return vehicles.filter((vehicle) => {
     // CORREÇÃO 2: Agora busca .placa em vez de .plate
-    const lastDigit = Number.parseInt(vehicle.placa.slice(-1))
-    return blockedEndings.includes(lastDigit)
-  })
+    const lastDigit = Number.parseInt(vehicle.placa.slice(-1));
+    return blockedEndings.includes(lastDigit);
+  });
 }
 
 // ========== FINANCIALS & TCO ==========
 export interface FuelEntry {
-  id: string
-  vehicleId: string
-  vehiclePlate: string
-  date: string
-  liters: number
-  cost: number
-  odometer: number
-  efficiency: number // Km/L
-  hasAnomaly: boolean
-  branch: Branch 
+  id: string;
+  vehicleId: string;
+  vehiclePlate: string;
+  date: string;
+  liters: number;
+  cost: number;
+  odometer: number;
+  efficiency: number; // Km/L
+  hasAnomaly: boolean;
+  branch: Branch;
 }
 
 export interface MonthlyCost {
-  month: string
-  fuel: number
-  maintenance: number
-  tires: number
-  insurance: number
-  total: number
-  branch: Branch 
+  month: string;
+  fuel: number;
+  maintenance: number;
+  tires: number;
+  insurance: number;
+  total: number;
+  branch: Branch;
 }
 
 export interface VehicleTCO {
-  vehicleId: string
-  vehiclePlate: string
-  vehicleModel: string
-  purchaseValue: number
-  currentFipeValue: number
-  cumulativeMaintenanceCost: number
-  cumulativeFuelCost: number
-  depreciationPercent: number
-  branch: Branch 
+  vehicleId: string;
+  vehiclePlate: string;
+  vehicleModel: string;
+  purchaseValue: number;
+  currentFipeValue: number;
+  cumulativeMaintenanceCost: number;
+  cumulativeFuelCost: number;
+  depreciationPercent: number;
+  branch: Branch;
 }
 
 export const mockFuelEntries: FuelEntry[] = [
@@ -544,31 +584,175 @@ export const mockFuelEntries: FuelEntry[] = [
     hasAnomaly: true,
     branch: "Recife",
   },
-]
+];
 
 export const mockMonthlyCosts: MonthlyCost[] = [
   // São Paulo
-  { month: "Ago/25", fuel: 25000, maintenance: 8000, tires: 5000, insurance: 3000, total: 41000, branch: "São Paulo" },
-  { month: "Set/25", fuel: 27000, maintenance: 5500, tires: 2000, insurance: 3000, total: 37500, branch: "São Paulo" },
-  { month: "Out/25", fuel: 29000, maintenance: 9000, tires: 7000, insurance: 3000, total: 48000, branch: "São Paulo" },
-  { month: "Nov/25", fuel: 26000, maintenance: 6000, tires: 2500, insurance: 3000, total: 37500, branch: "São Paulo" },
-  { month: "Dez/25", fuel: 30000, maintenance: 11000, tires: 3500, insurance: 3000, total: 47500, branch: "São Paulo" },
-  { month: "Jan/26", fuel: 23000, maintenance: 4500, tires: 1000, insurance: 3000, total: 31500, branch: "São Paulo" },
+  {
+    month: "Ago/25",
+    fuel: 25000,
+    maintenance: 8000,
+    tires: 5000,
+    insurance: 3000,
+    total: 41000,
+    branch: "São Paulo",
+  },
+  {
+    month: "Set/25",
+    fuel: 27000,
+    maintenance: 5500,
+    tires: 2000,
+    insurance: 3000,
+    total: 37500,
+    branch: "São Paulo",
+  },
+  {
+    month: "Out/25",
+    fuel: 29000,
+    maintenance: 9000,
+    tires: 7000,
+    insurance: 3000,
+    total: 48000,
+    branch: "São Paulo",
+  },
+  {
+    month: "Nov/25",
+    fuel: 26000,
+    maintenance: 6000,
+    tires: 2500,
+    insurance: 3000,
+    total: 37500,
+    branch: "São Paulo",
+  },
+  {
+    month: "Dez/25",
+    fuel: 30000,
+    maintenance: 11000,
+    tires: 3500,
+    insurance: 3000,
+    total: 47500,
+    branch: "São Paulo",
+  },
+  {
+    month: "Jan/26",
+    fuel: 23000,
+    maintenance: 4500,
+    tires: 1000,
+    insurance: 3000,
+    total: 31500,
+    branch: "São Paulo",
+  },
   // Recife
-  { month: "Ago/25", fuel: 12000, maintenance: 2500, tires: 2000, insurance: 1200, total: 17700, branch: "Recife" },
-  { month: "Set/25", fuel: 13000, maintenance: 1800, tires: 500, insurance: 1200, total: 16500, branch: "Recife" },
-  { month: "Out/25", fuel: 14500, maintenance: 4000, tires: 3500, insurance: 1200, total: 23200, branch: "Recife" },
-  { month: "Nov/25", fuel: 14000, maintenance: 2500, tires: 1200, insurance: 1200, total: 18900, branch: "Recife" },
-  { month: "Dez/25", fuel: 15500, maintenance: 5000, tires: 1500, insurance: 1200, total: 23200, branch: "Recife" },
-  { month: "Jan/26", fuel: 11500, maintenance: 2000, tires: 600, insurance: 1200, total: 15300, branch: "Recife" },
+  {
+    month: "Ago/25",
+    fuel: 12000,
+    maintenance: 2500,
+    tires: 2000,
+    insurance: 1200,
+    total: 17700,
+    branch: "Recife",
+  },
+  {
+    month: "Set/25",
+    fuel: 13000,
+    maintenance: 1800,
+    tires: 500,
+    insurance: 1200,
+    total: 16500,
+    branch: "Recife",
+  },
+  {
+    month: "Out/25",
+    fuel: 14500,
+    maintenance: 4000,
+    tires: 3500,
+    insurance: 1200,
+    total: 23200,
+    branch: "Recife",
+  },
+  {
+    month: "Nov/25",
+    fuel: 14000,
+    maintenance: 2500,
+    tires: 1200,
+    insurance: 1200,
+    total: 18900,
+    branch: "Recife",
+  },
+  {
+    month: "Dez/25",
+    fuel: 15500,
+    maintenance: 5000,
+    tires: 1500,
+    insurance: 1200,
+    total: 23200,
+    branch: "Recife",
+  },
+  {
+    month: "Jan/26",
+    fuel: 11500,
+    maintenance: 2000,
+    tires: 600,
+    insurance: 1200,
+    total: 15300,
+    branch: "Recife",
+  },
   // Piauí
-  { month: "Ago/25", fuel: 8000, maintenance: 1500, tires: 1000, insurance: 800, total: 11300, branch: "Piauí" },
-  { month: "Set/25", fuel: 8000, maintenance: 1200, tires: 500, insurance: 800, total: 10500, branch: "Piauí" },
-  { month: "Out/25", fuel: 8500, maintenance: 2000, tires: 1500, insurance: 800, total: 12800, branch: "Piauí" },
-  { month: "Nov/25", fuel: 9000, maintenance: 1300, tires: 800, insurance: 800, total: 11900, branch: "Piauí" },
-  { month: "Dez/25", fuel: 9500, maintenance: 2000, tires: 1000, insurance: 800, total: 13300, branch: "Piauí" },
-  { month: "Jan/26", fuel: 7500, maintenance: 1000, tires: 400, insurance: 800, total: 9700, branch: "Piauí" },
-]
+  {
+    month: "Ago/25",
+    fuel: 8000,
+    maintenance: 1500,
+    tires: 1000,
+    insurance: 800,
+    total: 11300,
+    branch: "Piauí",
+  },
+  {
+    month: "Set/25",
+    fuel: 8000,
+    maintenance: 1200,
+    tires: 500,
+    insurance: 800,
+    total: 10500,
+    branch: "Piauí",
+  },
+  {
+    month: "Out/25",
+    fuel: 8500,
+    maintenance: 2000,
+    tires: 1500,
+    insurance: 800,
+    total: 12800,
+    branch: "Piauí",
+  },
+  {
+    month: "Nov/25",
+    fuel: 9000,
+    maintenance: 1300,
+    tires: 800,
+    insurance: 800,
+    total: 11900,
+    branch: "Piauí",
+  },
+  {
+    month: "Dez/25",
+    fuel: 9500,
+    maintenance: 2000,
+    tires: 1000,
+    insurance: 800,
+    total: 13300,
+    branch: "Piauí",
+  },
+  {
+    month: "Jan/26",
+    fuel: 7500,
+    maintenance: 1000,
+    tires: 400,
+    insurance: 800,
+    total: 9700,
+    branch: "Piauí",
+  },
+];
 
 export const mockVehicleTCO: VehicleTCO[] = [
   {
@@ -637,45 +821,45 @@ export const mockVehicleTCO: VehicleTCO[] = [
     depreciationPercent: 20.5,
     branch: "Piauí",
   },
-]
+];
 
 // ========== TIRE MANAGEMENT ==========
 export interface Tire {
-  id: string
-  position: "FL" | "FR" | "RL" | "RR"
-  brand: string
-  model: string
-  treadDepth: number
-  installDate: string
-  mileageAtInstall: number
+  id: string;
+  position: "FL" | "FR" | "RL" | "RR";
+  brand: string;
+  model: string;
+  treadDepth: number;
+  installDate: string;
+  mileageAtInstall: number;
 }
 
 export interface VehicleTires {
-  vehicleId: string
-  vehiclePlate: string
-  vehicleModel: string
-  tires: Tire[]
-  branch: Branch 
+  vehicleId: string;
+  vehiclePlate: string;
+  vehicleModel: string;
+  tires: Tire[];
+  branch: Branch;
 }
 
 export interface TireRotation {
-  id: string
-  vehicleId: string
-  vehiclePlate: string
-  date: string
-  description: string
-  mileage: number
-  branch: Branch 
+  id: string;
+  vehicleId: string;
+  vehiclePlate: string;
+  date: string;
+  description: string;
+  mileage: number;
+  branch: Branch;
 }
 
 export interface SpareTire {
-  id: string
-  brand: string
-  model: string
-  size: string
-  quantity: number
-  condition: "Novo" | "Usado - Bom" | "Usado - Regular"
-  branch: Branch 
+  id: string;
+  brand: string;
+  model: string;
+  size: string;
+  quantity: number;
+  condition: "Novo" | "Usado - Bom" | "Usado - Regular";
+  branch: Branch;
 }
 
 export const mockVehicleTires: VehicleTires[] = [
@@ -811,7 +995,7 @@ export const mockVehicleTires: VehicleTires[] = [
       },
     ],
   },
-]
+];
 
 export const mockTireRotations: TireRotation[] = [
   {
@@ -850,7 +1034,7 @@ export const mockTireRotations: TireRotation[] = [
     mileage: 40000,
     branch: "Recife",
   },
-]
+];
 
 export const mockSpareTires: SpareTire[] = [
   {
@@ -889,38 +1073,40 @@ export const mockSpareTires: SpareTire[] = [
     condition: "Usado - Regular",
     branch: "Piauí",
   },
-]
+];
 
 // Função para obter cor do status do pneu
-export function getTireHealthColor(treadDepth: number): "green" | "yellow" | "red" {
-  if (treadDepth > 5) return "green"
-  if (treadDepth >= 1.6) return "yellow"
-  return "red"
+export function getTireHealthColor(
+  treadDepth: number
+): "green" | "yellow" | "red" {
+  if (treadDepth > 5) return "green";
+  if (treadDepth >= 1.6) return "yellow";
+  return "red";
 }
 
 export function getTireHealthLabel(treadDepth: number): string {
-  if (treadDepth > 5) return "Bom"
-  if (treadDepth >= 1.6) return "Atenção"
-  return "Crítico"
+  if (treadDepth > 5) return "Bom";
+  if (treadDepth >= 1.6) return "Atenção";
+  return "Crítico";
 }
 
 // ========== INCIDENTS & CLAIMS ==========
 export interface Incident {
-  id: string
-  vehicleId: string
-  vehiclePlate: string
-  vehicleModel: string
-  driverName: string
-  date: string
-  time: string
-  type: "Acidente" | "Avaria" | "Roubo/Furto" | "Colisão Leve"
-  description: string
-  location: string
-  status: "Aberto" | "Em Reparo" | "Aguardando Seguro" | "Fechado"
-  estimatedCost: number
-  insuranceClaim: boolean
-  photos: string[]
-  branch: Branch 
+  id: string;
+  vehicleId: string;
+  vehiclePlate: string;
+  vehicleModel: string;
+  driverName: string;
+  date: string;
+  time: string;
+  type: "Acidente" | "Avaria" | "Roubo/Furto" | "Colisão Leve";
+  description: string;
+  location: string;
+  status: "Aberto" | "Em Reparo" | "Aguardando Seguro" | "Fechado";
+  estimatedCost: number;
+  insuranceClaim: boolean;
+  photos: string[];
+  branch: Branch;
 }
 
 export const mockIncidents: Incident[] = [
@@ -951,7 +1137,8 @@ export const mockIncidents: Incident[] = [
     date: "2025-11-05",
     time: "08:15",
     type: "Avaria",
-    description: "Para-brisa trincado por pedra na rodovia. Necessita substituição completa.",
+    description:
+      "Para-brisa trincado por pedra na rodovia. Necessita substituição completa.",
     location: "BR-116, km 220 - Registro/SP",
     status: "Fechado",
     estimatedCost: 2200,
@@ -986,7 +1173,8 @@ export const mockIncidents: Incident[] = [
     date: "2026-01-06",
     time: "10:00",
     type: "Colisão Leve",
-    description: "Arranhões na traseira durante manobra de ré no pátio de descarga.",
+    description:
+      "Arranhões na traseira durante manobra de ré no pátio de descarga.",
     location: "Centro de Distribuição - Guarulhos/SP",
     status: "Aberto",
     estimatedCost: 1800,
@@ -994,17 +1182,19 @@ export const mockIncidents: Incident[] = [
     photos: [],
     branch: "Piauí",
   },
-]
+];
 
 // Função para calcular estatísticas de incidentes
 export function getIncidentStats() {
-  const open = mockIncidents.filter((i) => i.status === "Aberto").length
-  const inRepair = mockIncidents.filter((i) => i.status === "Em Reparo").length
-  const waitingInsurance = mockIncidents.filter((i) => i.status === "Aguardando Seguro").length
-  const closed = mockIncidents.filter((i) => i.status === "Fechado").length
-  const totalCost = mockIncidents.reduce((acc, i) => acc + i.estimatedCost, 0)
+  const open = mockIncidents.filter((i) => i.status === "Aberto").length;
+  const inRepair = mockIncidents.filter((i) => i.status === "Em Reparo").length;
+  const waitingInsurance = mockIncidents.filter(
+    (i) => i.status === "Aguardando Seguro"
+  ).length;
+  const closed = mockIncidents.filter((i) => i.status === "Fechado").length;
+  const totalCost = mockIncidents.reduce((acc, i) => acc + i.estimatedCost, 0);
 
-  return { open, inRepair, waitingInsurance, closed, totalCost }
+  return { open, inRepair, waitingInsurance, closed, totalCost };
 }
 
 // ========== DOCUMENTS ==========
@@ -1031,10 +1221,23 @@ export interface VehicleDocuments {
     vigenciaFim: string
     status: "Ativo" | "Vencendo" | "Vencido"
   }
-  semParar: { tag: string; saldo: number; mediaGastoMensal: number; ultimoUso: string; ativo: boolean }
+  
+  // AQUI ESTÁ A CORREÇÃO: O campo tollTag agora é declarado oficialmente
+  tollTag?: TollTag; 
+
+  // Mantemos o antigo como opcional (?) para compatibilidade
+  semParar?: { tag: string; saldo: number; mediaGastoMensal: number; ultimoUso: string; ativo: boolean }
+  
   branch: Branch 
+  
+  // Adicione estes campos opcionais também, caso seu código novo os utilize
+  id?: string
+  type?: string
+  expirationDate?: string
+  status?: string
 }
 
+// Observe que agora usamos 'tollTag' em vez de 'semParar' dentro do objeto document
 export const mockVehicleDocuments: VehicleDocuments[] = [
   {
     vehicleId: "1",
@@ -1043,8 +1246,18 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
     chassi: "9BWZZZ377VT004251",
     crlv: "SP-2025-1234567",
     crlvExpiry: "2026-12-31",
-    ipva: { valor: 4850, parcelas: 3, parcelasPagas: 2, vencimento: "2026-01-15", status: "Parcelado" },
-    licenciamento: { valor: 181.35, vencimento: "2026-03-20", status: "Válido" },
+    ipva: {
+      valor: 4850,
+      parcelas: 3,
+      parcelasPagas: 2,
+      vencimento: "2026-01-15",
+      status: "Parcelado",
+    },
+    licenciamento: {
+      valor: 181.35,
+      vencimento: "2026-03-20",
+      status: "Válido",
+    },
     seguro: {
       seguradora: "Porto Seguro",
       apolice: "PS-2025-789456",
@@ -1053,8 +1266,20 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       vigenciaFim: "2026-06-01",
       status: "Ativo",
     },
-    semParar: { tag: "SP-001234567", saldo: 450.0, mediaGastoMensal: 380.0, ultimoUso: "2026-01-07", ativo: true },
+    // Exemplo: Sem Parar
+    tollTag: {
+      provider: "Sem Parar",
+      tag: "SP-001234567",
+      status: "Ativo",
+      balance: 450.0,
+      monthlySpend: 380.0,
+      lastUpdate: "2026-01-07",
+    },
     branch: "São Paulo",
+    id: "1",
+    type: "IPVA",
+    expirationDate: "2026-01-15",
+    status: "Vencendo",
   },
   {
     vehicleId: "2",
@@ -1063,8 +1288,18 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
     chassi: "9BWZZZ377VT004252",
     crlv: "SP-2025-2345678",
     crlvExpiry: "2026-12-31",
-    ipva: { valor: 4200, parcelas: 3, parcelasPagas: 3, vencimento: "2026-01-15", status: "Pago" },
-    licenciamento: { valor: 181.35, vencimento: "2026-04-15", status: "Válido" },
+    ipva: {
+      valor: 4200,
+      parcelas: 3,
+      parcelasPagas: 3,
+      vencimento: "2026-01-15",
+      status: "Pago",
+    },
+    licenciamento: {
+      valor: 181.35,
+      vencimento: "2026-04-15",
+      status: "Válido",
+    },
     seguro: {
       seguradora: "Bradesco Seguros",
       apolice: "BD-2025-456123",
@@ -1073,8 +1308,20 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       vigenciaFim: "2026-01-10",
       status: "Vencendo",
     },
-    semParar: { tag: "SP-001234568", saldo: 120.0, mediaGastoMensal: 420.0, ultimoUso: "2026-01-05", ativo: true },
+    // Exemplo: Tag Itaú
+    tollTag: {
+      provider: "Tag Itaú",
+      tag: "IT-987654321",
+      status: "Ativo",
+      balance: 120.0,
+      monthlySpend: 420.0,
+      lastUpdate: "2026-01-05",
+    },
     branch: "São Paulo",
+    id: "3",
+    type: "Seguro",
+    expirationDate: "2026-01-10",
+    status: "Vencendo",
   },
   {
     vehicleId: "3",
@@ -1083,8 +1330,18 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
     chassi: "9BWZZZ377VT004253",
     crlv: "PE-2025-3456789",
     crlvExpiry: "2026-12-31",
-    ipva: { valor: 5200, parcelas: 3, parcelasPagas: 3, vencimento: "2026-02-15", status: "Pago" },
-    licenciamento: { valor: 181.35, vencimento: "2026-05-10", status: "Válido" },
+    ipva: {
+      valor: 5200,
+      parcelas: 3,
+      parcelasPagas: 3,
+      vencimento: "2026-02-15",
+      status: "Pago",
+    },
+    licenciamento: {
+      valor: 181.35,
+      vencimento: "2026-05-10",
+      status: "Válido",
+    },
     seguro: {
       seguradora: "Tokio Marine",
       apolice: "TM-2025-987321",
@@ -1093,28 +1350,19 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       vigenciaFim: "2026-11-01",
       status: "Ativo",
     },
-    semParar: { tag: "PE-001234569", saldo: 890.0, mediaGastoMensal: 290.0, ultimoUso: "2026-01-06", ativo: true },
-    branch: "Recife",
-  },
-  {
-    vehicleId: "4",
-    vehiclePlate: "JKL-3456",
-    renavam: "00456789123",
-    chassi: "9BWZZZ377VT004254",
-    crlv: "PE-2024-4567890",
-    crlvExpiry: "2025-12-20",
-    ipva: { valor: 3800, parcelas: 3, parcelasPagas: 0, vencimento: "2026-01-20", status: "Pendente" },
-    licenciamento: { valor: 181.35, vencimento: "2025-12-25", status: "Vencido" },
-    seguro: {
-      seguradora: "SulAmérica",
-      apolice: "SA-2025-654987",
-      cobertura: 650000,
-      vigenciaInicio: "2025-03-01",
-      vigenciaFim: "2026-03-01",
+    tollTag: {
+      provider: "Sem Parar",
+      tag: "PE-001234569",
       status: "Ativo",
+      balance: 890.0,
+      monthlySpend: 290.0,
+      lastUpdate: "2026-01-06",
     },
-    semParar: { tag: "PE-001234570", saldo: 0.0, mediaGastoMensal: 350.0, ultimoUso: "2025-12-15", ativo: false },
     branch: "Recife",
+    id: "6",
+    type: "IPVA",
+    expirationDate: "2026-02-15",
+    status: "Válido",
   },
   {
     vehicleId: "5",
@@ -1123,8 +1371,18 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
     chassi: "9BWZZZ377VT004255",
     crlv: "PI-2025-5678901",
     crlvExpiry: "2026-12-31",
-    ipva: { valor: 4100, parcelas: 3, parcelasPagas: 1, vencimento: "2026-02-10", status: "Parcelado" },
-    licenciamento: { valor: 181.35, vencimento: "2026-06-05", status: "Válido" },
+    ipva: {
+      valor: 4100,
+      parcelas: 3,
+      parcelasPagas: 1,
+      vencimento: "2026-02-10",
+      status: "Parcelado",
+    },
+    licenciamento: {
+      valor: 181.35,
+      vencimento: "2026-06-05",
+      status: "Válido",
+    },
     seguro: {
       seguradora: "Mapfre",
       apolice: "MF-2025-321654",
@@ -1133,63 +1391,57 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       vigenciaFim: "2026-09-01",
       status: "Ativo",
     },
-    semParar: { tag: "PI-001234571", saldo: 650.0, mediaGastoMensal: 200.0, ultimoUso: "2026-01-07", ativo: true },
-    branch: "Piauí",
-  },
-  {
-    vehicleId: "6",
-    vehiclePlate: "PQR-2345",
-    renavam: "00789321654",
-    chassi: "9BWZZZ377VT004256",
-    crlv: "PI-2025-6789012",
-    crlvExpiry: "2026-12-31",
-    ipva: { valor: 4500, parcelas: 3, parcelasPagas: 3, vencimento: "2026-01-15", status: "Pago" },
-    licenciamento: { valor: 181.35, vencimento: "2026-07-20", status: "Válido" },
-    seguro: {
-      seguradora: "HDI Seguros",
-      apolice: "HDI-2025-159753",
-      cobertura: 780000,
-      vigenciaInicio: "2025-08-15",
-      vigenciaFim: "2026-08-15",
+    // Exemplo: Tag Itaú
+    tollTag: {
+      provider: "Tag Itaú",
+      tag: "PI-ITA-001",
       status: "Ativo",
+      balance: 650.0,
+      monthlySpend: 200.0,
+      lastUpdate: "2026-01-07",
     },
-    semParar: { tag: "PI-001234572", saldo: 320.0, mediaGastoMensal: 180.0, ultimoUso: "2026-01-04", ativo: true },
     branch: "Piauí",
+    id: "temp1",
+    type: "Licenciamento",
+    expirationDate: "2026-06-05",
+    status: "Válido",
   },
-]
+];
 
 // Função para obter documentos de um veículo específico
-export function getVehicleDocuments(vehicleId: string): VehicleDocuments | undefined {
-  return mockVehicleDocuments.find((doc) => doc.vehicleId === vehicleId)
+export function getVehicleDocuments(
+  vehicleId: string
+): VehicleDocuments | undefined {
+  return mockVehicleDocuments.find((doc) => doc.vehicleId === vehicleId);
 }
 
 // ========== TACHOGRAPH MANAGEMENT (TACÓGRAFO) ==========
 export interface TachographCalibration {
-  vehicleId: string
-  vehiclePlate: string
-  vehicleModel: string
-  inmetroNumber: string
-  lastCalibrationDate: string
-  nextCalibrationDate: string
-  certificateNumber: string
-  branch: Branch 
+  vehicleId: string;
+  vehiclePlate: string;
+  vehicleModel: string;
+  inmetroNumber: string;
+  lastCalibrationDate: string;
+  nextCalibrationDate: string;
+  certificateNumber: string;
+  branch: Branch;
 }
 
 export interface TachographReading {
-  id: string
-  vehicleId: string
-  vehiclePlate: string
-  driverId: string
-  driverName: string
-  date: string
-  startKm: number
-  endKm: number
-  distance: number
-  maxSpeed: number
-  drivingTime: number // em horas
-  hasViolation: boolean
-  diskPhoto?: string 
-  branch: Branch 
+  id: string;
+  vehicleId: string;
+  vehiclePlate: string;
+  driverId: string;
+  driverName: string;
+  date: string;
+  startKm: number;
+  endKm: number;
+  distance: number;
+  maxSpeed: number;
+  drivingTime: number; // em horas
+  hasViolation: boolean;
+  diskPhoto?: string;
+  branch: Branch;
 }
 
 export const mockTachographCalibrations: TachographCalibration[] = [
@@ -1253,7 +1505,7 @@ export const mockTachographCalibrations: TachographCalibration[] = [
     certificateNumber: "CERT-2025-002345",
     branch: "Piauí",
   },
-]
+];
 
 export const mockTachographReadings: TachographReading[] = [
   {
@@ -1376,30 +1628,38 @@ export const mockTachographReadings: TachographReading[] = [
     hasViolation: false,
     branch: "São Paulo",
   },
-]
+];
 
 // Função para verificar status de calibração
 export function getCalibrationStatus(nextCalibrationDate: string): {
-  status: "ok" | "warning" | "expired"
-  daysRemaining: number
+  status: "ok" | "warning" | "expired";
+  daysRemaining: number;
 } {
-  const today = new Date()
-  const calibrationDate = new Date(nextCalibrationDate)
-  const diffTime = calibrationDate.getTime() - today.getTime()
-  const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  const today = new Date();
+  const calibrationDate = new Date(nextCalibrationDate);
+  const diffTime = calibrationDate.getTime() - today.getTime();
+  const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  if (daysRemaining < 0) return { status: "expired", daysRemaining }
-  if (daysRemaining <= 30) return { status: "warning", daysRemaining }
-  return { status: "ok", daysRemaining }
+  if (daysRemaining < 0) return { status: "expired", daysRemaining };
+  if (daysRemaining <= 30) return { status: "warning", daysRemaining };
+  return { status: "ok", daysRemaining };
 }
 
 // ========== FILTER HELPERS ==========
-export function filterByBranch<T extends { branch: Branch }>(data: T[], branch: Branch | "Todas"): T[] {
-  if (branch === "Todas") return data
-  return data.filter((item) => item.branch === branch)
+export function filterByBranch<T extends { branch: Branch }>(
+  data: T[],
+  branch: Branch | "Todas"
+): T[] {
+  if (branch === "Todas") return data;
+  return data.filter((item) => item.branch === branch);
 }
 
-export const branches: (Branch | "Todas")[] = ["Todas", "São Paulo", "Recife", "Piauí"]
+export const branches: (Branch | "Todas")[] = [
+  "Todas",
+  "São Paulo",
+  "Recife",
+  "Piauí",
+];
 
 // Função auxiliar para compatibilidade (Legacy Adapter)
 export function adaptVehicleToLegacy(v: Vehicle): any {
@@ -1408,6 +1668,6 @@ export function adaptVehicleToLegacy(v: Vehicle): any {
     model: v.modelo,
     plate: v.placa,
     year: v.ano,
-    mileage: v.km_atual
-  }
+    mileage: v.km_atual,
+  };
 }
