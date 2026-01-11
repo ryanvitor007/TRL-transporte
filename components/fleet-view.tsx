@@ -77,6 +77,7 @@ interface NewVehicleForm {
 
 export function FleetView() {
   const toast = useToastNotification();
+  const [isSaving, setIsSaving] = useState(false); // estado para indicar salvamento
   const [loadingDetran, setLoadingDetran] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -117,10 +118,11 @@ export function FleetView() {
     combustivel: "",
   });
 
-  const filteredVehicles = mockVehicles.filter((vehicle) => {
+  // CORREÇÃO: Mudamos de 'mockVehicles' para 'vehicles' (o estado real do banco)
+  const filteredVehicles = vehicles.filter((vehicle) => {
     const matchesSearch =
-      vehicle.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase());
+      vehicle.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vehicle.placa.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
       statusFilter === "all" || vehicle.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -186,29 +188,49 @@ export function FleetView() {
       setIsSearching(false);
     }
   };
-const handleConfirmarVeiculo = async () => {
+
+  const handleConfirmarVeiculo = async () => {
+    // 1. Ativa o loading e trava o botão
+    setIsSaving(true);
+
     try {
-      // Monta o objeto com os dados do formulário
       const novoCarro = {
-        placa: formData.placa, // (Use as variáveis do seu formulário)
-        modelo: formData.modelo,
-        ano: Number(formData.ano),
-        km_atual: Number(formData.km_atual) || 0,
-        renavam: formData.renavam || "",
-        status: "Ativo"
+        placa: newVehicle.placa,
+        modelo: newVehicle.modelo,
+        ano: Number(newVehicle.ano),
+        km_atual: Number(newVehicle.quilometragem) || 0,
+        renavam: newVehicle.renavam || "",
+        status: newVehicle.status || "Ativo",
       };
 
-      // 1. Salva no Banco de Dados
       await salvarVeiculoAPI(novoCarro);
-
-      // 2. Atualiza a lista na tela sem precisar dar F5
-      await carregarDados();
+      await carregarDados(); // Atualiza a tabela
 
       toast.success("Sucesso", "Veículo salvo no banco de dados!");
-      setIsOpen(false); // Fecha o modal
-      
-    } catch (error) {
-      toast.error("Erro", "Falha ao salvar o veículo.");
+      handleCloseModal();
+    } catch (error: any) {
+      console.error(error);
+
+      // 2. Tradutor de Erros: Verifica se é erro de duplicidade
+      const mensagemErro = error.message || "";
+
+      if (
+        mensagemErro.includes("unique") ||
+        mensagemErro.includes("duplicate")
+      ) {
+        toast.error(
+          "Erro de Cadastro",
+          "Esta placa já está cadastrada no sistema."
+        );
+      } else {
+        toast.error(
+          "Erro",
+          "Falha ao salvar. Verifique os dados e tente novamente."
+        );
+      }
+    } finally {
+      // 3. Desativa o loading independente de dar certo ou errado
+      setIsSaving(false);
     }
   };
 
@@ -474,10 +496,19 @@ const handleConfirmarVeiculo = async () => {
                   </Button>
                   <Button
                     onClick={handleConfirmarVeiculo}
-                    className="bg-green-600 hover:bg-green-700"
+                    disabled={isSaving} // Trava o clique se estiver salvando
                   >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Confirmar e Adicionar Veículo
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Confirmar e Adicionar Veículo
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -544,21 +575,28 @@ const handleConfirmarVeiculo = async () => {
                     className="cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => handleVehicleClick(vehicle)}
                   >
+                    {/* Ajuste os nomes para bater com o Banco de Dados */}
                     <TableCell className="font-medium">
-                      {vehicle.model}
+                      {vehicle.modelo}
                     </TableCell>
-                    <TableCell>{vehicle.plate}</TableCell>
-                    <TableCell>{vehicle.year}</TableCell>
+                    <TableCell>{vehicle.placa}</TableCell>
+                    <TableCell>{vehicle.ano}</TableCell>
                     <TableCell>
-                      {vehicle.mileage.toLocaleString("pt-BR")} km
+                      {/* km_atual pode vir como string ou number, garantimos a formatação */}
+                      {Number(vehicle.km_atual).toLocaleString("pt-BR")} km
                     </TableCell>
                     <TableCell>
-                      <Badge className={statusColors[vehicle.status]}>
+                      <Badge
+                        className={
+                          statusColors[vehicle.status] || "bg-gray-100"
+                        }
+                      >
                         {vehicle.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {new Date(vehicle.nextMaintenance).toLocaleDateString(
+                      {/* Data de cadastro em vez de nextMaintenance por enquanto */}
+                      {new Date(vehicle.data_cadastro).toLocaleDateString(
                         "pt-BR"
                       )}
                     </TableCell>
@@ -955,7 +993,7 @@ const handleConfirmarVeiculo = async () => {
                               </p>
                               <p className="font-medium">
                                 R${" "}
-                                {vehicleDocuments.semParar.mediaMensal.toLocaleString(
+                                {vehicleDocuments.semParar.mediaGastoMensal.toLocaleString(
                                   "pt-BR",
                                   {
                                     minimumFractionDigits: 2,
