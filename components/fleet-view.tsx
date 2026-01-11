@@ -190,10 +190,16 @@ export function FleetView() {
   };
 
   const handleConfirmarVeiculo = async () => {
-    // 1. Ativa o loading e trava o botão
+    // 1. Validação Básica antes de enviar
+    if (!newVehicle.placa || !newVehicle.modelo || !newVehicle.ano) {
+      toast.error("Campos Obrigatórios", "Por favor, preencha Placa, Modelo e Ano.");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
+      // 2. Monta o objeto COMPLETO (agora com Cor, Combustível e Chassi)
       const novoCarro = {
         placa: newVehicle.placa,
         modelo: newVehicle.modelo,
@@ -201,35 +207,28 @@ export function FleetView() {
         km_atual: Number(newVehicle.quilometragem) || 0,
         renavam: newVehicle.renavam || "",
         status: newVehicle.status || "Ativo",
+        // Campos que faltavam:
+        cor: newVehicle.cor || "",
+        combustivel: newVehicle.combustivel || "",
+        chassi: newVehicle.chassi || "",
       };
 
       await salvarVeiculoAPI(novoCarro);
-      await carregarDados(); // Atualiza a tabela
+      await carregarDados(); 
 
-      toast.success("Sucesso", "Veículo salvo no banco de dados!");
+      toast.success("Veículo Cadastrado", `${novoCarro.modelo} adicionado à frota com sucesso!`);
       handleCloseModal();
+      
     } catch (error: any) {
       console.error(error);
-
-      // 2. Tradutor de Erros: Verifica se é erro de duplicidade
       const mensagemErro = error.message || "";
-
-      if (
-        mensagemErro.includes("unique") ||
-        mensagemErro.includes("duplicate")
-      ) {
-        toast.error(
-          "Erro de Cadastro",
-          "Esta placa já está cadastrada no sistema."
-        );
+      
+      if (mensagemErro.includes("unique") || mensagemErro.includes("duplicate")) {
+        toast.error("Duplicidade", "Esta placa já está cadastrada no sistema.");
       } else {
-        toast.error(
-          "Erro",
-          "Falha ao salvar. Verifique os dados e tente novamente."
-        );
+        toast.error("Erro no Servidor", "Não foi possível salvar os dados. Tente novamente.");
       }
     } finally {
-      // 3. Desativa o loading independente de dar certo ou errado
       setIsSaving(false);
     }
   };
@@ -252,7 +251,7 @@ export function FleetView() {
   };
 
   const vehicleDocuments = selectedVehicle
-    ? getVehicleDocuments(selectedVehicle.id)
+    ? getVehicleDocuments(String(selectedVehicle.id))
     : null;
 
   const getStatusBadge = (status: string) => {
@@ -595,10 +594,9 @@ export function FleetView() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {/* Data de cadastro em vez de nextMaintenance por enquanto */}
-                      {new Date(vehicle.data_cadastro).toLocaleDateString(
-                        "pt-BR"
-                      )}
+                      {new Date(
+                        vehicle.data_cadastro || new Date()
+                      ).toLocaleDateString("pt-BR")}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -608,7 +606,7 @@ export function FleetView() {
         </CardContent>
       </Card>
 
-      {/* Modal de Documentos do Veículo - mantido igual */}
+      {/* Modal de Documentos do Veículo*/}
       <Dialog open={isDocModalOpen} onOpenChange={setIsDocModalOpen}>
         <DialogContent className="max-w-[85vw] h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0 border-b pb-4">
@@ -619,11 +617,11 @@ export function FleetView() {
                 </div>
                 <div>
                   <DialogTitle className="text-xl">
-                    {selectedVehicle?.model} - {selectedVehicle?.plate}
+                    {selectedVehicle?.modelo} - {selectedVehicle?.placa}
                   </DialogTitle>
                   <p className="text-sm text-muted-foreground">
-                    Ano {selectedVehicle?.year} •{" "}
-                    {selectedVehicle?.mileage.toLocaleString("pt-BR")} km
+                    Ano {selectedVehicle?.ano} •{" "}
+                    {selectedVehicle?.km_atual?.toLocaleString("pt-BR")} km
                   </p>
                 </div>
               </div>

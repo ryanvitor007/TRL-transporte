@@ -1,18 +1,24 @@
 // Mock data para simular resposta do backend
+// ATUALIZADO: Agora alinhado com o Banco de Dados (PostgreSQL/Supabase)
 
 export type Branch = "São Paulo" | "Recife" | "Piauí"
 
+// CORREÇÃO 1: 'id' agora aceita number (do banco) ou string (legado)
 export interface Vehicle {
-  id: string
-  model: string
-  plate: string
-  year: number
-  mileage: number
-  status: "Ativo" | "Em Oficina" | "Problema Documental"
-  lastMaintenance: string
-  nextMaintenance: string
-  nextMaintenanceMileage: number
-  branch: Branch // Added branch property
+  id: number | string; 
+  modelo: string;      // Antes: model
+  placa: string;       // Antes: plate
+  ano: number;         // Antes: year
+  km_atual: number;    // Antes: mileage
+  status: "Ativo" | "Em Oficina" | "Problema Documental";
+  renavam?: string;
+  data_cadastro?: string | Date;
+  
+  // Campos opcionais para manter compatibilidade
+  lastMaintenance?: string;
+  nextMaintenance?: string;
+  nextMaintenanceMileage?: number;
+  branch?: Branch; 
 }
 
 export interface Document {
@@ -27,7 +33,7 @@ export interface Document {
   parcelas?: number
   parcelasPagas?: number
   detranUrl?: string
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export interface Maintenance {
@@ -40,7 +46,7 @@ export interface Maintenance {
   scheduledMileage: number
   status: "Urgente" | "Agendada" | "Concluída"
   description: string
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export interface Fine {
@@ -56,7 +62,7 @@ export interface Fine {
   pontos?: number
   prazoRecurso?: string
   detranUrl?: string
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export interface Driver {
@@ -121,76 +127,82 @@ export const mockDrivers: Driver[] = [
 
 export const mockVehicles: Vehicle[] = [
   {
-    id: "1",
-    model: "Volvo FH 540",
-    plate: "ABC-1234",
-    year: 2022,
-    mileage: 125000,
+    id: 1,
+    modelo: "Volvo FH 540",
+    placa: "ABC-1234",
+    ano: 2022,
+    km_atual: 125000,
     status: "Ativo",
+    renavam: "12345678900",
+    data_cadastro: "2024-01-01T10:00:00Z",
+    branch: "São Paulo",
     lastMaintenance: "2025-12-15",
     nextMaintenance: "2026-02-15",
-    nextMaintenanceMileage: 135000,
-    branch: "São Paulo",
   },
   {
-    id: "2",
-    model: "Scania R450",
-    plate: "DEF-5678",
-    year: 2021,
-    mileage: 180000,
+    id: 2,
+    modelo: "Scania R450",
+    placa: "DEF-5678",
+    ano: 2021,
+    km_atual: 180000,
     status: "Em Oficina",
+    renavam: "09876543211",
+    data_cadastro: "2024-02-15T14:30:00Z",
+    branch: "São Paulo",
     lastMaintenance: "2025-11-20",
     nextMaintenance: "2026-01-20",
-    nextMaintenanceMileage: 190000,
-    branch: "São Paulo",
   },
   {
-    id: "3",
-    model: "Mercedes Actros",
-    plate: "GHI-9012",
-    year: 2023,
-    mileage: 45000,
+    id: 3,
+    modelo: "Mercedes Actros",
+    placa: "GHI-9012",
+    ano: 2023,
+    km_atual: 45000,
     status: "Ativo",
+    renavam: "11223344556",
+    data_cadastro: "2024-03-10T09:00:00Z",
+    branch: "Recife",
     lastMaintenance: "2026-01-05",
     nextMaintenance: "2026-03-05",
-    nextMaintenanceMileage: 55000,
-    branch: "Recife",
   },
   {
-    id: "4",
-    model: "DAF XF",
-    plate: "JKL-3456",
-    year: 2020,
-    mileage: 220000,
+    id: 4,
+    modelo: "DAF XF",
+    placa: "JKL-3456",
+    ano: 2020,
+    km_atual: 220000,
     status: "Problema Documental",
+    renavam: "99887766554",
+    data_cadastro: "2023-11-05T16:20:00Z",
+    branch: "Recife",
     lastMaintenance: "2025-10-10",
     nextMaintenance: "2025-12-10",
-    nextMaintenanceMileage: 230000,
-    branch: "Recife",
   },
   {
-    id: "5",
-    model: "Iveco S-Way",
-    plate: "MNO-7891",
-    year: 2022,
-    mileage: 98000,
+    id: 5,
+    modelo: "Iveco S-Way",
+    placa: "MNO-7891",
+    ano: 2022,
+    km_atual: 98000,
     status: "Ativo",
+    renavam: "55443322110",
+    data_cadastro: "2024-05-20T11:00:00Z",
+    branch: "Piauí",
     lastMaintenance: "2025-12-28",
     nextMaintenance: "2026-02-28",
-    nextMaintenanceMileage: 108000,
-    branch: "Piauí",
   },
   {
-    id: "6",
-    model: "Volvo FH 460",
-    plate: "PQR-2345",
-    year: 2021,
-    mileage: 156000,
+    id: 6,
+    modelo: "Volvo FH 460",
+    placa: "PQR-2345",
+    ano: 2021,
+    km_atual: 156000,
     status: "Ativo",
+    renavam: "66778899001",
+    data_cadastro: "2024-01-25T13:45:00Z",
+    branch: "Piauí",
     lastMaintenance: "2025-11-30",
     nextMaintenance: "2026-01-30",
-    nextMaintenanceMileage: 166000,
-    branch: "Piauí",
   },
 ]
 
@@ -417,7 +429,8 @@ export function getVehiclesInRotation(vehicles: Vehicle[]): Vehicle[] {
   const { blockedEndings } = getPlateRestriction()
 
   return vehicles.filter((vehicle) => {
-    const lastDigit = Number.parseInt(vehicle.plate.slice(-1))
+    // CORREÇÃO 2: Agora busca .placa em vez de .plate
+    const lastDigit = Number.parseInt(vehicle.placa.slice(-1))
     return blockedEndings.includes(lastDigit)
   })
 }
@@ -433,7 +446,7 @@ export interface FuelEntry {
   odometer: number
   efficiency: number // Km/L
   hasAnomaly: boolean
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export interface MonthlyCost {
@@ -443,7 +456,7 @@ export interface MonthlyCost {
   tires: number
   insurance: number
   total: number
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export interface VehicleTCO {
@@ -455,7 +468,7 @@ export interface VehicleTCO {
   cumulativeMaintenanceCost: number
   cumulativeFuelCost: number
   depreciationPercent: number
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export const mockFuelEntries: FuelEntry[] = [
@@ -642,7 +655,7 @@ export interface VehicleTires {
   vehiclePlate: string
   vehicleModel: string
   tires: Tire[]
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export interface TireRotation {
@@ -652,7 +665,7 @@ export interface TireRotation {
   date: string
   description: string
   mileage: number
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export interface SpareTire {
@@ -662,7 +675,7 @@ export interface SpareTire {
   size: string
   quantity: number
   condition: "Novo" | "Usado - Bom" | "Usado - Regular"
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export const mockVehicleTires: VehicleTires[] = [
@@ -907,7 +920,7 @@ export interface Incident {
   estimatedCost: number
   insuranceClaim: boolean
   photos: string[]
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export const mockIncidents: Incident[] = [
@@ -1019,7 +1032,7 @@ export interface VehicleDocuments {
     status: "Ativo" | "Vencendo" | "Vencido"
   }
   semParar: { tag: string; saldo: number; mediaGastoMensal: number; ultimoUso: string; ativo: boolean }
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export const mockVehicleDocuments: VehicleDocuments[] = [
@@ -1159,7 +1172,7 @@ export interface TachographCalibration {
   lastCalibrationDate: string
   nextCalibrationDate: string
   certificateNumber: string
-  branch: Branch // Added branch property
+  branch: Branch 
 }
 
 export interface TachographReading {
@@ -1175,8 +1188,8 @@ export interface TachographReading {
   maxSpeed: number
   drivingTime: number // em horas
   hasViolation: boolean
-  diskPhoto?: string // Renamed from diskPhotoUrl
-  branch: Branch // Added branch property
+  diskPhoto?: string 
+  branch: Branch 
 }
 
 export const mockTachographCalibrations: TachographCalibration[] = [
@@ -1387,3 +1400,14 @@ export function filterByBranch<T extends { branch: Branch }>(data: T[], branch: 
 }
 
 export const branches: (Branch | "Todas")[] = ["Todas", "São Paulo", "Recife", "Piauí"]
+
+// Função auxiliar para compatibilidade (Legacy Adapter)
+export function adaptVehicleToLegacy(v: Vehicle): any {
+  return {
+    ...v,
+    model: v.modelo,
+    plate: v.placa,
+    year: v.ano,
+    mileage: v.km_atual
+  }
+}
