@@ -196,10 +196,16 @@ export async function excluirVeiculoAPI(id: number | string): Promise<void> {
 }
 
 // Função para buscar a lista de carros do banco
+// --- FROTA / VEÍCULOS (Usado no Select de Manutenção) ---
 export async function buscarFrotaAPI() {
-  const response = await fetch(`${API_URL}/vehicles`);
-  if (!response.ok) throw new Error("Erro ao buscar frota");
-  return response.json();
+  try {
+    const response = await fetch(`${API_URL}/vehicles`);
+    if (!response.ok) return []; // Retorna lista vazia se der erro
+    return response.json();
+  } catch (error) {
+    console.error("Erro ao buscar frota:", error);
+    return [];
+  }
 }
 
 // Função para salvar o carro de verdade
@@ -248,6 +254,40 @@ export async function buscarDocumentosAPI() {
     return response.json();
   } catch (error) {
     console.error("Erro ao buscar documentos:", error);
+    return [];
+  }
+}
+
+// --- MANUTENÇÕES ---
+
+// Salvar nova manutenção
+export async function salvarManutencaoAPI(dados: any) {
+  const response = await fetch(`${API_URL}/maintenances`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  if (!response.ok) throw new Error("Erro ao salvar manutenção");
+  return response.json();
+}
+
+// Dar Baixa (Concluir)
+export async function concluirManutencaoAPI(id: number) {
+  const response = await fetch(`${API_URL}/maintenances/${id}/complete`, {
+    method: "PATCH",
+  });
+  if (!response.ok) throw new Error("Erro ao concluir manutenção");
+  return response.json();
+}
+
+// Listar
+export async function buscarManutencoesAPI() {
+  try {
+    const response = await fetch(`${API_URL}/maintenances`);
+    if (!response.ok) return [];
+    return response.json();
+  } catch (error) {
+    console.error(error);
     return [];
   }
 }
