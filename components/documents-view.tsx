@@ -106,6 +106,7 @@ export function DocumentsView() {
     return matchesSearch && matchesStatus;
   });
 
+  
   // KPIs
   const totalMultasValor = filteredFines.reduce(
     (acc, fine) => acc + Number(fine.amount),
@@ -520,3 +521,4 @@ export function DocumentsView() {
     </div>
   );
 }
+
