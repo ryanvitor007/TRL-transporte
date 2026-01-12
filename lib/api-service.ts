@@ -192,3 +192,30 @@ export async function salvarVeiculoAPI(dadosVeiculo: any) {
   if (!response.ok) throw new Error('Erro ao salvar veículo');
   return response.json();
 }
+
+// --- MULTAS ---
+export async function buscarMultasAPI() {
+  const response = await fetch(`${API_URL}/fines`);
+  if (!response.ok) throw new Error("Erro ao buscar multas");
+  return response.json();
+}
+
+export async function salvarMultaAPI(multa: any) {
+  const response = await fetch(`${API_URL}/fines`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(multa),
+  });
+  if (!response.ok) throw new Error("Erro ao salvar multa");
+  return response.json();
+}
+
+// --- DOCUMENTOS ---
+// (Simulando que buscamos documentos junto com veículos ou rota específica)
+export async function buscarDocumentosAPI() {
+  // Idealmente você criaria um DocumentsModule igual ao FinesModule,
+  // mas aqui podemos assumir que vamos listar veículos e seus docs.
+  // Por enquanto, vou deixar um placeholder para você implementar a rota '/documents' se quiser,
+  // ou podemos buscar a frota e assumir dados padrão se a tabela estiver vazia.
+  return []; 
+}

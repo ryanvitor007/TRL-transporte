@@ -97,6 +97,19 @@ export interface Driver {
   branch: Branch;
 }
 
+export interface TrafficFine {
+  id: string;
+  vehiclePlate: string;
+  driverName: string;
+  infractionDate: string;
+  description: string; // Ex: Excesso de velocidade
+  amount: number;
+  points: number;
+  status: "Pendente" | "Pago" | "Em Recurso" | "Vencido";
+  dueDate: string; // Vencimento do boleto
+  location: string;
+}
+
 export const mockDrivers: Driver[] = [
   {
     id: "d1",
