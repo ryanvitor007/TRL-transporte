@@ -8,10 +8,11 @@ import {
   Clock,
   DollarSign,
   Scale,
-  Car,
-  Hash, // <--- Adicionado
-  Calendar, // <--- Adicionado
   ExternalLink,
+  Car,
+  Hash,
+  Calendar,
+  MapPin,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -44,17 +45,20 @@ import {
 import { buscarMultasAPI, buscarDocumentosAPI } from "@/lib/api-service";
 import { useToastNotification } from "@/contexts/toast-context";
 
-// Interfaces atualizadas para garantir compatibilidade
+// --- INTERFACES (Atualizadas com vehicle_plate) ---
 interface FineFromAPI {
   id: number;
-  vehicle_plate?: string; // <--- Novo Campo vindo do banco
+  vehicle_id?: number;
+  vehicle_plate?: string; // <--- Novo Campo
   vehicles?: { placa: string; modelo: string } | null;
   driver_name: string;
-  infraction_date: string; // string ISO
+  infraction_date: string;
   description: string;
   amount: number;
   status: string;
   location: string;
+  due_date?: string;
+  detranUrl?: string;
 }
 
 interface DocumentFromAPI {
@@ -64,10 +68,10 @@ interface DocumentFromAPI {
   vehicles?: { placa: string; renavam: string } | null;
   ipva_status: string;
   ipva_valor: number;
-  ipva_vencimento: string; // string ISO
+  ipva_vencimento: string;
   licenciamento_status: string;
-  licenciamento_vencimento: string; // string ISO
-  crlv_validade: string; // string ISO
+  licenciamento_vencimento: string;
+  crlv_validade: string;
 }
 
 export function DocumentsView() {
@@ -83,6 +87,7 @@ export function DocumentsView() {
   const [selectedDocument, setSelectedDocument] =
     useState<DocumentFromAPI | null>(null);
 
+  // --- CARREGAR DADOS ---
   useEffect(() => {
     carregarDados();
   }, []);
@@ -94,27 +99,25 @@ export function DocumentsView() {
         buscarMultasAPI(),
         buscarDocumentosAPI(),
       ]);
-
-      // Garante que sejam arrays mesmo se a API falhar
       setFines(Array.isArray(dadosMultas) ? dadosMultas : []);
       setDocuments(Array.isArray(dadosDocs) ? dadosDocs : []);
     } catch (error) {
       console.error(error);
-      toast.error("Erro", "Falha ao carregar dados.");
+      toast.error("Erro", "Falha ao carregar dados do sistema.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Filtros
-  // Filtros
+  // --- FILTROS ---
   const filteredFines = fines.filter((fine) => {
-    // LÓGICA HÍBRIDA: Tenta pegar do Join (vehicles.placa) ou do campo direto (vehicle_plate)
-    const placaReal = fine.vehicles?.placa || fine.vehicle_plate || "Placa N/A";
+    // Tenta pegar a placa do veículo cadastrado OU a placa salva na multa
+    const placaReal = fine.vehicles?.placa || fine.vehicle_plate || "";
 
     const matchesSearch =
       placaReal.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fine.driver_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      fine.driver_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      fine.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
       statusFilter === "all" || fine.status === statusFilter;
@@ -152,12 +155,12 @@ export function DocumentsView() {
         <div className="flex gap-2">
           <Button onClick={() => carregarDados()} variant="outline" size="sm">
             <Clock className="mr-2 h-4 w-4" />
-            Atualizar Dados
+            Atualizar
           </Button>
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* --- CARDS DE KPI --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -174,7 +177,7 @@ export function DocumentsView() {
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {filteredFines.length} infrações registradas
+              {filteredFines.length} infrações encontradas
             </p>
           </CardContent>
         </Card>
@@ -218,11 +221,12 @@ export function DocumentsView() {
             <div className="text-2xl font-bold">
               {documents.length - expiringDocs.length}
             </div>
-            <p className="text-xs text-muted-foreground">Regularizados</p>
+            <p className="text-xs text-muted-foreground">Situação regular</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* --- ABAS --- */}
       <Tabs defaultValue="multas" className="space-y-4">
         <TabsList>
           <TabsTrigger value="multas" className="flex items-center gap-2">
@@ -235,7 +239,7 @@ export function DocumentsView() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ABA MULTAS */}
+        {/* ABA DE MULTAS */}
         <TabsContent value="multas" className="space-y-4">
           <Card>
             <CardHeader>
@@ -245,7 +249,7 @@ export function DocumentsView() {
               <div className="flex flex-col gap-4 mb-6 sm:flex-row">
                 <div className="relative flex-1">
                   <Input
-                    placeholder="Buscar por placa..."
+                    placeholder="Buscar por placa, motorista ou descrição..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -271,13 +275,20 @@ export function DocumentsView() {
                       <TableHead>Data</TableHead>
                       <TableHead>Placa</TableHead>
                       <TableHead>Infração</TableHead>
+                      <TableHead>Motorista</TableHead>
                       <TableHead>Valor</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredFines.length === 0 ? (
+                    {loading ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-4">
+                        <TableCell colSpan={6} className="text-center py-8">
+                          Carregando dados...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredFines.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8">
                           Nenhuma multa encontrada.
                         </TableCell>
                       </TableRow>
@@ -294,29 +305,58 @@ export function DocumentsView() {
                                 fine.status === "Pago" ? "default" : "secondary"
                               }
                               className={
-                                fine.status === "Pendente"
-                                  ? "bg-yellow-100 text-yellow-800"
+                                fine.status === "Pago"
+                                  ? "bg-green-100 text-green-800 hover:bg-green-200"
                                   : fine.status === "Vencido"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-green-100 text-green-800"
+                                  ? "bg-red-100 text-red-800 hover:bg-red-200"
+                                  : fine.status === "Pendente"
+                                  ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                                  : "bg-blue-100 text-blue-800 hover:bg-blue-200"
                               }
                             >
                               {fine.status}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {new Date(fine.infraction_date).toLocaleDateString(
-                              "pt-BR"
-                            )}
+                            <div className="flex flex-col">
+                              <span>
+                                {new Date(
+                                  fine.infraction_date
+                                ).toLocaleDateString("pt-BR")}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(
+                                  fine.infraction_date
+                                ).toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
                           </TableCell>
-                          {/* Tratamento para placa vazia */}
-                          <TableCell className="font-bold">
+                          {/* CORREÇÃO: Exibe a placa do cadastro ou a placa salva */}
+                          <TableCell className="font-medium">
                             {fine.vehicles?.placa ||
                               fine.vehicle_plate ||
                               "---"}
                           </TableCell>
-                          <TableCell>{fine.description}</TableCell>
-                          <TableCell>R$ {fine.amount}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="truncate max-w-[200px]">
+                                {fine.description}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {fine.location}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{fine.driver_name}</TableCell>
+                          <TableCell className="font-bold">
+                            R${" "}
+                            {Number(fine.amount).toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -327,7 +367,7 @@ export function DocumentsView() {
           </Card>
         </TabsContent>
 
-        {/* ABA DOCUMENTOS */}
+        {/* ABA DE DOCUMENTOS */}
         <TabsContent value="docs" className="space-y-4">
           <Card>
             <CardHeader>
@@ -349,25 +389,20 @@ export function DocumentsView() {
                   <TableBody>
                     {documents.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4">
+                        <TableCell colSpan={6} className="text-center py-8">
                           Nenhum documento encontrado.
                         </TableCell>
                       </TableRow>
                     ) : (
                       documents.map((doc) => (
                         <TableRow key={doc.id} className="hover:bg-muted/50">
-                          {/* COLUNA 1: PLACA (Com fallback) */}
                           <TableCell className="font-medium flex items-center gap-2">
                             <Car className="h-4 w-4 text-muted-foreground" />
                             {doc.vehicles?.placa || doc.vehicle_plate || "---"}
                           </TableCell>
-
-                          {/* COLUNA 2: RENAVAM (Tenta pegar do veiculo, senao da raiz doc) */}
                           <TableCell className="font-mono text-sm">
                             {doc.vehicles?.renavam || doc.renavam || "---"}
                           </TableCell>
-
-                          {/* COLUNA 3: IPVA */}
                           <TableCell>
                             <Badge
                               variant="outline"
@@ -380,8 +415,6 @@ export function DocumentsView() {
                               {doc.ipva_status}
                             </Badge>
                           </TableCell>
-
-                          {/* COLUNA 4: LICENCIAMENTO */}
                           <TableCell>
                             <Badge
                               variant="outline"
@@ -394,8 +427,6 @@ export function DocumentsView() {
                               {doc.licenciamento_status}
                             </Badge>
                           </TableCell>
-
-                          {/* COLUNA 5: VALIDADE */}
                           <TableCell>
                             {doc.crlv_validade
                               ? new Date(doc.crlv_validade).toLocaleDateString(
@@ -403,8 +434,6 @@ export function DocumentsView() {
                                 )
                               : "---"}
                           </TableCell>
-
-                          {/* COLUNA 6: AÇÕES */}
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"
@@ -425,31 +454,219 @@ export function DocumentsView() {
         </TabsContent>
       </Tabs>
 
-      {/* Modal Detalhes Multa (Exemplo simplificado) */}
+      {/* --- MODAL DE DETALHES DA MULTA (Visual Rico) --- */}
       <Dialog open={!!selectedFine} onOpenChange={() => setSelectedFine(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Detalhes da Infração</DialogTitle>
-            <DialogDescription>
-              Veículo: {selectedFine?.vehicles?.placa || "N/A"}
+        <DialogContent
+          className="!max-w-none !w-[85vw] max-h-[90vh] overflow-y-auto p-6"
+          style={{
+            width: "85vw !important",
+            maxWidth: "85vw !important",
+          }}
+        >
+          <DialogHeader className="mb-4">
+            <DialogTitle className="flex items-center gap-2 text-xl text-red-600">
+              <AlertTriangle className="h-6 w-6" />
+              Detalhes da Infração
+            </DialogTitle>
+            <DialogDescription className="text-base">
+              Informações da infração do veículo{" "}
+              {selectedFine?.vehicles?.placa ||
+                selectedFine?.vehicle_plate ||
+                "N/A"}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div>
-              <h4 className="font-medium text-sm">Infração</h4>
-              <p className="text-sm text-muted-foreground">
-                {selectedFine?.description}
-              </p>
+
+          {selectedFine && (
+            <div className="space-y-6 py-4">
+              {/* --- 1. Info Cards (Grid no Topo) --- */}
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card className="bg-muted/40 border-muted">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-full bg-red-100 p-3 text-red-600">
+                        <Car className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Placa
+                        </p>
+                        <p className="text-lg font-bold">
+                          {selectedFine.vehicles?.placa ||
+                            selectedFine.vehicle_plate ||
+                            "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-muted/40 border-muted">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-full bg-red-100 p-3 text-red-600">
+                        <Hash className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Cód. Infração
+                        </p>
+                        <p className="text-lg font-bold">#{selectedFine.id}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-muted/40 border-muted">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-full bg-red-100 p-3 text-red-600">
+                        <Calendar className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Data
+                        </p>
+                        <p className="text-lg font-bold">
+                          {new Date(
+                            selectedFine.infraction_date
+                          ).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-muted/40 border-muted">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-full bg-red-100 p-3 text-red-600">
+                        <DollarSign className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Valor
+                        </p>
+                        <p className="text-lg font-bold text-red-600">
+                          R${" "}
+                          {Number(selectedFine.amount).toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* --- 2. Detalhes da Multa --- */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">
+                    Informações Completas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Descrição da Infração
+                      </p>
+                      <p className="font-medium text-lg leading-snug">
+                        {selectedFine.description}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Status Atual
+                      </p>
+                      <Badge
+                        className={
+                          selectedFine.status === "Pago"
+                            ? "bg-green-100 text-green-800 hover:bg-green-100 px-3 py-1 text-base"
+                            : selectedFine.status === "Vencido"
+                            ? "bg-red-100 text-red-800 hover:bg-red-100 px-3 py-1 text-base"
+                            : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100 px-3 py-1 text-base"
+                        }
+                      >
+                        {selectedFine.status}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-4 w-4" /> Local da Infração
+                      </p>
+                      <p className="font-medium">{selectedFine.location}</p>
+                    </div>
+
+                    {selectedFine.driver_name && (
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Motorista Responsável
+                        </p>
+                        <p className="font-medium">
+                          {selectedFine.driver_name}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* --- 3. Aviso de Status --- */}
+              {selectedFine.status === "Pendente" && (
+                <Card className="border-amber-200 bg-amber-50">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-4">
+                      <AlertTriangle className="h-6 w-6 text-amber-600 mt-1" />
+                      <div>
+                        <p className="font-bold text-amber-800 text-lg">
+                          Multa Pendente de Pagamento
+                        </p>
+                        <p className="text-base text-amber-700">
+                          Efetue o pagamento ou apresente recurso para evitar
+                          acréscimos e bloqueio do licenciamento.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* --- 4. Botões de Ação --- */}
+              <div className="flex flex-col sm:flex-row justify-end gap-4 pt-4 border-t">
+                {selectedFine.status === "Pendente" && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="gap-2 h-12 text-base"
+                    onClick={() =>
+                      window.open("https://www.detran.sp.gov.br", "_blank")
+                    }
+                  >
+                    <Scale className="h-5 w-5" />
+                    Apresentar Recurso
+                  </Button>
+                )}
+                <Button
+                  size="lg"
+                  className="gap-2 bg-red-600 hover:bg-red-700 text-white h-12 text-base shadow-md"
+                  onClick={() =>
+                    window.open(
+                      selectedFine.detranUrl || "https://www.detran.sp.gov.br",
+                      "_blank"
+                    )
+                  }
+                >
+                  <ExternalLink className="h-5 w-5" />
+                  Acessar Portal DETRAN
+                </Button>
+              </div>
             </div>
-            <div>
-              <h4 className="font-medium text-sm">Valor</h4>
-              <p className="text-lg font-bold">R$ {selectedFine?.amount}</p>
-            </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* --- MODAL DE DETALHES DO DOCUMENTO (TAMANHO AUMENTADO) --- */}
+      {/* --- MODAL DE DETALHES DO DOCUMENTO (LARGURA TOTAL) --- */}
       <Dialog
         open={!!selectedDocument}
         onOpenChange={() => setSelectedDocument(null)}
