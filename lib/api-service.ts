@@ -157,6 +157,21 @@ export async function consultarVeiculoAPI(placa: string, cpfCnpj?: string): Prom
 
 const API_URL = 'http://localhost:3001';
 
+export async function excluirVeiculoAPI(id: number | string): Promise<void> {
+  // Converte para string se necessário, dependendo de como seu backend espera
+  const response = await fetch(`${API_URL}/vehicles/${id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Erro ao excluir veículo");
+  }
+}
+
 // Função para buscar a lista de carros do banco
 export async function buscarFrotaAPI() {
   const response = await fetch(`${API_URL}/vehicles`);

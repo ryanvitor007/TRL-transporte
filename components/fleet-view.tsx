@@ -7,6 +7,7 @@ import {
   consultarVeiculoAPI,
   salvarVeiculoAPI,
   buscarFrotaAPI,
+  excluirVeiculoAPI,
 } from "@/lib/api-service";
 import { useToastNotification } from "@/contexts/toast-context";
 import {
@@ -55,6 +56,7 @@ import {
   Clock,
   Wallet,
   Info,
+  Trash2,
 } from "lucide-react";
 import { type Vehicle, getVehicleDocuments } from "@/lib/mock-data";
 
@@ -80,6 +82,8 @@ interface NewVehicleForm {
 
 export function FleetView() {
   const toast = useToastNotification();
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -114,17 +118,17 @@ export function FleetView() {
   // Função para ler CSV e detectar Mês de Referência
   const processarCSV = async (file: File) => {
     const text = await file.text();
-    const lines = text.split('\n');
+    const lines = text.split("\n");
     const novasAtualizacoes: typeof tagUpdates = {};
     let carrosAtualizados = 0;
-    
+
     // CORREÇÃO CRÍTICA AQUI: Adicionado ": Date | null"
     let dataDetectada: Date | null = null;
-    const regexData = /(\d{2})[\/-](\d{2})[\/-](\d{4})/; 
+    const regexData = /(\d{2})[\/-](\d{2})[\/-](\d{4})/;
 
-    lines.forEach(line => {
-      const content = line.toUpperCase().replace(/[^A-Z0-9.,;\/-]/g, '');
-      
+    lines.forEach((line) => {
+      const content = line.toUpperCase().replace(/[^A-Z0-9.,;\/-]/g, "");
+
       // 1. Tenta detectar a data se ainda não achou
       if (!dataDetectada) {
         const match = line.match(regexData);
@@ -137,12 +141,12 @@ export function FleetView() {
       }
 
       // 2. Busca Placas
-      vehicles.forEach(vehicle => {
-        if (content.includes(vehicle.placa.replace('-', ''))) {
+      vehicles.forEach((vehicle) => {
+        if (content.includes(vehicle.placa.replace("-", ""))) {
           novasAtualizacoes[vehicle.placa] = {
-            balance: Math.random() * 500, 
-            monthlySpend: Math.random() * 200, 
-            lastUpdate: new Date().toISOString()
+            balance: Math.random() * 500,
+            monthlySpend: Math.random() * 200,
+            lastUpdate: new Date().toISOString(),
           };
           carrosAtualizados++;
         }
@@ -150,23 +154,55 @@ export function FleetView() {
     });
 
     const periodoFormatado = dataDetectada
-      ? new Date(dataDetectada).toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+      ? new Date(dataDetectada).toLocaleString("pt-BR", {
+          month: "long",
+          year: "numeric",
+        })
       : "Período não identificado";
 
-    return { 
-      updates: novasAtualizacoes, 
+    return {
+      updates: novasAtualizacoes,
       count: carrosAtualizados,
       metadata: {
         fileName: file.name,
-        uploadDate: new Date().toLocaleString('pt-BR'),
-        referencePeriod: periodoFormatado.charAt(0).toUpperCase() + periodoFormatado.slice(1)
-      }
+        uploadDate: new Date().toLocaleString("pt-BR"),
+        referencePeriod:
+          periodoFormatado.charAt(0).toUpperCase() + periodoFormatado.slice(1),
+      },
     };
   };
 
   useEffect(() => {
     carregarDados();
   }, []);
+
+  // Função para confirmar e executar a exclusão
+  const confirmDelete = async () => {
+    if (vehicleToDelete) {
+      try {
+        // 1. Chama a API para apagar do Banco de Dados
+        await excluirVeiculoAPI(vehicleToDelete.id);
+
+        // 2. Se deu certo, remove da lista visual (Front-end)
+        setVehicles((prev) => prev.filter((v) => v.id !== vehicleToDelete.id));
+
+        toast.success(
+          "Veículo Excluído",
+          `O veículo ${vehicleToDelete.placa} e todos os seus dados foram removidos.`
+        );
+      } catch (error) {
+        console.error("Erro ao excluir:", error);
+        toast.error(
+          "Erro na Exclusão",
+          "Não foi possível remover o veículo do banco de dados."
+        );
+      } finally {
+        // 3. Fecha o modal de qualquer jeito
+        setIsDeleteModalOpen(false);
+        setVehicleToDelete(null);
+      }
+    }
+  };
 
   const carregarDados = async () => {
     try {
@@ -392,18 +428,24 @@ export function FleetView() {
   const handleProcessFile = useCallback(async () => {
     if (uploadedFile) {
       toast.success("Lendo Arquivo...", "Analisando datas e placas...");
-      
+
       try {
         const { updates, count, metadata } = await processarCSV(uploadedFile);
-        
-        setTagUpdates(prev => ({ ...prev, ...updates }));
-        setImportInfo(metadata); 
+
+        setTagUpdates((prev) => ({ ...prev, ...updates }));
+        setImportInfo(metadata);
 
         if (count > 0) {
-          toast.success("Importação Concluída", `Extrato de ${metadata.referencePeriod} processado com sucesso.`);
+          toast.success(
+            "Importação Concluída",
+            `Extrato de ${metadata.referencePeriod} processado com sucesso.`
+          );
         } else {
           // CORREÇÃO: Trocado de .warning para .error (com título de Atenção)
-          toast.error("Atenção", "Nenhuma placa correspondente encontrada no arquivo.");
+          toast.error(
+            "Atenção",
+            "Nenhuma placa correspondente encontrada no arquivo."
+          );
         }
       } catch (error) {
         console.error(error);
@@ -463,13 +505,12 @@ export function FleetView() {
               // Se não, usa o padrão do banco/mock
               provider: "Outro",
               tag: "Não instalada",
-              status: "Inativo",
+              status: "Ativo",
               balance: 0,
               monthlySpend: 0,
               lastUpdate: new Date().toISOString(),
               updateMethod: "Sistema",
             },
-
 
         branch: selectedVehicle.branch || "São Paulo",
         status: "Válido",
@@ -795,44 +836,115 @@ export function FleetView() {
                 <TableRow>
                   <TableHead>Modelo</TableHead>
                   <TableHead>Placa</TableHead>
-                  <TableHead>Ano</TableHead>
-                  <TableHead>Quilometragem</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Próx. Manutenção</TableHead>
+                  {/* CORREÇÃO: Coluna Km Atual Restaurada */}
+                  <TableHead className="hidden md:table-cell">Km Atual</TableHead>
+                  <TableHead className="hidden md:table-cell">Ano</TableHead>
+                  <TableHead className="hidden md:table-cell">Status</TableHead>
+                  {/* Alinhamento corrigido à direita */}
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
+
+              {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
+                <Dialog
+                  open={isDeleteModalOpen}
+                  onOpenChange={setIsDeleteModalOpen}
+                >
+                  <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2 text-red-600">
+                        <AlertTriangle className="h-5 w-5" />
+                        Confirmar Exclusão
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="py-4">
+                      <p className="text-sm text-muted-foreground">
+                        Você tem certeza que deseja excluir o veículo{" "}
+                        <span className="font-bold text-foreground">
+                          {vehicleToDelete?.modelo} ({vehicleToDelete?.placa})
+                        </span>
+                        ?
+                      </p>
+                      <p className="mt-2 text-xs text-red-500 font-medium">
+                        Esta ação não pode ser desfeita e removerá todos os
+                        dados associados.
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsDeleteModalOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={confirmDelete}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Excluir Veículo
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
               <TableBody>
                 {filteredVehicles.map((vehicle) => (
                   <TableRow
                     key={vehicle.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleVehicleClick(vehicle)}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => {
+                      setSelectedVehicle(vehicle);
+                      setIsDocModalOpen(true);
+                    }}
                   >
                     <TableCell className="font-medium">
-                      {vehicle.modelo}
+                      <div className="flex flex-col">
+                        <span>{vehicle.modelo}</span>
+                        <span className="text-xs text-muted-foreground md:hidden">
+                          {vehicle.placa}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>{vehicle.placa}</TableCell>
-                    <TableCell>{vehicle.ano}</TableCell>
-                    <TableCell>
-                      {vehicle.km_atual?.toLocaleString("pt-BR") || 0} km
+                    
+                    {/* CORREÇÃO: Célula de Km Atual inserida para alinhar as colunas */}
+                    <TableCell className="hidden md:table-cell">
+                      {vehicle.km_atual ? vehicle.km_atual.toLocaleString() : 0} km
                     </TableCell>
-                    <TableCell>
+
+                    <TableCell className="hidden md:table-cell">{vehicle.ano}</TableCell>
+                    
+                    <TableCell className="hidden md:table-cell">
                       <Badge
+                        variant={vehicle.status === "Ativo" ? "default" : "secondary"}
                         className={
-                          statusColors[
-                            vehicle.status as keyof typeof statusColors
-                          ]
+                          vehicle.status === "Ativo"
+                            ? "bg-green-600 hover:bg-green-700"
+                            : vehicle.status === "Em Oficina"
+                            ? "bg-yellow-600 hover:bg-yellow-700"
+                            : "bg-red-600 hover:bg-red-700"
                         }
                       >
                         {vehicle.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      {vehicle.proxima_manutencao
-                        ? new Date(
-                            vehicle.proxima_manutencao
-                          ).toLocaleDateString("pt-BR")
-                        : "-"}
+                    
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Impede de abrir o modal de detalhes ao clicar na lixeira
+                          setVehicleToDelete(vehicle);
+                          setIsDeleteModalOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -946,29 +1058,34 @@ export function FleetView() {
                           <span className="text-sm">Seguro</span>
                           {getStatusBadge(vehicleDocuments.seguro.status)}
                         </div>
-                      {/* --- NOVO BLOCO: Informações do Extrato Importado --- */}
-                      {importInfo && tagUpdates[vehicleDocuments.vehiclePlate] && (
-                        <div className="mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="flex items-start gap-3">
-                            <div className="p-2 bg-blue-100 rounded-full text-blue-600 mt-0.5">
-                              <FileText className="h-4 w-4" />
+
+                        {/* --- NOVO BLOCO: Informações do Extrato Importado --- */}
+                        {importInfo &&
+                          tagUpdates[vehicleDocuments.vehiclePlate] && (
+                            <div className="mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div className="flex items-start gap-3">
+                                <div className="p-2 bg-blue-100 rounded-full text-blue-600 mt-0.5">
+                                  <FileText className="h-4 w-4" />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-semibold text-blue-900">
+                                    Extrato: {importInfo.fileName}
+                                  </h4>
+                                  <p className="text-xs text-blue-700">
+                                    Referência:{" "}
+                                    <span className="font-medium">
+                                      {importInfo.referencePeriod}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-white/50 px-3 py-1 rounded-full border border-blue-100">
+                                <Clock className="h-3 w-3" />
+                                Importado em: {importInfo.uploadDate}
+                              </div>
                             </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-blue-900">
-                                Extrato: {importInfo.fileName}
-                              </h4>
-                              <p className="text-xs text-blue-700">
-                                Referência: <span className="font-medium">{importInfo.referencePeriod}</span>
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-white/50 px-3 py-1 rounded-full border border-blue-100">
-                            <Clock className="h-3 w-3" />
-                            Importado em: {importInfo.uploadDate}
-                          </div>
-                        </div>
-                      )}
-                      {/* --- Fim do Novo Bloco --- */}
+                          )}
+                        {/* --- Fim do Novo Bloco --- */}
                         <div className="flex items-center justify-between">
                           <span>Sem Parar / Tags</span>
                           {vehicleDocuments.tollTag?.status === "Ativo" ? (
@@ -1206,7 +1323,8 @@ export function FleetView() {
                           <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-0">
                             Tag Itaú
                           </Badge>
-                        ) : vehicleDocuments.tollTag?.provider === "Sem Parar" ? (
+                        ) : vehicleDocuments.tollTag?.provider ===
+                          "Sem Parar" ? (
                           <Badge className="bg-red-600 hover:bg-red-700 text-white border-0">
                             Sem Parar
                           </Badge>
@@ -1217,65 +1335,93 @@ export function FleetView() {
                         )}
                       </div>
                     </CardHeader>
-                    
+
                     <CardContent>
                       {/* --- BLOCO DE METADADOS (INFO AZUL) --- */}
-                      {importInfo && tagUpdates[vehicleDocuments.vehiclePlate] && (
-                        <div className="mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="flex items-start gap-3">
-                            <div className="p-2 bg-blue-100 rounded-full text-blue-600 mt-0.5">
-                              <FileText className="h-4 w-4" />
+                      {importInfo &&
+                        tagUpdates[vehicleDocuments.vehiclePlate] && (
+                          <div className="mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                              <div className="p-2 bg-blue-100 rounded-full text-blue-600 mt-0.5">
+                                <FileText className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-semibold text-blue-900">
+                                  Extrato: {importInfo.fileName}
+                                </h4>
+                                <p className="text-xs text-blue-700">
+                                  Referência:{" "}
+                                  <span className="font-medium">
+                                    {importInfo.referencePeriod}
+                                  </span>
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-blue-900">
-                                Extrato: {importInfo.fileName}
-                              </h4>
-                              <p className="text-xs text-blue-700">
-                                Referência: <span className="font-medium">{importInfo.referencePeriod}</span>
-                              </p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-white/50 px-3 py-1 rounded-full border border-blue-100">
+                              <Clock className="h-3 w-3" />
+                              Importado em: {importInfo.uploadDate}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-white/50 px-3 py-1 rounded-full border border-blue-100">
-                            <Clock className="h-3 w-3" />
-                            Importado em: {importInfo.uploadDate}
-                          </div>
-                        </div>
-                      )}
+                        )}
 
                       {/* LÓGICA DE EXIBIÇÃO: Memória vs Banco */}
-                      {vehicleDocuments.tollTag && (vehicleDocuments.tollTag.status === "Ativo" || tagUpdates[vehicleDocuments.vehiclePlate]) ? (
+                      {vehicleDocuments.tollTag &&
+                      (vehicleDocuments.tollTag.status === "Ativo" ||
+                        tagUpdates[vehicleDocuments.vehiclePlate]) ? (
                         <div className="space-y-6">
                           {(() => {
-                            const dadosAtuais = tagUpdates[vehicleDocuments.vehiclePlate] 
-                              ? { ...vehicleDocuments.tollTag, ...tagUpdates[vehicleDocuments.vehiclePlate], updateMethod: "Extrato Importado" }
+                            const dadosAtuais = tagUpdates[
+                              vehicleDocuments.vehiclePlate
+                            ]
+                              ? {
+                                  ...vehicleDocuments.tollTag,
+                                  ...tagUpdates[vehicleDocuments.vehiclePlate],
+                                  updateMethod: "Extrato Importado",
+                                }
                               : vehicleDocuments.tollTag;
 
                             return (
                               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                                 <div className="space-y-2">
-                                  <p className="text-sm text-muted-foreground">Número da Tag</p>
-                                  <p className="font-mono text-lg font-medium">{dadosAtuais.tag}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Número da Tag
+                                  </p>
+                                  <p className="font-mono text-lg font-medium">
+                                    {dadosAtuais.tag}
+                                  </p>
                                 </div>
                                 <div className="space-y-2">
-                                  <p className="text-sm text-muted-foreground">Saldo Atual</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Saldo Atual
+                                  </p>
                                   <p className="text-2xl font-bold text-green-600">
                                     R$ {Number(dadosAtuais.balance).toFixed(2)}
                                   </p>
                                 </div>
                                 <div className="space-y-2">
-                                  <p className="text-sm text-muted-foreground">Gasto Mensal</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Gasto Mensal
+                                  </p>
                                   <p className="text-lg font-medium">
-                                    R$ {Number(dadosAtuais.monthlySpend).toFixed(2)}
+                                    R${" "}
+                                    {Number(dadosAtuais.monthlySpend).toFixed(
+                                      2
+                                    )}
                                   </p>
                                 </div>
                                 <div className="space-y-2">
-                                  <p className="text-sm text-muted-foreground">Última Atualização</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Última Atualização
+                                  </p>
                                   <div className="flex flex-col">
                                     <span className="font-medium">
-                                      {new Date(dadosAtuais.lastUpdate).toLocaleDateString("pt-BR")}
+                                      {new Date(
+                                        dadosAtuais.lastUpdate
+                                      ).toLocaleDateString("pt-BR")}
                                     </span>
                                     <span className="text-xs text-muted-foreground">
-                                      Via {dadosAtuais.updateMethod || "Sistema"}
+                                      Via{" "}
+                                      {dadosAtuais.updateMethod || "Sistema"}
                                     </span>
                                   </div>
                                 </div>
@@ -1284,9 +1430,11 @@ export function FleetView() {
                           })()}
 
                           {/* ÁREA DE IMPORTAÇÃO */}
-                          <div 
+                          <div
                             className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${
-                              isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:bg-muted/50"
+                              isDragging
+                                ? "border-primary bg-primary/10"
+                                : "border-muted-foreground/25 hover:bg-muted/50"
                             }`}
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
@@ -1298,11 +1446,26 @@ export function FleetView() {
                                   <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
                                     <FileText className="h-6 w-6" />
                                   </div>
-                                  <h3 className="font-medium text-green-700">{uploadedFile.name}</h3>
-                                  <p className="text-xs text-muted-foreground">Pronto para importar</p>
+                                  <h3 className="font-medium text-green-700">
+                                    {uploadedFile.name}
+                                  </h3>
+                                  <p className="text-xs text-muted-foreground">
+                                    Pronto para importar
+                                  </p>
                                   <div className="flex gap-2 mt-2">
-                                    <Button size="sm" variant="outline" onClick={() => setUploadedFile(null)}>Cancelar</Button>
-                                    <Button size="sm" onClick={handleProcessFile}>Confirmar Importação</Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setUploadedFile(null)}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={handleProcessFile}
+                                    >
+                                      Confirmar Importação
+                                    </Button>
                                   </div>
                                 </>
                               ) : (
@@ -1310,22 +1473,27 @@ export function FleetView() {
                                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                                     <Upload className="h-5 w-5 text-primary" />
                                   </div>
-                                  <h3 className="font-medium">Atualizar Saldo e Extrato</h3>
+                                  <h3 className="font-medium">
+                                    Atualizar Saldo e Extrato
+                                  </h3>
                                   <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                                    Arraste o arquivo PDF ou CSV do extrato aqui para atualizar os gastos.
+                                    Arraste o arquivo PDF ou CSV do extrato aqui
+                                    para atualizar os gastos.
                                   </p>
-                                  <input 
-                                    type="file" 
+                                  <input
+                                    type="file"
                                     ref={fileInputRef}
-                                    className="hidden" 
+                                    className="hidden"
                                     accept=".csv,.pdf"
                                     onChange={handleFileInput}
                                   />
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     className="mt-2"
-                                    onClick={() => fileInputRef.current?.click()}
+                                    onClick={() =>
+                                      fileInputRef.current?.click()
+                                    }
                                   >
                                     Selecionar Arquivo
                                   </Button>
@@ -1346,7 +1514,6 @@ export function FleetView() {
                   </Card>
                 </TabsContent>
                 {/* FIM DA ABA SEM PARAR */}
-
               </Tabs>
             </div>
           )}
