@@ -46,27 +46,23 @@ import {
 } from "@/components/ui/table";
 import {
   Wrench,
-  Calendar,
+  Clock,
   DollarSign,
   AlertCircle,
-  Clock,
   CheckCircle,
   Plus,
   Car,
-  Upload,
   FileText,
   Eye,
   ChevronsUpDown,
   Check,
-  Gauge,
-  GitCompare,
   Loader2,
+  Upload,
 } from "lucide-react";
 
-// Importações REAIS da API
-import { useApp } from "@/contexts/app-context";
 import { cn } from "@/lib/utils";
 import { useToastNotification } from "@/contexts/toast-context";
+// Importações da API
 import {
   buscarFrotaAPI,
   buscarManutencoesAPI,
@@ -74,15 +70,15 @@ import {
   concluirManutencaoAPI,
 } from "@/lib/api-service";
 
-// Interface adaptada para o Banco de Dados
+// --- INTERFACES ---
 interface ExtendedMaintenance {
-  id: number; // ID agora é numérico no banco
+  id: number;
   vehicle_id: number;
   vehicle_plate: string;
   vehicle_model: string;
   type: string;
   description: string;
-  scheduled_date: string; // ISO string
+  scheduled_date: string;
   completed_date?: string;
   cost: number;
   status: string;
@@ -91,6 +87,7 @@ interface ExtendedMaintenance {
   invoice_url?: string;
 }
 
+// --- CONFIGURAÇÃO DE STATUS ---
 const statusConfig: Record<
   string,
   { color: string; icon: any; label: string }
@@ -127,18 +124,18 @@ export function MaintenanceView() {
   const toast = useToastNotification();
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  // Estados Reais
+  // Estados de Dados da API
   const [maintenances, setMaintenances] = useState<ExtendedMaintenance[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]); // Lista para o Combobox
   const [loading, setLoading] = useState(true);
 
-  // Modal states
+  // Estados dos Modais
   const [isNewMaintenanceOpen, setIsNewMaintenanceOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedMaintenance, setSelectedMaintenance] =
     useState<ExtendedMaintenance | null>(null);
 
-  // Form states
+  // Estados do Formulário
   const [vehicleComboOpen, setVehicleComboOpen] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
 
@@ -155,7 +152,7 @@ export function MaintenanceView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompletingService, setIsCompletingService] = useState(false);
 
-  // 1. Carregar Dados ao Iniciar
+  // --- 1. CARREGAR DADOS AO ABRIR ---
   useEffect(() => {
     carregarTudo();
   }, []);
@@ -167,26 +164,26 @@ export function MaintenanceView() {
         buscarFrotaAPI(),
         buscarManutencoesAPI(),
       ]);
-      setVehicles(frota || []);
-      setMaintenances(manuts || []);
+      // Garante que sejam arrays
+      setVehicles(Array.isArray(frota) ? frota : []);
+      setMaintenances(Array.isArray(manuts) ? manuts : []);
     } catch (error) {
       console.error(error);
-      toast.error("Erro", "Falha ao carregar dados.");
+      toast.error("Erro", "Falha ao carregar dados do sistema.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper para achar veículo selecionado (Dados do Banco)
-  // ID do banco é number, o select as vezes volta string, convertemos para garantir
+  // Helper para achar o veículo selecionado no array de frota
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => String(v.id) === String(selectedVehicleId)),
     [selectedVehicleId, vehicles]
   );
 
-  // Filtros
+  // Filtros da Tabela
   const filteredMaintenances = maintenances.filter((m) => {
-    // Normaliza status para bater com o filtro (Banco pode vir 'Agendada' ou 'Agendado')
+    // Normaliza status (caso o banco traga 'Agendado' e o filtro espere 'Agendada')
     const statusNormalized = m.status === "Agendado" ? "Agendada" : m.status;
     return statusFilter === "all" || statusNormalized === statusFilter;
   });
@@ -196,21 +193,20 @@ export function MaintenanceView() {
     (sum, m) => sum + Number(m.cost || 0),
     0
   );
-
-  const scheduledCount = maintenances.filter(
-    (m) => m.status === "Agendada" || m.status === "Agendado"
+  const scheduledCount = maintenances.filter((m) =>
+    m.status.includes("Agendad")
   ).length;
   const inProgressCount = maintenances.filter(
     (m) => m.status === "Em Andamento"
   ).length;
   const completedCount = maintenances.filter(
-    (m) => m.status === "Concluída"
+    (m) => m.status === "Concluída" || m.status === "Concluído"
   ).length;
 
-  // 2. Salvar Nova Manutenção (POST)
+  // --- 2. SALVAR NOVA MANUTENÇÃO ---
   const handleSubmitMaintenance = async () => {
     if (!selectedVehicleId || !newMaintenance.type || !newMaintenance.date) {
-      toast.error("Atenção", "Preencha os campos obrigatórios.");
+      toast.error("Atenção", "Preencha Veículo, Tipo e Data.");
       return;
     }
 
@@ -219,8 +215,8 @@ export function MaintenanceView() {
     try {
       const payload = {
         vehicle_id: Number(selectedVehicleId),
-        vehicle_plate: selectedVehicle.placa,
-        vehicle_model: selectedVehicle.modelo,
+        vehicle_plate: selectedVehicle?.placa || "N/A",
+        vehicle_model: selectedVehicle?.modelo || "N/A",
         type: newMaintenance.type,
         description: newMaintenance.description,
         scheduled_date: newMaintenance.date,
@@ -229,9 +225,8 @@ export function MaintenanceView() {
         provider: newMaintenance.provider,
         km_at_maintenance:
           Number(newMaintenance.kmAtMaintenance) ||
-          selectedVehicle.km_atual ||
+          selectedVehicle?.km_atual ||
           0,
-        // invoice_url: aqui você implementaria o upload real futuramente
       };
 
       await salvarManutencaoAPI(payload);
@@ -239,7 +234,7 @@ export function MaintenanceView() {
       toast.success("Sucesso", "Manutenção agendada com sucesso!");
       setIsNewMaintenanceOpen(false);
 
-      // Limpa form
+      // Resetar form
       setNewMaintenance({
         type: "",
         description: "",
@@ -251,7 +246,7 @@ export function MaintenanceView() {
       setSelectedVehicleId("");
       setUploadedFile(null);
 
-      // Recarrega lista
+      // Atualizar lista
       carregarTudo();
     } catch (error) {
       toast.error("Erro", "Falha ao salvar manutenção.");
@@ -260,24 +255,24 @@ export function MaintenanceView() {
     }
   };
 
-  // 3. Dar Baixa (PATCH)
+  // --- 3. DAR BAIXA (CONCLUIR) ---
   const handleCompleteService = async () => {
     if (!selectedMaintenance) return;
     setIsCompletingService(true);
 
     try {
       await concluirManutencaoAPI(selectedMaintenance.id);
-
       toast.success("Concluído", "Serviço baixado com sucesso!");
       setIsDetailsOpen(false);
       carregarTudo();
     } catch (error) {
-      toast.error("Erro", "Falha ao dar baixa na manutenção.");
+      toast.error("Erro", "Falha ao dar baixa.");
     } finally {
       setIsCompletingService(false);
     }
   };
 
+  // Upload Fake (Visual)
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
@@ -286,9 +281,9 @@ export function MaintenanceView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">
             Gestão de Manutenção
           </h1>
           <p className="text-muted-foreground">
@@ -296,12 +291,14 @@ export function MaintenanceView() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={() => carregarTudo()} variant="outline" size="sm">
+            <Clock className="mr-2 h-4 w-4" /> Atualizar
+          </Button>
           <Button
             onClick={() => setIsNewMaintenanceOpen(true)}
             className="gap-2 bg-primary hover:bg-primary/90"
           >
-            <Plus className="h-4 w-4" />
-            Nova Manutenção
+            <Plus className="h-4 w-4" /> Nova Manutenção
           </Button>
         </div>
       </div>
@@ -362,7 +359,7 @@ export function MaintenanceView() {
         </Card>
       </div>
 
-      {/* Lista */}
+      {/* Tabela de Manutenções */}
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -378,7 +375,13 @@ export function MaintenanceView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredMaintenances.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    Carregando dados...
+                  </TableCell>
+                </TableRow>
+              ) : filteredMaintenances.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
                     Nenhuma manutenção encontrada.
@@ -386,7 +389,6 @@ export function MaintenanceView() {
                 </TableRow>
               ) : (
                 filteredMaintenances.map((maintenance) => {
-                  // Normaliza para achar a cor correta
                   const statusKey =
                     maintenance.status === "Agendado"
                       ? "Agendada"
@@ -447,7 +449,7 @@ export function MaintenanceView() {
         </CardContent>
       </Card>
 
-      {/* MODAL NOVA MANUTENÇÃO */}
+      {/* --- MODAL NOVA MANUTENÇÃO --- */}
       <Dialog
         open={isNewMaintenanceOpen}
         onOpenChange={setIsNewMaintenanceOpen}
@@ -461,12 +463,14 @@ export function MaintenanceView() {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* Input Inteligente de Veículo (Combobox) */}
+            {/* INPUT INTELIGENTE (COMBOBOX) */}
             <div className="space-y-2">
               <Label>Veículo *</Label>
+              {/* CORREÇÃO AQUI: Adicionamos modal={true} para permitir o clique dentro do Dialog */}
               <Popover
                 open={vehicleComboOpen}
                 onOpenChange={setVehicleComboOpen}
+                modal={true}
               >
                 <PopoverTrigger asChild>
                   <Button
@@ -480,7 +484,8 @@ export function MaintenanceView() {
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
+
+                <PopoverContent className="w-[400px] p-0 z-[200]">
                   <Command>
                     <CommandInput placeholder="Buscar placa..." />
                     <CommandList>
@@ -513,7 +518,7 @@ export function MaintenanceView() {
               </Popover>
             </div>
 
-            {/* Info Automática do Veículo */}
+            {/* Info Automática */}
             {selectedVehicle && (
               <Card className="bg-muted/50">
                 <CardContent className="pt-4 flex items-center gap-4">
@@ -633,7 +638,7 @@ export function MaintenanceView() {
               />
             </div>
 
-            {/* Upload Fake (Visual) */}
+            {/* Upload Fake */}
             <div className="space-y-2">
               <Label>Nota Fiscal (Opcional)</Label>
               <div
@@ -673,7 +678,7 @@ export function MaintenanceView() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL DETALHES + DAR BAIXA */}
+      {/* --- MODAL DETALHES + DAR BAIXA --- */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -740,21 +745,22 @@ export function MaintenanceView() {
                 >
                   Fechar
                 </Button>
-                {selectedMaintenance.status !== "Concluída" && (
-                  <Button
-                    onClick={handleCompleteService}
-                    disabled={isCompletingService}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {isCompletingService ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <>
-                        <CheckCircle className="mr-2 h-4 w-4" /> Dar Baixa
-                      </>
-                    )}
-                  </Button>
-                )}
+                {selectedMaintenance.status !== "Concluída" &&
+                  selectedMaintenance.status !== "Concluído" && (
+                    <Button
+                      onClick={handleCompleteService}
+                      disabled={isCompletingService}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isCompletingService ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <>
+                          <CheckCircle className="mr-2 h-4 w-4" /> Dar Baixa
+                        </>
+                      )}
+                    </Button>
+                  )}
               </DialogFooter>
             </div>
           )}
