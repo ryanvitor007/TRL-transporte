@@ -50,7 +50,7 @@ import {
   Upload,
   Filter,
   X,
-  FileX, // <--- Ícone novo para quando não tem arquivo
+  FileX,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -133,9 +133,9 @@ export function MaintenanceView() {
     type: "",
     description: "",
     date: "",
-    kmAtMaintenance: "",
+    kmAtMaintenance: "", // Agora armazena string formatada (ex: "10.000")
     provider: "",
-    cost: "",
+    cost: "", // Agora armazena string formatada (ex: "R$ 1.500,00")
   });
 
   // Estado e Ref para Upload
@@ -267,7 +267,44 @@ export function MaintenanceView() {
     (m) => m.status === "Concluída" || m.status === "Concluído"
   ).length;
 
-  // --- 2. LÓGICA DE UPLOAD ---
+  // --- FORMATADORES DE INPUT (MÁSCARAS) ---
+
+  // Formata Moeda (R$ 1.000,00)
+  const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ""); // Remove tudo que não é dígito
+    if (value === "") {
+      setNewMaintenance((prev) => ({ ...prev, cost: "" }));
+      return;
+    }
+    const amount = Number(value) / 100;
+    const formatted = amount.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+    setNewMaintenance((prev) => ({ ...prev, cost: formatted }));
+  };
+
+  // Formata KM (10.000 ou 10.000,5)
+  const handleKmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    // Permite apenas números e uma vírgula
+    value = value.replace(/[^0-9,]/g, "");
+
+    // Impede mais de uma vírgula
+    const parts = value.split(",");
+    if (parts.length > 2) return;
+
+    // Formata milhar na parte inteira
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+    // Reconstrói a string
+    setNewMaintenance((prev) => ({
+      ...prev,
+      kmAtMaintenance: parts.join(","),
+    }));
+  };
+
+  // --- LÓGICA DE UPLOAD ---
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setUploadedFile(e.target.files[0]);
@@ -308,6 +345,18 @@ export function MaintenanceView() {
         ? URL.createObjectURL(uploadedFile)
         : null;
 
+      // CONVERSÃO: Limpa a formatação para enviar números puros para a API
+      // Remove R$, pontos e converte vírgula em ponto para float
+      const rawCost = newMaintenance.cost
+        ? Number(newMaintenance.cost.replace(/[^\d,]/g, "").replace(",", "."))
+        : 0;
+
+      const rawKm = newMaintenance.kmAtMaintenance
+        ? Number(
+            newMaintenance.kmAtMaintenance.replace(/\./g, "").replace(",", ".")
+          )
+        : selectedVehicle?.km_atual || 0;
+
       const payload = {
         vehicle_id: Number(selectedVehicleId),
         vehicle_plate: selectedVehicle?.placa || "N/A",
@@ -315,13 +364,10 @@ export function MaintenanceView() {
         type: newMaintenance.type,
         description: newMaintenance.description,
         scheduled_date: newMaintenance.date,
-        cost: Number(newMaintenance.cost) || 0,
+        cost: rawCost, // Envia número puro
         status: "Agendada",
         provider: newMaintenance.provider,
-        km_at_maintenance:
-          Number(newMaintenance.kmAtMaintenance) ||
-          selectedVehicle?.km_atual ||
-          0,
+        km_at_maintenance: rawKm, // Envia número puro
         invoice_url: mockInvoiceUrl,
       };
 
@@ -825,20 +871,16 @@ export function MaintenanceView() {
                 />
               </div>
 
+              {/* INPUT KM FORMATADO */}
               <div className="space-y-2">
                 <Label>Km na Manutenção</Label>
                 <Input
-                  type="number"
+                  type="text"
                   placeholder={
                     selectedVehicle ? String(selectedVehicle.km_atual) : "0"
                   }
                   value={newMaintenance.kmAtMaintenance}
-                  onChange={(e) =>
-                    setNewMaintenance((prev) => ({
-                      ...prev,
-                      kmAtMaintenance: e.target.value,
-                    }))
-                  }
+                  onChange={handleKmChange}
                 />
               </div>
 
@@ -855,18 +897,14 @@ export function MaintenanceView() {
                 />
               </div>
 
+              {/* INPUT CUSTO FORMATADO */}
               <div className="col-span-2 space-y-2">
                 <Label>Custo Estimado (R$)</Label>
                 <Input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  placeholder="R$ 0,00"
                   value={newMaintenance.cost}
-                  onChange={(e) =>
-                    setNewMaintenance((prev) => ({
-                      ...prev,
-                      cost: e.target.value,
-                    }))
-                  }
+                  onChange={handleCostChange}
                 />
               </div>
             </div>
@@ -1056,7 +1094,7 @@ export function MaintenanceView() {
                     </Button>
                   </div>
                 ) : (
-                  /* CASO SEM ARQUIVO (Pontilhado Acinzentado) */
+                  /* CASO SEM ARQUIVO */
                   <div className="border-2 border-dashed border-muted bg-muted/10 rounded-lg p-6 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                     <FileX className="h-8 w-8 opacity-20" />
                     <span className="text-sm italic">
