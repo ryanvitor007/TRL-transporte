@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { DriverSidebar } from "@/components/driver-sidebar";
 import { DriverTopBar } from "@/components/driver-top-bar";
-import { TachographView } from "@/components/tachograph-view";
-import { MaintenanceView } from "@/components/maintenance-view";
-import { IncidentsView } from "@/components/incidents-view";
+import { DriverTachographView } from "@/components/driver-tachograph-view";
+import { DriverMaintenanceView } from "@/components/driver-maintenance-view";
+import { DriverIncidentsView } from "@/components/driver-incidents-view";
+import { DriverJourneyView } from "@/components/driver-journey-view";
 import { Loader2 } from "lucide-react";
 
 export default function DriverDashboard() {
-  const [activeView, setActiveView] = useState("tachograph");
+  const [activeView, setActiveView] = useState("journey");
   const { isAuthenticated, user } = useAuth();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
@@ -39,14 +40,16 @@ export default function DriverDashboard() {
 
   const renderView = () => {
     switch (activeView) {
+      case "journey":
+        return <DriverJourneyView />;
       case "tachograph":
-        return <TachographView />;
+        return <DriverTachographView />;
       case "incidents":
-        return <IncidentsView />;
+        return <DriverIncidentsView />;
       case "maintenance":
-        return <MaintenanceView />;
+        return <DriverMaintenanceView />;
       default:
-        return <TachographView />;
+        return <DriverJourneyView />;
     }
   };
 
@@ -55,7 +58,7 @@ export default function DriverDashboard() {
       <DriverSidebar activeView={activeView} onViewChange={setActiveView} />
       <div className="flex flex-1 flex-col">
         <DriverTopBar />
-        <main className="flex-1 overflow-auto bg-background p-4 pt-4 lg:p-8 lg:pt-6 max-h-[calc(100vh-57px)]">
+        <main className="flex-1 overflow-auto bg-background p-4 pt-6 lg:p-8 lg:pt-8 max-h-[calc(100vh-57px)]">
           {renderView()}
         </main>
       </div>

@@ -291,3 +291,34 @@ export async function buscarManutencoesAPI() {
     return [];
   }
 }
+
+// --- MÓDULO DE TACÓGRAFOS ---
+
+export const buscarTacografosAPI = async () => {
+  // Simula delay
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  // Tenta pegar do localStorage
+  const stored = localStorage.getItem("trl_tachographs");
+  if (stored) return JSON.parse(stored);
+
+  // Se não tiver nada, retorna lista vazia (ou dados mock iniciais se preferir)
+  return [];
+};
+
+export const salvarTacografoAPI = async (dados: any) => {
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
+  const currentData = await buscarTacografosAPI();
+
+  const novoRegistro = {
+    id: Date.now(), // ID único baseado em timestamp
+    ...dados,
+    status: "Enviado",
+    timestamp: new Date().toISOString(),
+  };
+
+  const newData = [novoRegistro, ...currentData];
+  localStorage.setItem("trl_tachographs", JSON.stringify(newData));
+  return novoRegistro;
+};

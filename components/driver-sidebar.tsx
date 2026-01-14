@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ChevronLeft,
+  Route,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMobile } from "@/hooks/use-mobile";
@@ -20,6 +21,7 @@ interface DriverSidebarProps {
 }
 
 const driverMenuItems = [
+  { id: "journey", label: "Jornada", icon: Route },
   { id: "tachograph", label: "Tacógrafo", icon: Gauge },
   { id: "incidents", label: "Incidentes e Sinistros", icon: AlertOctagon },
   { id: "maintenance", label: "Manutenção", icon: Wrench },
