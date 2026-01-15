@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   Car,
   AlertTriangle,
@@ -17,7 +16,6 @@ import {
   Loader2,
   FileText,
   Calendar,
-  CreditCard,
   MapPin,
   Info,
 } from "lucide-react";
@@ -53,51 +51,79 @@ interface DashboardAlert {
   status: string;
   message: string;
   date: Date | string;
-  data: any; // Armazena o objeto original (multa, manutenção ou documento)
+  data: any;
 }
 
 export function DashboardView() {
   const { selectedBranch } = useApp();
   const [loading, setLoading] = useState(true);
+  const isFetched = useRef(false); // Ref para evitar chamadas duplas (React 18 Strict Mode)
 
-  // Estados para dados reais
+  // Estados para dados
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [maintenances, setMaintenances] = useState<any[]>([]);
   const [fines, setFines] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
 
-  // Estado do Modal de Detalhes
+  // Estado do Modal
   const [selectedAlert, setSelectedAlert] = useState<DashboardAlert | null>(
     null
   );
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  // --- 1. CARREGAR DADOS REAIS ---
+  // --- 1. CARREGAR DADOS REAIS (BLINDADO) ---
   useEffect(() => {
+    // Se já buscou, não busca de novo
+    if (isFetched.current) return;
+
+    let isMounted = true;
+
     async function loadDashboardData() {
       try {
         setLoading(true);
+        console.log("Iniciando carga do Dashboard..."); // Log para debug
+
         const [frotaRes, manutsRes, multasRes, docsRes] = await Promise.all([
-          buscarFrotaAPI(),
-          buscarManutencoesAPI(),
-          buscarMultasAPI(),
-          buscarDocumentosAPI(),
+          buscarFrotaAPI().catch((err) => {
+            console.error("Erro frota:", err);
+            return [];
+          }),
+          buscarManutencoesAPI().catch((err) => {
+            console.error("Erro manuts:", err);
+            return [];
+          }),
+          buscarMultasAPI().catch((err) => {
+            console.error("Erro multas:", err);
+            return [];
+          }),
+          buscarDocumentosAPI().catch((err) => {
+            console.error("Erro docs:", err);
+            return [];
+          }),
         ]);
 
-        setVehicles(Array.isArray(frotaRes) ? frotaRes : []);
-        setMaintenances(Array.isArray(manutsRes) ? manutsRes : []);
-        setFines(Array.isArray(multasRes) ? multasRes : []);
-        setDocuments(Array.isArray(docsRes) ? docsRes : []);
+        if (isMounted) {
+          setVehicles(Array.isArray(frotaRes) ? frotaRes : []);
+          setMaintenances(Array.isArray(manutsRes) ? manutsRes : []);
+          setFines(Array.isArray(multasRes) ? multasRes : []);
+          setDocuments(Array.isArray(docsRes) ? docsRes : []);
+          isFetched.current = true; // Marca como carregado
+        }
       } catch (error) {
-        console.error("Erro ao carregar dashboard:", error);
+        console.error("Erro fatal ao carregar dashboard:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
-    loadDashboardData();
-  }, []);
 
-  // --- 2. CÁLCULOS DE KPI ---
+    loadDashboardData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Array de dependências vazio é crucial
+
+  // --- 2. CÁLCULOS DE KPI (Memoizados) ---
   const activeVehicles = useMemo(() => {
     return vehicles.filter((v) => {
       const status = v.status || "Ativo";
@@ -121,22 +147,33 @@ export function DashboardView() {
 
     const maintenanceCost = maintenances
       .filter((m) => {
+        if (!m.scheduled_date) return false;
         const d = new Date(m.scheduled_date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        return (
+          !isNaN(d.getTime()) &&
+          d.getMonth() === currentMonth &&
+          d.getFullYear() === currentYear
+        );
       })
       .reduce((sum, m) => sum + Number(m.cost || 0), 0);
 
     const finesCost = fines
       .filter((f) => {
-        const d = new Date(f.date || f.due_date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        const dateStr = f.date || f.due_date;
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        return (
+          !isNaN(d.getTime()) &&
+          d.getMonth() === currentMonth &&
+          d.getFullYear() === currentYear
+        );
       })
       .reduce((sum, f) => sum + Number(f.amount || f.valor || 0), 0);
 
     return maintenanceCost + finesCost;
   }, [maintenances, fines]);
 
-  // --- 3. GRÁFICO ---
+  // --- 3. GRÁFICO (Protegido contra NaN) ---
   const monthlyChartData = useMemo(() => {
     const data: Record<string, number> = {};
     const months = [
@@ -155,6 +192,7 @@ export function DashboardView() {
     ];
 
     const today = new Date();
+    // Inicializa últimos 6 meses com 0
     for (let i = 5; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const key = months[d.getMonth()];
@@ -162,37 +200,52 @@ export function DashboardView() {
     }
 
     maintenances.forEach((m) => {
+      if (!m.scheduled_date) return;
       const d = new Date(m.scheduled_date);
+      if (isNaN(d.getTime())) return;
+
       const key = months[d.getMonth()];
-      if (data[key] !== undefined) data[key] += Number(m.cost || 0);
+      if (data[key] !== undefined) {
+        const custo = Number(m.cost);
+        data[key] += isNaN(custo) ? 0 : custo;
+      }
     });
 
     fines.forEach((f) => {
-      const d = new Date(f.date || f.due_date);
+      const dateStr = f.date || f.due_date;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return;
+
       const key = months[d.getMonth()];
-      if (data[key] !== undefined)
-        data[key] += Number(f.amount || f.valor || 0);
+      if (data[key] !== undefined) {
+        const valor = Number(f.amount || f.valor);
+        data[key] += isNaN(valor) ? 0 : valor;
+      }
     });
 
     return Object.entries(data).map(([month, total]) => ({ month, total }));
   }, [maintenances, fines]);
 
-  // --- 4. ALERTAS INTELIGENTES ---
+  // --- 4. ALERTAS (Protegidos) ---
   const alerts = useMemo(() => {
     const list: DashboardAlert[] = [];
-
-    // Alerta de Documentos
     const today = new Date();
     const warningDate = new Date();
     warningDate.setDate(today.getDate() + 30);
 
+    // Documentos
     documents.forEach((doc) => {
-      const expDate = new Date(doc.expiration_date || doc.validade);
+      const dateStr = doc.expiration_date || doc.validade;
+      if (!dateStr) return;
+      const expDate = new Date(dateStr);
+      if (isNaN(expDate.getTime())) return;
+
       if (expDate < today) {
         list.push({
           type: "document",
           status: "Vencido",
-          message: `${doc.type || "Doc"} vencido - ${doc.vehicle_plate}`,
+          message: `${doc.type || "Doc"} vencido - ${doc.vehicle_plate || "?"}`,
           date: expDate,
           data: doc,
         });
@@ -200,33 +253,39 @@ export function DashboardView() {
         list.push({
           type: "document",
           status: "Vencendo",
-          message: `${doc.type || "Doc"} vence em breve - ${doc.vehicle_plate}`,
+          message: `${doc.type || "Doc"} vence em breve`,
           date: expDate,
           data: doc,
         });
       }
     });
 
-    // Alerta de Manutenções
+    // Manutenções
     maintenances.forEach((m) => {
-      if (m.status === "Urgente" || m.status === "Atrasada") {
+      if (
+        (m.status === "Urgente" || m.status === "Atrasada") &&
+        m.scheduled_date
+      ) {
         list.push({
           type: "maintenance",
           status: "Urgente",
-          message: `${m.type} - ${m.vehicle_plate}`,
+          message: `${m.type} - ${m.vehicle_plate || "?"}`,
           date: new Date(m.scheduled_date),
           data: m,
         });
       }
     });
 
-    // Alerta de Multas
+    // Multas
     fines.forEach((f) => {
-      if (f.status === "Pendente" || f.status === "Não Paga") {
+      if (
+        (f.status === "Pendente" || f.status === "Não Paga") &&
+        (f.due_date || f.date)
+      ) {
         list.push({
           type: "fine",
           status: "Pendente",
-          message: `Multa pendente - ${f.vehicle_plate}`,
+          message: `Multa pendente - ${f.vehicle_plate || "?"}`,
           date: new Date(f.due_date || f.date),
           data: f,
         });
@@ -244,23 +303,27 @@ export function DashboardView() {
     if (blockedEndings.length === 0) return [];
     return vehicles.filter((v) => {
       const placa = v.placa || "";
-      const final = placa.slice(-1);
-      return blockedEndings.includes(parseInt(final));
+      if (placa.length < 1) return false;
+      const finalChar = placa.slice(-1);
+      const finalInt = parseInt(finalChar);
+      return !isNaN(finalInt) && blockedEndings.includes(finalInt);
     });
   }, [vehicles, blockedEndings]);
 
-  // Função para abrir detalhes
-  const handleAlertClick = (alert: DashboardAlert) => {
-    setSelectedAlert(alert);
-    setIsDetailsOpen(true);
-  };
-
-  // --- RENDERIZAR CONTEÚDO DO MODAL ---
+  // Render do Modal
   const renderAlertDetails = () => {
     if (!selectedAlert) return null;
     const { type, data } = selectedAlert;
 
-    // Detalhes de MULTAS
+    // Fallbacks para valores nulos/undefined
+    const valorDisplay = (val: any) =>
+      Number(val || 0).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      });
+    const dataDisplay = (dateStr: string) =>
+      dateStr ? new Date(dateStr).toLocaleDateString("pt-BR") : "Data inválida";
+
     if (type === "fine") {
       return (
         <div className="space-y-4">
@@ -269,49 +332,27 @@ export function DashboardView() {
               <FileText className="h-6 w-6 text-red-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-red-900">
-                Infração de Trânsito
-              </p>
+              <p className="text-sm font-medium text-red-900">Infração</p>
               <p className="text-2xl font-bold text-red-700">
-                {Number(data.amount || data.valor || 0).toLocaleString(
-                  "pt-BR",
-                  { style: "currency", currency: "BRL" }
-                )}
+                {valorDisplay(data.amount || data.valor)}
               </p>
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Car className="h-3 w-3" /> Veículo
-              </span>
+              <p className="text-xs text-muted-foreground">Veículo</p>
               <p className="font-medium">{data.vehicle_plate}</p>
             </div>
             <div className="space-y-1">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Calendar className="h-3 w-3" /> Vencimento
-              </span>
+              <p className="text-xs text-muted-foreground">Vencimento</p>
               <p className="font-medium">
-                {new Date(data.due_date || data.date).toLocaleDateString(
-                  "pt-BR"
-                )}
+                {dataDisplay(data.due_date || data.date)}
               </p>
             </div>
             <div className="space-y-1 col-span-2">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <MapPin className="h-3 w-3" /> Local / Descrição
-              </span>
+              <p className="text-xs text-muted-foreground">Local</p>
               <p className="font-medium">
-                {data.description || data.local || "Sem descrição"}
-              </p>
-            </div>
-            <div className="space-y-1 col-span-2">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Info className="h-3 w-3" /> Código da Infração
-              </span>
-              <p className="font-medium text-sm font-mono bg-muted p-1 rounded w-fit">
-                {data.code || "N/A"}
+                {data.description || data.local || "-"}
               </p>
             </div>
           </div>
@@ -319,7 +360,6 @@ export function DashboardView() {
       );
     }
 
-    // Detalhes de MANUTENÇÃO
     if (type === "maintenance") {
       return (
         <div className="space-y-4">
@@ -328,51 +368,30 @@ export function DashboardView() {
               <Wrench className="h-6 w-6 text-amber-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-amber-900">
-                Manutenção Urgente
-              </p>
+              <p className="text-sm font-medium text-amber-900">Manutenção</p>
               <p className="text-2xl font-bold text-amber-700">
-                {Number(data.cost || 0).toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
+                {valorDisplay(data.cost)}
               </p>
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Car className="h-3 w-3" /> Veículo
-              </span>
+              <p className="text-xs text-muted-foreground">Veículo</p>
               <p className="font-medium">{data.vehicle_plate}</p>
             </div>
             <div className="space-y-1">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Calendar className="h-3 w-3" /> Agendado para
-              </span>
-              <p className="font-medium">
-                {new Date(data.scheduled_date).toLocaleDateString("pt-BR")}
-              </p>
+              <p className="text-xs text-muted-foreground">Data</p>
+              <p className="font-medium">{dataDisplay(data.scheduled_date)}</p>
             </div>
             <div className="space-y-1 col-span-2">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Wrench className="h-3 w-3" /> Tipo
-              </span>
+              <p className="text-xs text-muted-foreground">Tipo</p>
               <p className="font-medium">{data.type}</p>
-            </div>
-            <div className="space-y-1 col-span-2">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Info className="h-3 w-3" /> Descrição
-              </span>
-              <p className="text-sm bg-muted p-2 rounded">{data.description}</p>
             </div>
           </div>
         </div>
       );
     }
 
-    // Detalhes de DOCUMENTO
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
@@ -380,30 +399,19 @@ export function DashboardView() {
             <FileWarning className="h-6 w-6 text-blue-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-blue-900">
-              Alerta de Documento
-            </p>
-            <p className="text-lg font-bold text-blue-700">
-              {data.type || "Documento"}
-            </p>
+            <p className="text-sm font-medium text-blue-900">Documento</p>
+            <p className="text-lg font-bold text-blue-700">{data.type}</p>
           </div>
         </div>
-
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Car className="h-3 w-3" /> Veículo
-            </span>
+            <p className="text-xs text-muted-foreground">Veículo</p>
             <p className="font-medium">{data.vehicle_plate}</p>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Calendar className="h-3 w-3" /> Validade
-            </span>
-            <p className="font-medium text-red-600 font-bold">
-              {new Date(
-                data.expiration_date || data.validade
-              ).toLocaleDateString("pt-BR")}
+            <p className="text-xs text-muted-foreground">Validade</p>
+            <p className="font-medium text-red-600">
+              {dataDisplay(data.expiration_date || data.validade)}
             </p>
           </div>
         </div>
@@ -413,14 +421,19 @@ export function DashboardView() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            Carregando dados da frota...
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground">
@@ -428,7 +441,6 @@ export function DashboardView() {
         </p>
       </div>
 
-      {/* Métricas principais */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -439,11 +451,8 @@ export function DashboardView() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{vehicles.length}</div>
-            <div className="mt-1 flex items-center gap-2 text-sm">
-              <span className="flex items-center text-green-600">
-                <TrendingUp className="mr-1 h-4 w-4" />
-                {activeVehicles} disponíveis
-              </span>
+            <div className="mt-1 flex items-center gap-2 text-sm text-green-600">
+              <TrendingUp className="h-4 w-4" /> {activeVehicles} disponíveis
             </div>
           </CardContent>
         </Card>
@@ -463,9 +472,6 @@ export function DashboardView() {
                 maximumFractionDigits: 0,
               })}
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              multas + manutenções
-            </p>
           </CardContent>
         </Card>
 
@@ -480,9 +486,6 @@ export function DashboardView() {
             <div className="text-3xl font-bold text-green-600">
               {availabilityPercentage}%
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {vehicles.length - activeVehicles} indisponíveis
-            </p>
           </CardContent>
         </Card>
 
@@ -499,66 +502,52 @@ export function DashboardView() {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {blockedEndings.length > 0
-                ? `Finais ${blockedEndings.join(" e ")}`
-                : "Sem restrição"}
+                ? `Finais ${blockedEndings.join(", ")}`
+                : "Livre"}
             </p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Alertas Críticos */}
         <Card className="border-destructive/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Alertas da Frota ({alerts.length})
+              <AlertTriangle className="h-5 w-5" /> Alertas ({alerts.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {alerts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <div className="rounded-full bg-green-100 p-3 mb-2">
-                  <TrendingUp className="h-6 w-6 text-green-600" />
-                </div>
-                <p>Tudo certo! Nenhuma pendência encontrada.</p>
+                <TrendingUp className="h-8 w-8 text-green-500 mb-2" />
+                <p>Nenhuma pendência.</p>
               </div>
             ) : (
               <div className="max-h-72 space-y-3 overflow-y-auto pr-2">
                 {alerts.map((alert, idx) => (
                   <div
                     key={idx}
-                    onClick={() => handleAlertClick(alert)}
-                    className="group flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-3 cursor-pointer hover:bg-destructive/10 transition-colors"
+                    onClick={() => {
+                      setSelectedAlert(alert);
+                      setIsDetailsOpen(true);
+                    }}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent cursor-pointer transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       {alert.type === "document" ? (
-                        <FileWarning className="h-5 w-5 text-destructive" />
+                        <FileWarning className="h-4 w-4 text-blue-500" />
                       ) : alert.type === "fine" ? (
-                        <FileText className="h-5 w-5 text-destructive" />
+                        <FileText className="h-4 w-4 text-red-500" />
                       ) : (
-                        <Wrench className="h-5 w-5 text-destructive" />
+                        <Wrench className="h-4 w-4 text-amber-500" />
                       )}
                       <div>
-                        <p className="text-sm font-medium group-hover:underline">
-                          {alert.message}
-                        </p>
+                        <p className="text-sm font-medium">{alert.message}</p>
                         <p className="text-xs text-muted-foreground">
-                          <Clock className="mr-1 inline h-3 w-3" />
                           {new Date(alert.date).toLocaleDateString("pt-BR")}
                         </p>
                       </div>
                     </div>
-                    <Badge
-                      variant={
-                        alert.status === "Vencido" ||
-                        alert.status === "Pendente"
-                          ? "destructive"
-                          : "secondary"
-                      }
-                    >
-                      {alert.status}
-                    </Badge>
                   </div>
                 ))}
               </div>
@@ -566,13 +555,9 @@ export function DashboardView() {
           </CardContent>
         </Card>
 
-        {/* Gráfico de Custos */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" />
-              Evolução de Custos (Últimos 6 meses)
-            </CardTitle>
+            <CardTitle>Evolução de Custos</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
@@ -584,25 +569,20 @@ export function DashboardView() {
                   />
                   <XAxis dataKey="month" className="text-xs" />
                   <YAxis
-                    tickFormatter={(value) => `R$${value / 1000}k`}
                     className="text-xs"
+                    tickFormatter={(v) => `R$${v / 1000}k`}
                   />
                   <Tooltip
-                    formatter={(value: number) =>
-                      value.toLocaleString("pt-BR", {
+                    formatter={(v: number) =>
+                      v.toLocaleString("pt-BR", {
                         style: "currency",
                         currency: "BRL",
                       })
                     }
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                    }}
                   />
                   <Area
                     type="monotone"
                     dataKey="total"
-                    name="Total Gasto"
                     stroke="hsl(var(--primary))"
                     fill="hsl(var(--primary)/0.2)"
                   />
@@ -613,61 +593,12 @@ export function DashboardView() {
         </Card>
       </div>
 
-      {/* Lista de Veículos no Rodízio */}
-      {vehiclesInRotation.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Ban className="h-5 w-5 text-amber-500" />
-              Veículos no Rodízio Hoje
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 rounded-lg bg-amber-50 p-4 dark:bg-amber-950/30">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                Hoje ({dayName}), veículos com placa final{" "}
-                <strong>{blockedEndings.join(" e ")}</strong> não devem circular
-                no centro expandido de SP.
-              </p>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {vehiclesInRotation.map((vehicle: any) => (
-                <div
-                  key={vehicle.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div>
-                    <p className="font-medium">{vehicle.modelo}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {vehicle.placa}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="border-amber-500 text-amber-600"
-                  >
-                    Restrito
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* MODAL DE DETALHES DO ALERTA */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Detalhes do Alerta</DialogTitle>
-            <DialogDescription>
-              Informações detalhadas sobre a pendência selecionada.
-            </DialogDescription>
+            <DialogTitle>Detalhes</DialogTitle>
           </DialogHeader>
-
           {renderAlertDetails()}
-
           <DialogFooter>
             <Button onClick={() => setIsDetailsOpen(false)}>Fechar</Button>
           </DialogFooter>

@@ -1,25 +1,8 @@
-// API Service para consulta de veículos no DETRAN
-// Esta função simula uma chamada à API do DETRAN para buscar dados do veículo pela placa
+// API Service - Conexão Real com Backend NestJS e Adapters
 
 const API_BASE_URL = "http://localhost:3001";
 
-export interface VeiculoAPIResponse {
-  placa: string;
-  marca_modelo: string;
-  ano_fabricacao: number;
-  ano_modelo: number;
-  cor: string;
-  renavam: string;
-  chassi: string;
-  combustivel: string;
-  potencia: string;
-  cilindradas: string;
-  tipo_veiculo: string;
-  especie: string;
-  categoria: string;
-  municipio: string;
-  uf: string;
-}
+// --- INTERFACES DE TIPAGEM ---
 
 export interface VeiculoDetran {
   placa: string;
@@ -29,7 +12,54 @@ export interface VeiculoDetran {
   multas_vencidas: number;
   status_licenciamento: string;
   restricoes: string[];
+  uf?: string;
+  municipio?: string;
 }
+
+export interface Veiculo {
+  id?: number;
+  placa: string;
+  marca: string;
+  modelo: string;
+  ano: number;
+  status: string;
+}
+
+// --- ADAPTERS (Tradutores de Dados) ---
+// Converte snake_case (banco) para camelCase (front)
+const adapterIncidente = (dbData: any) => {
+  return {
+    id: dbData.id,
+    type: dbData.tipo,
+    date: dbData.data_ocorrencia,
+    time: dbData.hora_ocorrencia,
+    vehiclePlate: dbData.veiculo_placa,
+    vehicleModel: dbData.veiculo_modelo || "Não informado",
+    driverName: dbData.motorista_nome,
+    location: dbData.localizacao,
+    description: dbData.descricao,
+    estimatedCost: Number(dbData.custo_estimado),
+    insuranceClaim: dbData.acionamento_seguro,
+    status: dbData.status,
+    // CORREÇÃO: Mapeia o array de fotos do banco para o front
+    fotos: dbData.fotos || [],
+    invoiceUrl: dbData.nota_fiscal_url || null, // <--- NOVO CAMPO
+  };
+};
+
+// --- FUNÇÕES AUXILIARES ---
+
+async function handleResponse(response: Response) {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `Erro na API: ${response.statusText}`);
+  }
+  // Algumas rotas (como DELETE) podem não retornar corpo
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+// --- MÓDULO: DETRAN ---
 
 export async function consultarDetranAPI(
   placa: string,
@@ -40,195 +70,93 @@ export async function consultarDetranAPI(
       `${API_BASE_URL}/detran/consultar?placa=${placa}&renavam=${renavam}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       }
     );
-
-    if (!response.ok) {
-      throw new Error("Erro ao comunicar com o servidor");
-    }
-
-    return await response.json();
+    return handleResponse(response);
   } catch (error) {
-    console.error("Erro na API:", error);
+    console.error("Erro ao consultar DETRAN:", error);
     throw error;
   }
 }
 
-// Função que simula a consulta à API do DETRAN (mock local)
-// Em produção, substituir pela chamada real à API
-export async function consultarVeiculoAPI(
-  placa: string,
-  cpfCnpj?: string
-): Promise<VeiculoAPIResponse> {
-  // Simula delay de rede (1-2 segundos)
-  await new Promise((resolve) =>
-    setTimeout(resolve, 1000 + Math.random() * 1000)
+export async function consultarVeiculoAPI(placa: string, cpfCnpj?: string) {
+  console.warn(
+    "Atenção: Consulta direta por placa requer RENAVAM na API real."
   );
-
-  // Remove caracteres especiais da placa
-  const placaLimpa = placa.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-
-  // Valida formato da placa (3 letras + 4 números ou formato Mercosul)
-  const placaAntigaRegex = /^[A-Z]{3}[0-9]{4}$/;
-  const placaMercosulRegex = /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
-
-  if (
-    !placaAntigaRegex.test(placaLimpa) &&
-    !placaMercosulRegex.test(placaLimpa)
-  ) {
-    throw new Error("Formato de placa inválido. Use ABC-1234 ou ABC1D23.");
-  }
-
-  // Simula algumas placas conhecidas para teste
-  const veiculosMock: Record<string, VeiculoAPIResponse> = {
-    ABC1234: {
-      placa: "ABC-1234",
-      marca_modelo: "VOLVO/FH 540",
-      ano_fabricacao: 2022,
-      ano_modelo: 2023,
-      cor: "BRANCA",
-      renavam: "12345678901",
-      chassi: "9BWHE21JX24060001",
-      combustivel: "DIESEL",
-      potencia: "540cv",
-      cilindradas: "12800",
-      tipo_veiculo: "CAMINHAO TRATOR",
-      especie: "CARGA",
-      categoria: "PARTICULAR",
-      municipio: "SAO PAULO",
-      uf: "SP",
-    },
-    DEF5678: {
-      placa: "DEF-5678",
-      marca_modelo: "SCANIA/R450",
-      ano_fabricacao: 2021,
-      ano_modelo: 2021,
-      cor: "AZUL",
-      renavam: "98765432101",
-      chassi: "9BSR4X2Z0H4000002",
-      combustivel: "DIESEL",
-      potencia: "450cv",
-      cilindradas: "12700",
-      tipo_veiculo: "CAMINHAO TRATOR",
-      especie: "CARGA",
-      categoria: "PARTICULAR",
-      municipio: "SAO PAULO",
-      uf: "SP",
-    },
-    GHI9012: {
-      placa: "GHI-9012",
-      marca_modelo: "MERCEDES-BENZ/ACTROS 2651",
-      ano_fabricacao: 2023,
-      ano_modelo: 2024,
-      cor: "PRATA",
-      renavam: "11223344556",
-      chassi: "WDB96340310000003",
-      combustivel: "DIESEL",
-      potencia: "510cv",
-      cilindradas: "12800",
-      tipo_veiculo: "CAMINHAO TRATOR",
-      especie: "CARGA",
-      categoria: "PARTICULAR",
-      municipio: "CAMPINAS",
-      uf: "SP",
-    },
-  };
-
-  // Verifica se a placa está nos mocks
-  if (veiculosMock[placaLimpa]) {
-    return veiculosMock[placaLimpa];
-  }
-
-  // Para placas não conhecidas, gera dados simulados
-  // Em produção, aqui seria feita a chamada real à API
-  const marcas = ["VOLVO", "SCANIA", "MERCEDES-BENZ", "DAF", "IVECO", "MAN"];
-  const modelos = [
-    "FH 540",
-    "R450",
-    "ACTROS 2651",
-    "XF 480",
-    "S-WAY 480",
-    "TGX 29.480",
-  ];
-  const cores = ["BRANCA", "AZUL", "PRATA", "VERMELHA", "PRETA"];
-
-  const marcaIndex = Math.floor(Math.random() * marcas.length);
-
-  return {
-    placa: `${placaLimpa.slice(0, 3)}-${placaLimpa.slice(3)}`,
-    marca_modelo: `${marcas[marcaIndex]}/${modelos[marcaIndex]}`,
-    ano_fabricacao: 2020 + Math.floor(Math.random() * 5),
-    ano_modelo: 2021 + Math.floor(Math.random() * 4),
-    cor: cores[Math.floor(Math.random() * cores.length)],
-    renavam: String(Math.floor(10000000000 + Math.random() * 90000000000)),
-    chassi: `9BW${placaLimpa}${String(
-      Math.floor(100000 + Math.random() * 900000)
-    )}`,
-    combustivel: "DIESEL",
-    potencia: `${400 + Math.floor(Math.random() * 150)}cv`,
-    cilindradas: "12800",
-    tipo_veiculo: "CAMINHAO TRATOR",
-    especie: "CARGA",
-    categoria: "PARTICULAR",
-    municipio: "SAO PAULO",
-    uf: "SP",
-  };
+  return { placa, marca_modelo: "Consulte via Detran para detalhes" };
 }
 
-const API_URL = "http://localhost:3001";
+// --- MÓDULO: FROTA / VEÍCULOS ---
 
-export async function excluirVeiculoAPI(id: number | string): Promise<void> {
-  // Converte para string se necessário, dependendo de como seu backend espera
-  const response = await fetch(`${API_URL}/vehicles/${id}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Erro ao excluir veículo");
-  }
-}
-
-// Função para buscar a lista de carros do banco
-// --- FROTA / VEÍCULOS (Usado no Select de Manutenção) ---
 export async function buscarFrotaAPI() {
   try {
-    const response = await fetch(`${API_URL}/vehicles`);
-    if (!response.ok) return []; // Retorna lista vazia se der erro
-    return response.json();
+    const response = await fetch(`${API_BASE_URL}/vehicles`, {
+      cache: "no-store",
+    });
+    return handleResponse(response);
   } catch (error) {
     console.error("Erro ao buscar frota:", error);
     return [];
   }
 }
 
-// Função para salvar o carro de verdade
 export async function salvarVeiculoAPI(dadosVeiculo: any) {
-  const response = await fetch(`${API_URL}/vehicles`, {
+  const response = await fetch(`${API_BASE_URL}/vehicles`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dadosVeiculo),
   });
-
-  if (!response.ok) throw new Error("Erro ao salvar veículo");
-  return response.json();
+  return handleResponse(response);
 }
 
-// --- MULTAS ---
-export async function buscarMultasAPI() {
-  // Tenta buscar as multas. Se der erro (404), retorna array vazio para não travar a tela
+export async function excluirVeiculoAPI(id: number | string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/vehicles/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  });
+  return handleResponse(response);
+}
+
+// --- MÓDULO: MANUTENÇÕES ---
+
+export async function buscarManutencoesAPI() {
   try {
-    const response = await fetch(`${API_URL}/fines`);
-    if (!response.ok) return [];
-    return response.json();
+    const response = await fetch(`${API_BASE_URL}/maintenances`, {
+      cache: "no-store",
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error("Erro ao buscar manutenções:", error);
+    return [];
+  }
+}
+
+export async function salvarManutencaoAPI(dados: any) {
+  const response = await fetch(`${API_BASE_URL}/maintenances`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return handleResponse(response);
+}
+
+export async function concluirManutencaoAPI(id: number) {
+  const response = await fetch(`${API_BASE_URL}/maintenances/${id}/complete`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+  });
+  return handleResponse(response);
+}
+
+// --- MÓDULO: MULTAS ---
+
+export async function buscarMultasAPI() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/fines`, {
+      cache: "no-store",
+    });
+    return handleResponse(response);
   } catch (error) {
     console.error("Erro ao buscar multas:", error);
     return [];
@@ -236,89 +164,133 @@ export async function buscarMultasAPI() {
 }
 
 export async function salvarMultaAPI(multa: any) {
-  const response = await fetch(`${API_URL}/fines`, {
+  const response = await fetch(`${API_BASE_URL}/fines`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(multa),
   });
-  if (!response.ok) throw new Error("Erro ao salvar multa");
-  return response.json();
+  return handleResponse(response);
 }
 
-// --- DOCUMENTOS ---
-// (Simulando que buscamos documentos junto com veículos ou rota específica)
+export async function atualizarStatusMultaAPI(id: number, status: string) {
+  const response = await fetch(`${API_BASE_URL}/fines/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  return handleResponse(response);
+}
+
+// --- MÓDULO: DOCUMENTOS ---
+
 export async function buscarDocumentosAPI() {
   try {
-    const response = await fetch(`${API_URL}/documents`); // Atenção: Rota '/documents'
-    if (!response.ok) return [];
-    return response.json();
+    const response = await fetch(`${API_BASE_URL}/documents`, {
+      cache: "no-store",
+    });
+    return handleResponse(response);
   } catch (error) {
     console.error("Erro ao buscar documentos:", error);
     return [];
   }
 }
 
-// --- MANUTENÇÕES ---
+// --- MÓDULO DE INCIDENTES (SINISTROS) ---
 
-// Salvar nova manutenção
-export async function salvarManutencaoAPI(dados: any) {
-  const response = await fetch(`${API_URL}/maintenances`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(dados),
-  });
-  if (!response.ok) throw new Error("Erro ao salvar manutenção");
-  return response.json();
-}
-
-// Dar Baixa (Concluir)
-export async function concluirManutencaoAPI(id: number) {
-  const response = await fetch(`${API_URL}/maintenances/${id}/complete`, {
-    method: "PATCH",
-  });
-  if (!response.ok) throw new Error("Erro ao concluir manutenção");
-  return response.json();
-}
-
-// Listar
-export async function buscarManutencoesAPI() {
+export async function buscarIncidentesAPI() {
   try {
-    const response = await fetch(`${API_URL}/maintenances`);
+    const response = await fetch(`${API_BASE_URL}/incidents`, {
+      cache: "no-store",
+    });
     if (!response.ok) return [];
-    return response.json();
+
+    const dadosBrutos = await response.json();
+
+    // Aplica o adaptador para cada item da lista
+    if (Array.isArray(dadosBrutos)) {
+      return dadosBrutos.map(adapterIncidente);
+    }
+    return [];
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao buscar incidentes:", error);
     return [];
   }
 }
 
-// --- MÓDULO DE TACÓGRAFOS ---
+// Nota: Agora recebe FormData para upload de fotos
+export async function salvarIncidenteAPI(formData: FormData) {
+  const response = await fetch(`${API_BASE_URL}/incidents`, {
+    method: "POST",
+    body: formData, // Envia o FormData diretamente (sem JSON.stringify)
+  });
+
+  if (!response.ok) throw new Error("Erro ao salvar incidente");
+
+  const novoRegistro = await response.json();
+  // Retorna o dado adaptado (incluindo fotos) para aparecer na tela imediatamente
+  return adapterIncidente(novoRegistro);
+}
+
+// Adicione esta função logo abaixo de salvarIncidenteAPI
+export async function atualizarStatusIncidenteAPI(id: number, status: string) {
+  const response = await fetch(`${API_BASE_URL}/incidents/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!response.ok) throw new Error("Erro ao atualizar status do incidente");
+  return response.json(); // Retorna o dado atualizado do backend
+}
+
+// função para concluir incidente com upload opcional de nota fiscal
+export async function concluirIncidenteAPI(id: number, formData: FormData) {
+  // O FormData aqui deve conter o arquivo 'invoice' (opcional)
+  const response = await fetch(`${API_BASE_URL}/incidents/${id}/conclude`, {
+    method: "PATCH",
+    body: formData,
+  });
+
+  if (!response.ok) throw new Error("Erro ao concluir incidente");
+  const novoRegistro = await response.json();
+  return adapterIncidente(novoRegistro);
+}
+
+// --- MÓDULO: TACÓGRAFOS (Mock LocalStorage) ---
 
 export const buscarTacografosAPI = async () => {
-  // Simula delay
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  // Tenta pegar do localStorage
+  if (typeof window === "undefined") return [];
   const stored = localStorage.getItem("trl_tachographs");
-  if (stored) return JSON.parse(stored);
-
-  // Se não tiver nada, retorna lista vazia (ou dados mock iniciais se preferir)
-  return [];
+  return stored ? JSON.parse(stored) : [];
 };
 
 export const salvarTacografoAPI = async (dados: any) => {
-  await new Promise((resolve) => setTimeout(resolve, 800));
-
+  await new Promise((resolve) => setTimeout(resolve, 500));
   const currentData = await buscarTacografosAPI();
-
   const novoRegistro = {
-    id: Date.now(), // ID único baseado em timestamp
+    id: Date.now(),
     ...dados,
     status: "Enviado",
     timestamp: new Date().toISOString(),
   };
-
-  const newData = [novoRegistro, ...currentData];
-  localStorage.setItem("trl_tachographs", JSON.stringify(newData));
+  localStorage.setItem(
+    "trl_tachographs",
+    JSON.stringify([novoRegistro, ...currentData])
+  );
   return novoRegistro;
 };
+
+// --- MÓDULO: JORNADA (Mock LocalStorage) ---
+
+export async function buscarJornadaAtualAPI(motoristaId: string) {
+  if (typeof window === "undefined") return null;
+  const jornadas = JSON.parse(localStorage.getItem("trl_journey") || "[]");
+  return (
+    jornadas.find((j: any) => j.motoristaId === motoristaId && !j.dataFim) ||
+    null
+  );
+}
+
+export async function registrarPontoJornadaAPI(dados: any) {
+  return { success: true };
+}
