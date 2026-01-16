@@ -1,22 +1,46 @@
-"use client"
+"use client";
 
-import { useState, useMemo, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Calendar } from "@/components/ui/calendar"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
-import { format, isWithinInterval, parseISO } from "date-fns"
-import { ptBR } from "date-fns/locale"
-import type { DateRange } from "react-day-picker"
+import { useState, useMemo, useRef, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { buscarFrotaAPI, buscarDadosRelatorioAPI } from "@/lib/api-service";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import { format, isWithinInterval, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
 import {
   FileText,
   ShieldCheck,
@@ -41,600 +65,300 @@ import {
   Clock,
   User,
   Truck,
-} from "lucide-react"
-import Image from "next/image"
+} from "lucide-react";
+import Image from "next/image";
 
 // ==================== INTERFACES ====================
 interface Vehicle {
-  id: string
-  placa: string
-  modelo: string
+  id: string;
+  placa: string;
+  modelo: string;
 }
 
 interface Multa {
-  id: string
-  placa: string
-  data: string
-  hora: string
-  valor: number
-  local: string
-  status: "Paga" | "Pendente"
-  infracao: string
-  motorista: string
+  id: string;
+  placa: string;
+  data: string;
+  hora: string;
+  valor: number;
+  local: string;
+  status: "Paga" | "Pendente";
+  infracao: string;
+  motorista: string;
 }
 
 interface Manutencao {
-  id: string
-  placa: string
-  data: string
-  tipo: "Preventiva" | "Corretiva"
-  descricao: string
-  custo: number
-  pecas: string
-  oficina: string
-  notaFiscal: string
+  id: string;
+  placa: string;
+  data: string;
+  tipo: "Preventiva" | "Corretiva";
+  descricao: string;
+  custo: number;
+  pecas: string;
+  oficina: string;
+  notaFiscal: string;
 }
 
 interface Sinistro {
-  id: string
-  placa: string
-  data: string
-  tipo: string
-  custo: number
-  descricao: string
-  motorista: string
-  statusSeguro: "Aprovado" | "Em Análise" | "Negado"
+  id: string;
+  placa: string;
+  data: string;
+  tipo: string;
+  custo: number;
+  descricao: string;
+  motorista: string;
+  statusSeguro: "Aprovado" | "Em Análise" | "Negado";
 }
 
 interface Licenciamento {
-  placa: string
-  tipoDoc: string
-  crlv: "Válido" | "Pendente"
-  ipvaStatus: string
-  licenciamentoStatus: "Regular" | "Irregular"
-  vencimento: string
+  placa: string;
+  tipoDoc: string;
+  crlv: "Válido" | "Pendente";
+  ipvaStatus: string;
+  licenciamentoStatus: "Regular" | "Irregular";
+  vencimento: string;
 }
 
 interface ReportHistory {
-  id: string
-  dataGeracao: string
-  horaGeracao: string
-  periodoInicio: string
-  periodoFim: string
-  veiculos: { placa: string; modelo: string }[]
+  id: string;
+  dataGeracao: string;
+  horaGeracao: string;
+  periodoInicio: string;
+  periodoFim: string;
+  veiculos: { placa: string; modelo: string }[];
   conteudo: {
-    multas: boolean
-    licenciamento: boolean
-    manutencoes: boolean
-    sinistros: boolean
-  }
-  totalMultas: number
-  totalManutencoes: number
-  totalSinistros: number
-  quantidadeMultas: number
-  quantidadeManutencoes: number
-  quantidadeSinistros: number
-  docHash: string
-  geradoPor: string
+    multas: boolean;
+    licenciamento: boolean;
+    manutencoes: boolean;
+    sinistros: boolean;
+  };
+  totalMultas: number;
+  totalManutencoes: number;
+  totalSinistros: number;
+  quantidadeMultas: number;
+  quantidadeManutencoes: number;
+  quantidadeSinistros: number;
+  docHash: string;
+  geradoPor: string;
 }
 
-// ==================== MOCK DATA EXPANDIDO ====================
-const mockVehicles: Vehicle[] = [
-  { id: "1", placa: "ABC-1234", modelo: "VW Constellation 24.280" },
-  { id: "2", placa: "DEF-5678", modelo: "Mercedes Actros 2651" },
-  { id: "3", placa: "GHI-9012", modelo: "Scania R450" },
-  { id: "4", placa: "JKL-3456", modelo: "Volvo FH 540" },
-  { id: "5", placa: "MNO-7890", modelo: "DAF XF 530" },
-]
+// ==================== MOCK DATA - HISTÓRICO DE RELATÓRIOS (Para funcionalidade de histórico) ====================
+// Arrays vazios para dados que virão da API no futuro
+const mockMultas: any[] = [];
+const mockManutencoes: any[] = [];
+const mockSinistros: any[] = [];
+const mockLicenciamentos: any[] = [];
 
-const mockMultas: Multa[] = [
-  {
-    id: "1",
-    placa: "ABC-1234",
-    data: "2025-12-15",
-    hora: "14:32",
-    valor: 293.47,
-    local: "BR-116, KM 45 - Curitiba/PR",
-    status: "Pendente",
-    infracao: "Excesso de velocidade (Art. 218, III)",
-    motorista: "João Silva",
-  },
-  {
-    id: "2",
-    placa: "ABC-1234",
-    data: "2025-11-20",
-    hora: "09:15",
-    valor: 130.16,
-    local: "Av. Brasil, 2500 - Rio de Janeiro/RJ",
-    status: "Paga",
-    infracao: "Estacionamento irregular (Art. 181, XVII)",
-    motorista: "João Silva",
-  },
-  {
-    id: "3",
-    placa: "DEF-5678",
-    data: "2025-12-01",
-    hora: "22:45",
-    valor: 880.41,
-    local: "SP-330, KM 120 - Ribeirão Preto/SP",
-    status: "Pendente",
-    infracao: "Sobrepeso no eixo (Art. 231, V)",
-    motorista: "Carlos Santos",
-  },
-  {
-    id: "4",
-    placa: "GHI-9012",
-    data: "2025-10-10",
-    hora: "06:20",
-    valor: 195.23,
-    local: "BR-101, KM 200 - Joinville/SC",
-    status: "Paga",
-    infracao: "Farol apagado (Art. 250, I)",
-    motorista: "Pedro Oliveira",
-  },
-  {
-    id: "5",
-    placa: "ABC-1234",
-    data: "2025-11-05",
-    hora: "11:00",
-    valor: 195.23,
-    local: "BR-376, KM 80 - Ponta Grossa/PR",
-    status: "Pendente",
-    infracao: "Ultrapassagem em local proibido (Art. 211)",
-    motorista: "João Silva",
-  },
-]
-
-const mockManutencoes: Manutencao[] = [
-  {
-    id: "1",
-    placa: "ABC-1234",
-    data: "2025-12-10",
-    tipo: "Preventiva",
-    descricao: "Troca de óleo e filtros",
-    custo: 1500,
-    pecas: "Óleo 15W40 (20L), Filtro óleo, Filtro ar, Filtro combustível",
-    oficina: "Auto Center TRL",
-    notaFiscal: "NF-2025-001234",
-  },
-  {
-    id: "2",
-    placa: "DEF-5678",
-    data: "2025-11-25",
-    tipo: "Corretiva",
-    descricao: "Reparo no sistema de freios",
-    custo: 4200,
-    pecas: "Pastilhas de freio (jogo), Discos de freio (2un), Fluido DOT4",
-    oficina: "Freios & Cia",
-    notaFiscal: "NF-2025-005678",
-  },
-  {
-    id: "3",
-    placa: "GHI-9012",
-    data: "2025-12-05",
-    tipo: "Preventiva",
-    descricao: "Revisão geral 100.000km",
-    custo: 8500,
-    pecas: "Kit revisão completo, Correias, Tensores, Amortecedores",
-    oficina: "Scania Service",
-    notaFiscal: "NF-2025-009012",
-  },
-  {
-    id: "4",
-    placa: "ABC-1234",
-    data: "2025-10-15",
-    tipo: "Corretiva",
-    descricao: "Reparo no sistema de freios - Troca de lonas",
-    custo: 3200,
-    pecas: "Lonas de freio traseiro (jogo), Tambor de freio",
-    oficina: "Auto Center TRL",
-    notaFiscal: "NF-2025-001100",
-  },
-]
-
-const mockSinistros: Sinistro[] = [
-  {
-    id: "1",
-    placa: "ABC-1234",
-    data: "2025-12-08",
-    tipo: "Colisão traseira",
-    custo: 12500,
-    descricao: "Engavetamento na BR-116 devido a neblina intensa",
-    motorista: "João Silva",
-    statusSeguro: "Em Análise",
-  },
-  {
-    id: "2",
-    placa: "DEF-5678",
-    data: "2025-11-15",
-    tipo: "Avaria lateral",
-    custo: 3800,
-    descricao: "Raspão em manobra no pátio de carga",
-    motorista: "Carlos Santos",
-    statusSeguro: "Aprovado",
-  },
-  {
-    id: "3",
-    placa: "JKL-3456",
-    data: "2025-10-20",
-    tipo: "Colisão frontal",
-    custo: 45000,
-    descricao: "Acidente com animal na pista (javali) na BR-277",
-    motorista: "Roberto Lima",
-    statusSeguro: "Aprovado",
-  },
-]
-
-const mockLicenciamentos: Licenciamento[] = [
-  {
-    placa: "ABC-1234",
-    tipoDoc: "CRLV-e",
-    crlv: "Válido",
-    ipvaStatus: "Pago",
-    licenciamentoStatus: "Regular",
-    vencimento: "2026-04-15",
-  },
-  {
-    placa: "DEF-5678",
-    tipoDoc: "CRLV-e",
-    crlv: "Válido",
-    ipvaStatus: "Parcelado (3/10)",
-    licenciamentoStatus: "Regular",
-    vencimento: "2026-03-20",
-  },
-  {
-    placa: "GHI-9012",
-    tipoDoc: "CRLV-e",
-    crlv: "Pendente",
-    ipvaStatus: "Pendente",
-    licenciamentoStatus: "Irregular",
-    vencimento: "2025-12-31",
-  },
-  {
-    placa: "JKL-3456",
-    tipoDoc: "CRLV-e",
-    crlv: "Válido",
-    ipvaStatus: "Pago",
-    licenciamentoStatus: "Regular",
-    vencimento: "2026-05-10",
-  },
-  {
-    placa: "MNO-7890",
-    tipoDoc: "CRLV-e",
-    crlv: "Válido",
-    ipvaStatus: "Pago",
-    licenciamentoStatus: "Regular",
-    vencimento: "2026-06-01",
-  },
-]
-
-// ==================== MOCK HISTÓRICO DE RELATÓRIOS ====================
-const mockReportHistory: ReportHistory[] = [
-  {
-    id: "rpt-001",
-    dataGeracao: "2026-01-14",
-    horaGeracao: "14:32:15",
-    periodoInicio: "2025-10-01",
-    periodoFim: "2025-12-31",
-    veiculos: [
-      { placa: "ABC-1234", modelo: "VW Constellation 24.280" },
-      { placa: "DEF-5678", modelo: "Mercedes Actros 2651" },
-    ],
-    conteudo: { multas: true, licenciamento: true, manutencoes: true, sinistros: false },
-    totalMultas: 1303.04,
-    totalManutencoes: 4700.00,
-    totalSinistros: 0,
-    quantidadeMultas: 4,
-    quantidadeManutencoes: 3,
-    quantidadeSinistros: 0,
-    docHash: "X7JY-CXL7-WCPK-MT1X",
-    geradoPor: "Luiz Henrique",
-  },
-  {
-    id: "rpt-002",
-    dataGeracao: "2026-01-10",
-    horaGeracao: "09:15:42",
-    periodoInicio: "2025-11-01",
-    periodoFim: "2025-11-30",
-    veiculos: [
-      { placa: "GHI-9012", modelo: "Scania R450" },
-    ],
-    conteudo: { multas: true, licenciamento: false, manutencoes: false, sinistros: true },
-    totalMultas: 195.23,
-    totalManutencoes: 0,
-    totalSinistros: 8500.00,
-    quantidadeMultas: 1,
-    quantidadeManutencoes: 0,
-    quantidadeSinistros: 1,
-    docHash: "K9LP-MN2R-QW3T-YU4I",
-    geradoPor: "Franciele Silva",
-  },
-  {
-    id: "rpt-003",
-    dataGeracao: "2026-01-05",
-    horaGeracao: "16:48:30",
-    periodoInicio: "2025-09-01",
-    periodoFim: "2025-12-15",
-    veiculos: [
-      { placa: "ABC-1234", modelo: "VW Constellation 24.280" },
-      { placa: "DEF-5678", modelo: "Mercedes Actros 2651" },
-      { placa: "GHI-9012", modelo: "Scania R450" },
-      { placa: "JKL-3456", modelo: "Volvo FH 540" },
-      { placa: "MNO-7890", modelo: "DAF XF 530" },
-    ],
-    conteudo: { multas: true, licenciamento: true, manutencoes: true, sinistros: true },
-    totalMultas: 1694.50,
-    totalManutencoes: 7200.00,
-    totalSinistros: 21000.00,
-    quantidadeMultas: 5,
-    quantidadeManutencoes: 4,
-    quantidadeSinistros: 2,
-    docHash: "A5BC-D6EF-G7HI-J8KL",
-    geradoPor: "Luiz Henrique",
-  },
-  {
-    id: "rpt-004",
-    dataGeracao: "2025-12-20",
-    horaGeracao: "11:22:05",
-    periodoInicio: "2025-07-01",
-    periodoFim: "2025-09-30",
-    veiculos: [
-      { placa: "JKL-3456", modelo: "Volvo FH 540" },
-      { placa: "MNO-7890", modelo: "DAF XF 530" },
-    ],
-    conteudo: { multas: false, licenciamento: true, manutencoes: true, sinistros: false },
-    totalMultas: 0,
-    totalManutencoes: 3250.00,
-    totalSinistros: 0,
-    quantidadeMultas: 0,
-    quantidadeManutencoes: 2,
-    quantidadeSinistros: 0,
-    docHash: "P9QR-S0TU-V1WX-Y2ZA",
-    geradoPor: "Franciele Silva",
-  },
-]
+// Histórico de relatórios - exemplo para demonstração
+const mockReportHistory: ReportHistory[] = [];
 
 // ==================== HELPER FUNCTIONS ====================
 const generateDocHash = () => {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let hash = ""
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let hash = "";
   for (let i = 0; i < 4; i++) {
     for (let j = 0; j < 4; j++) {
-      hash += chars.charAt(Math.floor(Math.random() * chars.length))
+      hash += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    if (i < 3) hash += "-"
+    if (i < 3) hash += "-";
   }
-  return hash
-}
+  return hash;
+};
 
 // ==================== COMPONENT ====================
 export function ReportsView() {
   // Estados de seleção
-  const [selectedVehicles, setSelectedVehicles] = useState<string[]>([])
+  const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(2025, 9, 1),
     to: new Date(),
-  })
+  });
 
   // Estados de conteúdo do relatório
-  const [includeMultas, setIncludeMultas] = useState(false)
-  const [includeLicenciamento, setIncludeLicenciamento] = useState(false)
-  const [includeManutencoes, setIncludeManutencoes] = useState(false)
-  const [includeSinistros, setIncludeSinistros] = useState(false)
+  const [includeMultas, setIncludeMultas] = useState(false);
+  const [includeLicenciamento, setIncludeLicenciamento] = useState(false);
+  const [includeManutencoes, setIncludeManutencoes] = useState(false);
+  const [includeSinistros, setIncludeSinistros] = useState(false);
 
   // Estados de sinistros selecionados
-  const [selectedSinistros, setSelectedSinistros] = useState<string[]>([])
+  const [selectedSinistros, setSelectedSinistros] = useState<string[]>([]);
 
   // Estados de segurança
-  const [pdfPassword, setPdfPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
+  const [pdfPassword, setPdfPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Estados de controle
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-  const [isVehicleSelectOpen, setIsVehicleSelectOpen] = useState(false)
-  const [docHash] = useState(generateDocHash())
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isVehicleSelectOpen, setIsVehicleSelectOpen] = useState(false);
+  const [docHash] = useState(generateDocHash());
 
   // Estados para o PDF Download
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Estado para histórico expandido
-  const [expandedReportId, setExpandedReportId] = useState<string | null>(null)
-  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null)
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
+  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(
+    null,
+  );
 
   // Ref para área de impressão
-  const printRef = useRef<HTMLDivElement>(null)
+  const printRef = useRef<HTMLDivElement>(null);
 
-  // Filtra sinistros pelo período e veículos selecionados
-  const filteredSinistros = useMemo(() => {
-    if (!dateRange?.from || !dateRange?.to) return []
-    return mockSinistros.filter((s) => {
-      const sinistroDate = parseISO(s.data)
-      const inDateRange = isWithinInterval(sinistroDate, {
-        start: dateRange.from!,
-        end: dateRange.to!,
-      })
-      const inSelectedVehicles = selectedVehicles.length === 0 || selectedVehicles.includes(s.placa)
-      return inDateRange && inSelectedVehicles
-    })
-  }, [dateRange, selectedVehicles])
+  // Estados da API
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [reportData, setReportData] = useState({
+    incidents: [] as any[],
+    maintenances: [] as any[],
+    summary: {
+      totalCost: 0,
+      totalIncidents: 0,
+      totalMaintenances: 0,
+      analysisText: "Aguardando dados...",
+    },
+  });
+  const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
 
-  // Filtra dados para o preview
-  const filteredMultas = useMemo(() => {
-    if (!dateRange?.from || !dateRange?.to) return []
-    return mockMultas.filter((m) => {
-      const multaDate = parseISO(m.data)
-      const inDateRange = isWithinInterval(multaDate, {
-        start: dateRange.from!,
-        end: dateRange.to!,
-      })
-      const inSelectedVehicles = selectedVehicles.length === 0 || selectedVehicles.includes(m.placa)
-      return inDateRange && inSelectedVehicles
-    })
-  }, [dateRange, selectedVehicles])
-
-  const filteredManutencoes = useMemo(() => {
-    if (!dateRange?.from || !dateRange?.to) return []
-    return mockManutencoes.filter((m) => {
-      const manutDate = parseISO(m.data)
-      const inDateRange = isWithinInterval(manutDate, {
-        start: dateRange.from!,
-        end: dateRange.to!,
-      })
-      const inSelectedVehicles = selectedVehicles.length === 0 || selectedVehicles.includes(m.placa)
-      return inDateRange && inSelectedVehicles
-    })
-  }, [dateRange, selectedVehicles])
-
-  const filteredLicenciamentos = useMemo(() => {
-    if (selectedVehicles.length === 0) return mockLicenciamentos
-    return mockLicenciamentos.filter((l) => selectedVehicles.includes(l.placa))
-  }, [selectedVehicles])
-
-  const generateAIAnalysis = useMemo(() => {
-    const totalMultas = filteredMultas.reduce((acc, m) => acc + m.valor, 0)
-    const multasPendentes = filteredMultas.filter((m) => m.status === "Pendente")
-    const totalManutencoes = filteredManutencoes.reduce((acc, m) => acc + m.custo, 0)
-    const manutencoesCorretivas = filteredManutencoes.filter((m) => m.tipo === "Corretiva")
-    const sinistrosAnalisados = filteredSinistros.filter((s) => selectedSinistros.includes(s.id))
-    const totalSinistros = sinistrosAnalisados.reduce((acc, s) => acc + s.custo, 0)
-    const licenciamentosIrregulares = filteredLicenciamentos.filter((l) => l.licenciamentoStatus === "Irregular")
-
-    const custoTotal = totalMultas + totalManutencoes + totalSinistros
-
-    // Identifica veículo mais problemático
-    const multasPorVeiculo: Record<string, number> = {}
-    filteredMultas.forEach((m) => {
-      multasPorVeiculo[m.placa] = (multasPorVeiculo[m.placa] || 0) + 1
-    })
-    const veiculoMaisMultas = Object.entries(multasPorVeiculo).sort((a, b) => b[1] - a[1])[0]
-
-    // Identifica padrões de manutenção
-    const manutencoesPorTipo: Record<string, number> = {}
-    filteredManutencoes.forEach((m) => {
-      const key = m.descricao.toLowerCase().includes("freio") ? "freios" : m.tipo.toLowerCase()
-      manutencoesPorTipo[key] = (manutencoesPorTipo[key] || 0) + 1
-    })
-    const tipoMaisFrequente = Object.entries(manutencoesPorTipo).sort((a, b) => b[1] - a[1])[0]
-
-    let analysis = ""
-
-    if (custoTotal > 0) {
-      analysis += `Durante o período analisado, a frota acumulou um custo operacional total de ${custoTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}. `
-    }
-
-    if (veiculoMaisMultas && veiculoMaisMultas[1] > 1) {
-      analysis += `O veículo ${veiculoMaisMultas[0]} apresentou ${veiculoMaisMultas[1]} infrações no período, representando o maior índice de ocorrências. `
-    }
-
-    if (manutencoesCorretivas.length > 0) {
-      analysis += `Foram realizadas ${manutencoesCorretivas.length} manutenção(ões) corretiva(s), `
-      if (tipoMaisFrequente && tipoMaisFrequente[0] === "freios") {
-        analysis += `com destaque para problemas recorrentes no sistema de freios. Recomenda-se inspeção preventiva intensificada. `
-      } else {
-        analysis += `indicando necessidade de revisão no cronograma de manutenções preventivas. `
+  // Carrega frota quando o componente monta
+  useEffect(() => {
+    const loadVehicles = async () => {
+      setIsLoadingVehicles(true);
+      try {
+        const vehiclesData = await buscarFrotaAPI();
+        if (Array.isArray(vehiclesData)) {
+          setVehicles(vehiclesData);
+        } else {
+          setVehicles([]);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar frota:", error);
+        setVehicles([]);
+      } finally {
+        setIsLoadingVehicles(false);
       }
-    }
+    };
+    
+    loadVehicles();
+  }, []);
 
-    if (multasPendentes.length > 0) {
-      const valorPendente = multasPendentes.reduce((acc, m) => acc + m.valor, 0)
-      analysis += `Existem ${multasPendentes.length} multa(s) pendente(s) totalizando ${valorPendente.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} aguardando regularização. `
-    }
 
-    if (licenciamentosIrregulares.length > 0) {
-      analysis += `ATENÇÃO: ${licenciamentosIrregulares.length} veículo(s) apresenta(m) situação documental irregular, requerendo ação imediata. `
-    }
+  // Dados do relatório já vêm filtrados da API em reportData
+  const filteredMultas: any[] = reportData.incidents || [];
+  const filteredManutencoes: any[] = reportData.maintenances || [];
+  const filteredSinistros: Sinistro[] = []; // Sinistros virão separados da API se necessário
+  const filteredLicenciamentos: Licenciamento[] = []; // Licenciamentos virão da API se necessário
 
-    if (sinistrosAnalisados.length > 0) {
-      const sinistrosEmAnalise = sinistrosAnalisados.filter((s) => s.statusSeguro === "Em Análise")
-      if (sinistrosEmAnalise.length > 0) {
-        analysis += `Há ${sinistrosEmAnalise.length} sinistro(s) aguardando análise da seguradora. `
-      }
-    }
-
-    if (analysis === "") {
-      analysis =
-        "Nenhuma ocorrência significativa foi identificada no período selecionado. A frota apresenta operação dentro dos parâmetros normais."
-    }
-
-    return analysis
-  }, [filteredMultas, filteredManutencoes, filteredSinistros, selectedSinistros, filteredLicenciamentos])
+  // Análise é fornecida pela API
+  const generateAIAnalysis = reportData.summary?.analysisText || "Aguardando dados do relatório...";
 
   // Handler para toggle de veículo
   const toggleVehicle = (placa: string) => {
-    setSelectedVehicles((prev) => (prev.includes(placa) ? prev.filter((p) => p !== placa) : [...prev, placa]))
-  }
+    setSelectedVehicles((prev) =>
+      prev.includes(placa) ? prev.filter((p) => p !== placa) : [...prev, placa],
+    );
+  };
 
   // Handler para selecionar todos os veículos
   const selectAllVehicles = () => {
-    if (selectedVehicles.length === mockVehicles.length) {
-      setSelectedVehicles([])
+    if (selectedVehicles.length === vehicles.length) {
+      setSelectedVehicles([]);
     } else {
-      setSelectedVehicles(mockVehicles.map((v) => v.placa))
+      setSelectedVehicles(vehicles.map((v) => v.placa));
     }
-  }
+  };
 
   // Handler para toggle de sinistro
   const toggleSinistro = (id: string) => {
-    setSelectedSinistros((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]))
-  }
+    setSelectedSinistros((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+  };
 
   // Handler para gerar PDF
   const handleGenerateReport = async () => {
-    setIsGenerating(true)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsGenerating(false)
-    setIsPreviewOpen(true)
-  }
+    // Validação básica
+    if (!dateRange?.from || !dateRange?.to) {
+      alert("Por favor, selecione um período de data válido.");
+      return;
+    }
+
+    if (!pdfPassword) {
+      alert("Por favor, defina uma senha para o relatório.");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      // Determinar placa selecionada
+      const vehiclePlate = selectedVehicles.length === 1 
+        ? selectedVehicles[0] 
+        : "all";
+
+      // Chamar API com filtros
+      const data = await buscarDadosRelatorioAPI({
+        startDate: dateRange.from.toISOString().split('T')[0],
+        endDate: dateRange.to.toISOString().split('T')[0],
+        vehiclePlate: vehiclePlate,
+      });
+
+      setReportData(data);
+      setIsPreviewOpen(true);
+    } catch (error) {
+      console.error("Erro ao gerar relatório:", error);
+      alert("Erro ao gerar relatório. Verifique a conexão e tente novamente.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleDownloadPDF = async () => {
-    setIsGeneratingPdf(true)
+    setIsGeneratingPdf(true);
 
     try {
-      const printContent = printRef.current
+      const printContent = printRef.current;
       if (!printContent) {
-        throw new Error("Conteúdo do relatório não encontrado")
+        throw new Error("Conteúdo do relatório não encontrado");
       }
 
       // Criar um iframe oculto para imprimir apenas o documento
-      const iframe = document.createElement("iframe")
-      iframe.style.position = "fixed"
-      iframe.style.right = "0"
-      iframe.style.bottom = "0"
-      iframe.style.width = "0"
-      iframe.style.height = "0"
-      iframe.style.border = "none"
-      document.body.appendChild(iframe)
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "none";
+      document.body.appendChild(iframe);
 
-      const iframeDoc = iframe.contentWindow?.document
+      const iframeDoc = iframe.contentWindow?.document;
       if (!iframeDoc) {
-        throw new Error("Não foi possível criar iframe")
+        throw new Error("Não foi possível criar iframe");
       }
 
       // Capturar o HTML interno do preview
-      const documentElement = printContent.querySelector(".print-content")
+      const documentElement = printContent.querySelector(".print-content");
       if (!documentElement) {
-        throw new Error("Documento não encontrado")
+        throw new Error("Documento não encontrado");
       }
 
       // Clonar o elemento para manipulação
-      const clonedDoc = documentElement.cloneNode(true) as HTMLElement
+      const clonedDoc = documentElement.cloneNode(true) as HTMLElement;
 
       // Converter todas as imagens para base64 inline
-      const images = clonedDoc.querySelectorAll("img")
+      const images = clonedDoc.querySelectorAll("img");
       for (const img of images) {
-        const imgElement = img as HTMLImageElement
-        const src = imgElement.src
+        const imgElement = img as HTMLImageElement;
+        const src = imgElement.src;
         if (src && !src.startsWith("data:")) {
           try {
-            const response = await fetch(src)
-            const blob = await response.blob()
+            const response = await fetch(src);
+            const blob = await response.blob();
             const base64 = await new Promise<string>((resolve) => {
-              const reader = new FileReader()
-              reader.onloadend = () => resolve(reader.result as string)
-              reader.readAsDataURL(blob)
-            })
-            imgElement.src = base64
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            imgElement.src = base64;
           } catch {
             // Se falhar, manter a imagem original
           }
@@ -642,7 +366,7 @@ export function ReportsView() {
       }
 
       // Escrever o documento no iframe com estilos de impressão
-      iframeDoc.open()
+      iframeDoc.open();
       iframeDoc.write(`
         <!DOCTYPE html>
         <html>
@@ -1127,7 +851,10 @@ export function ReportsView() {
             </div>
 
             ${
-              includeMultas || includeManutencoes || includeSinistros || includeLicenciamento
+              includeMultas ||
+              includeManutencoes ||
+              includeSinistros ||
+              includeLicenciamento
                 ? `
             <div class="ai-box">
               <div class="ai-box-inner">
@@ -1181,7 +908,10 @@ export function ReportsView() {
                   <p class="value">${filteredSinistros
                     .filter((s) => selectedSinistros.includes(s.id))
                     .reduce((acc, s) => acc + s.custo, 0)
-                    .toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>
+                    .toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })}</p>
                   <p class="count">${selectedSinistros.length} sinistro(s)</p>
                 </div>
                 `
@@ -1390,77 +1120,86 @@ export function ReportsView() {
           </div>
         </body>
         </html>
-      `)
-      iframeDoc.close()
+      `);
+      iframeDoc.close();
 
       // Imprimir o iframe
-      iframe.contentWindow?.print()
+      iframe.contentWindow?.print();
 
       // Remover iframe após impressão
       setTimeout(() => {
-        document.body.removeChild(iframe)
-      }, 1000)
+        document.body.removeChild(iframe);
+      }, 1000);
     } catch (error) {
-      console.error("[v0] Error generating PDF:", error)
-      alert("Erro ao gerar PDF. Por favor, tente novamente.")
+      console.error("[v0] Error generating PDF:", error);
+      alert("Erro ao gerar PDF. Por favor, tente novamente.");
     } finally {
-      setIsGeneratingPdf(false)
+      setIsGeneratingPdf(false);
     }
-  }
+  };
 
   // Função para baixar relatório do histórico
   const handleDownloadHistoryPDF = async (report: ReportHistory) => {
-    setDownloadingReportId(report.id)
+    setDownloadingReportId(report.id);
 
     try {
       // Criar um iframe oculto para imprimir o documento do histórico
-      const iframe = document.createElement("iframe")
-      iframe.style.position = "fixed"
-      iframe.style.right = "0"
-      iframe.style.bottom = "0"
-      iframe.style.width = "0"
-      iframe.style.height = "0"
-      iframe.style.border = "none"
-      document.body.appendChild(iframe)
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "none";
+      document.body.appendChild(iframe);
 
-      const iframeDoc = iframe.contentWindow?.document
+      const iframeDoc = iframe.contentWindow?.document;
       if (!iframeDoc) {
-        throw new Error("Não foi possível criar iframe")
+        throw new Error("Não foi possível criar iframe");
       }
 
       // Buscar dados dos veículos do relatório
-      const reportVehicles = report.veiculos
-      const reportPlacas = reportVehicles.map((v) => v.placa)
-      
+      const reportVehicles = report.veiculos;
+      const reportPlacas = reportVehicles.map((v) => v.placa);
+
       // Filtrar dados com base no período e veículos do relatório
-      const periodoInicio = parseISO(report.periodoInicio)
-      const periodoFim = parseISO(report.periodoFim)
-      
+      const periodoInicio = parseISO(report.periodoInicio);
+      const periodoFim = parseISO(report.periodoFim);
+
       const filteredMultas = mockMultas.filter(
         (m) =>
           reportPlacas.includes(m.placa) &&
-          isWithinInterval(parseISO(m.data), { start: periodoInicio, end: periodoFim })
-      )
-      
+          isWithinInterval(parseISO(m.data), {
+            start: periodoInicio,
+            end: periodoFim,
+          }),
+      );
+
       const filteredManutencoes = mockManutencoes.filter(
         (m) =>
           reportPlacas.includes(m.placa) &&
-          isWithinInterval(parseISO(m.data), { start: periodoInicio, end: periodoFim })
-      )
-      
+          isWithinInterval(parseISO(m.data), {
+            start: periodoInicio,
+            end: periodoFim,
+          }),
+      );
+
       const filteredSinistros = mockSinistros.filter(
         (s) =>
           reportPlacas.includes(s.placa) &&
-          isWithinInterval(parseISO(s.data), { start: periodoInicio, end: periodoFim })
-      )
-      
+          isWithinInterval(parseISO(s.data), {
+            start: periodoInicio,
+            end: periodoFim,
+          }),
+      );
+
       const filteredLicenciamento = mockLicenciamentos.filter((l) =>
-        reportPlacas.includes(l.placa)
-      )
+        reportPlacas.includes(l.placa),
+      );
 
       // Gerar HTML do relatório com os dados do histórico
       const generateMultasTable = () => {
-        if (!report.conteudo.multas || filteredMultas.length === 0) return ""
+        if (!report.conteudo.multas || filteredMultas.length === 0) return "";
         return `
           <div class="section">
             <h4>DETALHAMENTO DE MULTAS E INFRAÇÕES</h4>
@@ -1487,17 +1226,21 @@ export function ReportsView() {
                       <td class="currency">R$ ${m.valor.toFixed(2)}</td>
                       <td><span class="badge ${m.status === "Paga" ? "badge-success" : "badge-warning"}">${m.status}</span></td>
                     </tr>
-                  `
+                  `,
                   )
                   .join("")}
               </tbody>
             </table>
           </div>
-        `
-      }
+        `;
+      };
 
       const generateLicenciamentoTable = () => {
-        if (!report.conteudo.licenciamento || filteredLicenciamento.length === 0) return ""
+        if (
+          !report.conteudo.licenciamento ||
+          filteredLicenciamento.length === 0
+        )
+          return "";
         return `
           <div class="section">
             <h4>STATUS DE DOCUMENTAÇÃO DOS VEÍCULOS</h4>
@@ -1524,17 +1267,18 @@ export function ReportsView() {
                       <td><span class="badge ${l.licenciamentoStatus === "Regular" ? "badge-success" : "badge-danger"}">${l.licenciamentoStatus}</span></td>
                       <td>${format(parseISO(l.vencimento), "dd/MM/yyyy")}</td>
                     </tr>
-                  `
+                  `,
                   )
                   .join("")}
               </tbody>
             </table>
           </div>
-        `
-      }
+        `;
+      };
 
       const generateManutencoesTable = () => {
-        if (!report.conteudo.manutencoes || filteredManutencoes.length === 0) return ""
+        if (!report.conteudo.manutencoes || filteredManutencoes.length === 0)
+          return "";
         return `
           <div class="section">
             <h4>HISTÓRICO DETALHADO DE MANUTENÇÕES</h4>
@@ -1561,17 +1305,18 @@ export function ReportsView() {
                       <td>${m.notaFiscal}</td>
                       <td class="currency">R$ ${m.custo.toFixed(2)}</td>
                     </tr>
-                  `
+                  `,
                   )
                   .join("")}
               </tbody>
             </table>
           </div>
-        `
-      }
+        `;
+      };
 
       const generateSinistrosTable = () => {
-        if (!report.conteudo.sinistros || filteredSinistros.length === 0) return ""
+        if (!report.conteudo.sinistros || filteredSinistros.length === 0)
+          return "";
         return `
           <div class="section">
             <h4>REGISTRO DE SINISTROS E ACIDENTES</h4>
@@ -1598,33 +1343,40 @@ export function ReportsView() {
                       <td class="currency">R$ ${s.custo.toFixed(2)}</td>
                       <td><span class="badge ${s.statusSeguro === "Aprovado" ? "badge-success" : s.statusSeguro === "Negado" ? "badge-danger" : "badge-warning"}">${s.statusSeguro}</span></td>
                     </tr>
-                  `
+                  `,
                   )
                   .join("")}
               </tbody>
             </table>
           </div>
-        `
-      }
+        `;
+      };
 
       // Gerar análise executiva
       const generateAnalysis = () => {
-        const parts = []
+        const parts = [];
         if (report.conteudo.multas && report.quantidadeMultas > 0) {
-          parts.push(`${report.quantidadeMultas} multa(s) registrada(s) totalizando ${report.totalMultas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
+          parts.push(
+            `${report.quantidadeMultas} multa(s) registrada(s) totalizando ${report.totalMultas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+          );
         }
         if (report.conteudo.manutencoes && report.quantidadeManutencoes > 0) {
-          parts.push(`${report.quantidadeManutencoes} serviço(s) de manutenção no valor total de ${report.totalManutencoes.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
+          parts.push(
+            `${report.quantidadeManutencoes} serviço(s) de manutenção no valor total de ${report.totalManutencoes.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+          );
         }
         if (report.conteudo.sinistros && report.quantidadeSinistros > 0) {
-          parts.push(`${report.quantidadeSinistros} sinistro(s) com custo estimado de ${report.totalSinistros.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
+          parts.push(
+            `${report.quantidadeSinistros} sinistro(s) com custo estimado de ${report.totalSinistros.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+          );
         }
-        const total = report.totalMultas + report.totalManutencoes + report.totalSinistros
-        return `Durante o período analisado, a frota registrou: ${parts.join("; ")}. Custo total do período: ${total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`
-      }
+        const total =
+          report.totalMultas + report.totalManutencoes + report.totalSinistros;
+        return `Durante o período analisado, a frota registrou: ${parts.join("; ")}. Custo total do período: ${total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`;
+      };
 
       // Montar HTML completo
-      iframeDoc.open()
+      iframeDoc.open();
       iframeDoc.write(`
         <!DOCTYPE html>
         <html>
@@ -2096,27 +1848,39 @@ export function ReportsView() {
             <div class="financial-section">
               <h4>Resumo Financeiro do Período</h4>
               <div class="financial-cards">
-                ${report.conteudo.multas ? `
+                ${
+                  report.conteudo.multas
+                    ? `
                   <div class="financial-card red">
                     <label>Total em Multas</label>
                     <p class="value">R$ ${report.totalMultas.toFixed(2).replace(".", ",")}</p>
                     <p class="count">${report.quantidadeMultas} ocorrência(s)</p>
                   </div>
-                ` : ""}
-                ${report.conteudo.manutencoes ? `
+                `
+                    : ""
+                }
+                ${
+                  report.conteudo.manutencoes
+                    ? `
                   <div class="financial-card amber">
                     <label>Total em Manutenções</label>
                     <p class="value">R$ ${report.totalManutencoes.toFixed(2).replace(".", ",")}</p>
                     <p class="count">${report.quantidadeManutencoes} serviço(s)</p>
                   </div>
-                ` : ""}
-                ${report.conteudo.sinistros ? `
+                `
+                    : ""
+                }
+                ${
+                  report.conteudo.sinistros
+                    ? `
                   <div class="financial-card slate">
                     <label>Total em Sinistros</label>
                     <p class="value">R$ ${report.totalSinistros.toFixed(2).replace(".", ",")}</p>
                     <p class="count">${report.quantidadeSinistros} sinistro(s)</p>
                   </div>
-                ` : ""}
+                `
+                    : ""
+                }
               </div>
             </div>
 
@@ -2157,24 +1921,24 @@ export function ReportsView() {
           </div>
         </body>
         </html>
-      `)
-      iframeDoc.close()
+      `);
+      iframeDoc.close();
 
       // Aguardar carregamento e imprimir
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      iframe.contentWindow?.print()
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      iframe.contentWindow?.print();
 
       // Remover iframe após impressão
       setTimeout(() => {
-        document.body.removeChild(iframe)
-      }, 1000)
+        document.body.removeChild(iframe);
+      }, 1000);
     } catch (error) {
-      console.error("[v0] Error downloading history PDF:", error)
-      alert("Erro ao baixar relatório. Por favor, tente novamente.")
+      console.error("[v0] Error downloading history PDF:", error);
+      alert("Erro ao baixar relatório. Por favor, tente novamente.");
     } finally {
-      setDownloadingReportId(null)
+      setDownloadingReportId(null);
     }
-  }
+  };
 
   // Dados da empresa
   const empresaData = {
@@ -2184,14 +1948,12 @@ export function ReportsView() {
     telefone: "(11) 3456-7890",
     site: "www.trltransporte.com.br",
     email: "contato@trltransporte.com.br",
-  }
+  };
 
   // Cálculos para resumo
-  const totalMultasValor = filteredMultas.reduce((acc, m) => acc + m.valor, 0)
-  const totalManutencoesValor = filteredManutencoes.reduce((acc, m) => acc + m.custo, 0)
-  const totalSinistrosValor = filteredSinistros
-    .filter((s) => selectedSinistros.includes(s.id))
-    .reduce((acc, s) => acc + s.custo, 0)
+  const totalMultasValor = reportData.summary?.totalCost || 0;
+  const totalManutencoesValor = reportData.summary?.totalMaintenances || 0;
+  const totalSinistrosValor = reportData.summary?.totalIncidents || 0;
 
   return (
     <>
@@ -2231,8 +1993,12 @@ export function ReportsView() {
               <FileText className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Gerador de Relatórios Oficiais</h1>
-              <p className="text-muted-foreground">Gere documentos detalhados, assinados e protegidos da frota.</p>
+              <h1 className="text-2xl font-bold tracking-tight">
+                Gerador de Relatórios Oficiais
+              </h1>
+              <p className="text-muted-foreground">
+                Gere documentos detalhados, assinados e protegidos da frota.
+              </p>
             </div>
           </div>
         </div>
@@ -2247,13 +2013,18 @@ export function ReportsView() {
                   <Car className="h-5 w-5 text-primary" />
                   Seleção de Escopo
                 </CardTitle>
-                <CardDescription>Defina os veículos e o período do relatório</CardDescription>
+                <CardDescription>
+                  Defina os veículos e o período do relatório
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Multi-Select de Veículos */}
                 <div className="space-y-2">
                   <Label>Veículos da Frota</Label>
-                  <Popover open={isVehicleSelectOpen} onOpenChange={setIsVehicleSelectOpen}>
+                  <Popover
+                    open={isVehicleSelectOpen}
+                    onOpenChange={setIsVehicleSelectOpen}
+                  >
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
@@ -2263,7 +2034,7 @@ export function ReportsView() {
                         <span className="truncate">
                           {selectedVehicles.length === 0
                             ? "Selecionar veículos..."
-                            : selectedVehicles.length === mockVehicles.length
+                            : selectedVehicles.length === vehicles.length
                               ? "Todos os veículos selecionados"
                               : `${selectedVehicles.length} veículo(s) selecionado(s)`}
                         </span>
@@ -2272,30 +2043,49 @@ export function ReportsView() {
                     <PopoverContent className="w-80 p-0" align="start">
                       <div className="p-3 border-b">
                         <div className="flex items-center justify-between">
-                          <span className="font-medium text-sm">Selecionar Veículos</span>
-                          <Button variant="ghost" size="sm" onClick={selectAllVehicles} className="h-auto p-1 text-xs">
-                            {selectedVehicles.length === mockVehicles.length ? "Desmarcar todos" : "Selecionar todos"}
+                          <span className="font-medium text-sm">
+                            Selecionar Veículos
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={selectAllVehicles}
+                            className="h-auto p-1 text-xs"
+                          >
+                            {selectedVehicles.length === vehicles.length
+                              ? "Desmarcar todos"
+                              : "Selecionar todos"}
                           </Button>
                         </div>
                       </div>
                       <ScrollArea className="h-[200px]">
                         <div className="p-2 space-y-1">
-                          {mockVehicles.map((vehicle) => (
+                          {vehicles.map((vehicle) => (
                             <div
-                              key={vehicle.id}
+                              key={vehicle.placa}
                               className={cn(
                                 "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors",
-                                selectedVehicles.includes(vehicle.placa) ? "bg-primary/10" : "hover:bg-muted",
+                                selectedVehicles.includes(vehicle.placa)
+                                  ? "bg-primary/10"
+                                  : "hover:bg-muted",
                               )}
                               onClick={() => toggleVehicle(vehicle.placa)}
                             >
                               <Checkbox
-                                checked={selectedVehicles.includes(vehicle.placa)}
-                                onCheckedChange={() => toggleVehicle(vehicle.placa)}
+                                checked={selectedVehicles.includes(
+                                  vehicle.placa,
+                                )}
+                                onCheckedChange={() =>
+                                  toggleVehicle(vehicle.placa)
+                                }
                               />
                               <div className="flex-1 min-w-0">
-                                <p className="font-mono text-sm font-medium">{vehicle.placa}</p>
-                                <p className="text-xs text-muted-foreground truncate">{vehicle.modelo}</p>
+                                <p className="font-mono text-sm font-medium">
+                                  {vehicle.placa}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {vehicle.modelo}
+                                </p>
                               </div>
                             </div>
                           ))}
@@ -2336,11 +2126,18 @@ export function ReportsView() {
                         {dateRange?.from ? (
                           dateRange.to ? (
                             <>
-                              {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
-                              {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+                              {format(dateRange.from, "dd/MM/yyyy", {
+                                locale: ptBR,
+                              })}{" "}
+                              -{" "}
+                              {format(dateRange.to, "dd/MM/yyyy", {
+                                locale: ptBR,
+                              })}
                             </>
                           ) : (
-                            format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
+                            format(dateRange.from, "dd/MM/yyyy", {
+                              locale: ptBR,
+                            })
                           )
                         ) : (
                           "Selecione o período"
@@ -2370,7 +2167,9 @@ export function ReportsView() {
                   <FileText className="h-5 w-5 text-primary" />
                   Conteúdo do Relatório
                 </CardTitle>
-                <CardDescription>Selecione os dados que deseja incluir no documento</CardDescription>
+                <CardDescription>
+                  Selecione os dados que deseja incluir no documento
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -2378,20 +2177,26 @@ export function ReportsView() {
                   <div
                     className={cn(
                       "flex items-start gap-3 p-4 rounded-lg border transition-colors cursor-pointer",
-                      includeMultas ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30",
+                      includeMultas
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-muted-foreground/30",
                     )}
                     onClick={() => setIncludeMultas(!includeMultas)}
                   >
                     <Checkbox
                       checked={includeMultas}
-                      onCheckedChange={(checked) => setIncludeMultas(checked === true)}
+                      onCheckedChange={(checked) =>
+                        setIncludeMultas(checked === true)
+                      }
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <FileWarning className="h-4 w-4 text-destructive" />
                         <span className="font-medium">Multas</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Data, hora, local, motorista, valor e status</p>
+                      <p className="text-xs text-muted-foreground">
+                        Data, hora, local, motorista, valor e status
+                      </p>
                     </div>
                   </div>
 
@@ -2403,18 +2208,24 @@ export function ReportsView() {
                         ? "border-primary bg-primary/5"
                         : "border-border hover:border-muted-foreground/30",
                     )}
-                    onClick={() => setIncludeLicenciamento(!includeLicenciamento)}
+                    onClick={() =>
+                      setIncludeLicenciamento(!includeLicenciamento)
+                    }
                   >
                     <Checkbox
                       checked={includeLicenciamento}
-                      onCheckedChange={(checked) => setIncludeLicenciamento(checked === true)}
+                      onCheckedChange={(checked) =>
+                        setIncludeLicenciamento(checked === true)
+                      }
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <ShieldCheck className="h-4 w-4 text-green-600" />
                         <span className="font-medium">Documentação</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Tipo documento, vencimento e status</p>
+                      <p className="text-xs text-muted-foreground">
+                        Tipo documento, vencimento e status
+                      </p>
                     </div>
                   </div>
 
@@ -2430,14 +2241,18 @@ export function ReportsView() {
                   >
                     <Checkbox
                       checked={includeManutencoes}
-                      onCheckedChange={(checked) => setIncludeManutencoes(checked === true)}
+                      onCheckedChange={(checked) =>
+                        setIncludeManutencoes(checked === true)
+                      }
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-4 w-4 text-amber-600" />
                         <span className="font-medium">Manutenções</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Peças, oficina, custo e nota fiscal</p>
+                      <p className="text-xs text-muted-foreground">
+                        Peças, oficina, custo e nota fiscal
+                      </p>
                     </div>
                   </div>
 
@@ -2453,14 +2268,18 @@ export function ReportsView() {
                   >
                     <Checkbox
                       checked={includeSinistros}
-                      onCheckedChange={(checked) => setIncludeSinistros(checked === true)}
+                      onCheckedChange={(checked) =>
+                        setIncludeSinistros(checked === true)
+                      }
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <AlertOctagon className="h-4 w-4 text-red-600" />
                         <span className="font-medium">Sinistros</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Motorista, custo e status do seguro</p>
+                      <p className="text-xs text-muted-foreground">
+                        Motorista, custo e status do seguro
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2475,7 +2294,10 @@ export function ReportsView() {
                     <AlertTriangle className="h-5 w-5" />
                     Refinamento de Sinistros
                   </CardTitle>
-                  <CardDescription>Selecione quais sinistros do período serão incluídos no relatório</CardDescription>
+                  <CardDescription>
+                    Selecione quais sinistros do período serão incluídos no
+                    relatório
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -2484,13 +2306,17 @@ export function ReportsView() {
                         <TableHead className="w-12">
                           <Checkbox
                             checked={
-                              selectedSinistros.length === filteredSinistros.length && filteredSinistros.length > 0
+                              selectedSinistros.length ===
+                                filteredSinistros.length &&
+                              filteredSinistros.length > 0
                             }
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedSinistros(filteredSinistros.map((s) => s.id))
+                                setSelectedSinistros(
+                                  filteredSinistros.map((s) => s.id),
+                                );
                               } else {
-                                setSelectedSinistros([])
+                                setSelectedSinistros([]);
                               }
                             }}
                           />
@@ -2508,17 +2334,22 @@ export function ReportsView() {
                           key={sinistro.id}
                           className={cn(
                             "cursor-pointer",
-                            selectedSinistros.includes(sinistro.id) && "bg-amber-100/50 dark:bg-amber-900/20",
+                            selectedSinistros.includes(sinistro.id) &&
+                              "bg-amber-100/50 dark:bg-amber-900/20",
                           )}
                           onClick={() => toggleSinistro(sinistro.id)}
                         >
                           <TableCell>
                             <Checkbox
                               checked={selectedSinistros.includes(sinistro.id)}
-                              onCheckedChange={() => toggleSinistro(sinistro.id)}
+                              onCheckedChange={() =>
+                                toggleSinistro(sinistro.id)
+                              }
                             />
                           </TableCell>
-                          <TableCell>{format(parseISO(sinistro.data), "dd/MM/yyyy")}</TableCell>
+                          <TableCell>
+                            {format(parseISO(sinistro.data), "dd/MM/yyyy")}
+                          </TableCell>
                           <TableCell>{sinistro.tipo}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="font-mono">
@@ -2527,7 +2358,10 @@ export function ReportsView() {
                           </TableCell>
                           <TableCell>{sinistro.motorista}</TableCell>
                           <TableCell className="text-right font-medium">
-                            {sinistro.custo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                            {sinistro.custo.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -2535,7 +2369,8 @@ export function ReportsView() {
                   </Table>
                   {selectedSinistros.length > 0 && (
                     <p className="text-sm text-muted-foreground mt-3">
-                      {selectedSinistros.length} sinistro(s) selecionado(s) para o relatório
+                      {selectedSinistros.length} sinistro(s) selecionado(s) para
+                      o relatório
                     </p>
                   )}
                 </CardContent>
@@ -2546,7 +2381,10 @@ export function ReportsView() {
               <Card className="border-muted">
                 <CardContent className="py-8 text-center text-muted-foreground">
                   <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>Nenhum sinistro encontrado no período e veículos selecionados.</p>
+                  <p>
+                    Nenhum sinistro encontrado no período e veículos
+                    selecionados.
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -2585,7 +2423,9 @@ export function ReportsView() {
                       <Eye className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Esta senha será necessária para abrir o PDF gerado</p>
+                  <p className="text-xs text-muted-foreground">
+                    Esta senha será necessária para abrir o PDF gerado
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -2597,14 +2437,24 @@ export function ReportsView() {
                   <Building2 className="h-5 w-5 text-primary" />
                   Dados da Empresa
                 </CardTitle>
-                <CardDescription>Informações que aparecerão no documento</CardDescription>
+                <CardDescription>
+                  Informações que aparecerão no documento
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <Image src="/images/image.png" alt="TRL Transporte" width={40} height={40} className="rounded" />
+                  <Image
+                    src="/images/image.png"
+                    alt="TRL Transporte"
+                    width={40}
+                    height={40}
+                    className="rounded"
+                  />
                   <div>
                     <p className="font-medium text-sm">{empresaData.nome}</p>
-                    <p className="text-xs text-muted-foreground">CNPJ: {empresaData.cnpj}</p>
+                    <p className="text-xs text-muted-foreground">
+                      CNPJ: {empresaData.cnpj}
+                    </p>
                   </div>
                 </div>
 
@@ -2629,8 +2479,13 @@ export function ReportsView() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Marca D'Água</p>
-                  <Badge variant="outline" className="text-destructive border-destructive/30">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Marca D'Água
+                  </p>
+                  <Badge
+                    variant="outline"
+                    className="text-destructive border-destructive/30"
+                  >
                     CONFIDENCIAL - INTRANSFERÍVEL
                   </Badge>
                 </div>
@@ -2681,10 +2536,17 @@ export function ReportsView() {
             ) : (
               <div className="space-y-2">
                 {mockReportHistory.map((report) => (
-                  <div key={report.id} className="border rounded-lg overflow-hidden">
+                  <div
+                    key={report.id}
+                    className="border rounded-lg overflow-hidden"
+                  >
                     {/* Linha Clicável */}
                     <button
-                      onClick={() => setExpandedReportId(expandedReportId === report.id ? null : report.id)}
+                      onClick={() =>
+                        setExpandedReportId(
+                          expandedReportId === report.id ? null : report.id,
+                        )
+                      }
                       className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors text-left"
                     >
                       <div className="flex items-center gap-4">
@@ -2693,15 +2555,24 @@ export function ReportsView() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">Relatório da Frota</span>
-                            <Badge variant="outline" className="font-mono text-xs">
+                            <span className="font-medium">
+                              Relatório da Frota
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-xs"
+                            >
                               {report.docHash}
                             </Badge>
                           </div>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {format(parseISO(report.dataGeracao), "dd/MM/yyyy")} às {report.horaGeracao.slice(0, 5)}
+                              {format(
+                                parseISO(report.dataGeracao),
+                                "dd/MM/yyyy",
+                              )}{" "}
+                              às {report.horaGeracao.slice(0, 5)}
                             </span>
                             <span className="flex items-center gap-1">
                               <Truck className="h-3 w-3" />
@@ -2713,16 +2584,24 @@ export function ReportsView() {
                       <div className="flex items-center gap-3">
                         <div className="hidden md:flex items-center gap-1.5">
                           {report.conteudo.multas && (
-                            <Badge variant="secondary" className="text-xs">Multas</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Multas
+                            </Badge>
                           )}
                           {report.conteudo.licenciamento && (
-                            <Badge variant="secondary" className="text-xs">Docs</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Docs
+                            </Badge>
                           )}
                           {report.conteudo.manutencoes && (
-                            <Badge variant="secondary" className="text-xs">Manutenções</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Manutenções
+                            </Badge>
                           )}
                           {report.conteudo.sinistros && (
-                            <Badge variant="secondary" className="text-xs">Sinistros</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Sinistros
+                            </Badge>
                           )}
                         </div>
                         {expandedReportId === report.id ? (
@@ -2744,9 +2623,17 @@ export function ReportsView() {
                                 Período do Relatório
                               </p>
                               <p className="font-medium">
-                                {format(parseISO(report.periodoInicio), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                                {format(
+                                  parseISO(report.periodoInicio),
+                                  "dd 'de' MMMM 'de' yyyy",
+                                  { locale: ptBR },
+                                )}
                                 {" até "}
-                                {format(parseISO(report.periodoFim), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                                {format(
+                                  parseISO(report.periodoFim),
+                                  "dd 'de' MMMM 'de' yyyy",
+                                  { locale: ptBR },
+                                )}
                               </p>
                             </div>
 
@@ -2756,11 +2643,19 @@ export function ReportsView() {
                               </p>
                               <div className="space-y-1.5">
                                 {report.veiculos.map((v) => (
-                                  <div key={v.placa} className="flex items-center gap-2 text-sm">
-                                    <Badge variant="outline" className="font-mono font-bold">
+                                  <div
+                                    key={v.placa}
+                                    className="flex items-center gap-2 text-sm"
+                                  >
+                                    <Badge
+                                      variant="outline"
+                                      className="font-mono font-bold"
+                                    >
                                       {v.placa}
                                     </Badge>
-                                    <span className="text-muted-foreground">{v.modelo}</span>
+                                    <span className="text-muted-foreground">
+                                      {v.modelo}
+                                    </span>
                                   </div>
                                 ))}
                               </div>
@@ -2788,7 +2683,9 @@ export function ReportsView() {
                                   <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950/30 rounded border border-red-100 dark:border-red-900">
                                     <FileWarning className="h-4 w-4 text-red-600" />
                                     <div>
-                                      <p className="text-xs font-medium">Multas</p>
+                                      <p className="text-xs font-medium">
+                                        Multas
+                                      </p>
                                       <p className="text-xs text-muted-foreground">
                                         {report.quantidadeMultas} registro(s)
                                       </p>
@@ -2799,8 +2696,12 @@ export function ReportsView() {
                                   <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950/30 rounded border border-green-100 dark:border-green-900">
                                     <ShieldCheck className="h-4 w-4 text-green-600" />
                                     <div>
-                                      <p className="text-xs font-medium">Documentação</p>
-                                      <p className="text-xs text-muted-foreground">Status incluído</p>
+                                      <p className="text-xs font-medium">
+                                        Documentação
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Status incluído
+                                      </p>
                                     </div>
                                   </div>
                                 )}
@@ -2808,9 +2709,12 @@ export function ReportsView() {
                                   <div className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-950/30 rounded border border-amber-100 dark:border-amber-900">
                                     <Wrench className="h-4 w-4 text-amber-600" />
                                     <div>
-                                      <p className="text-xs font-medium">Manutenções</p>
+                                      <p className="text-xs font-medium">
+                                        Manutenções
+                                      </p>
                                       <p className="text-xs text-muted-foreground">
-                                        {report.quantidadeManutencoes} serviço(s)
+                                        {report.quantidadeManutencoes}{" "}
+                                        serviço(s)
                                       </p>
                                     </div>
                                   </div>
@@ -2819,9 +2723,12 @@ export function ReportsView() {
                                   <div className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-950/30 rounded border border-slate-200 dark:border-slate-800">
                                     <AlertOctagon className="h-4 w-4 text-slate-600" />
                                     <div>
-                                      <p className="text-xs font-medium">Sinistros</p>
+                                      <p className="text-xs font-medium">
+                                        Sinistros
+                                      </p>
                                       <p className="text-xs text-muted-foreground">
-                                        {report.quantidadeSinistros} ocorrência(s)
+                                        {report.quantidadeSinistros}{" "}
+                                        ocorrência(s)
                                       </p>
                                     </div>
                                   </div>
@@ -2830,7 +2737,9 @@ export function ReportsView() {
                             </div>
 
                             {/* Resumo Financeiro */}
-                            {(report.totalMultas > 0 || report.totalManutencoes > 0 || report.totalSinistros > 0) && (
+                            {(report.totalMultas > 0 ||
+                              report.totalManutencoes > 0 ||
+                              report.totalSinistros > 0) && (
                               <div>
                                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                                   Resumo Financeiro
@@ -2838,25 +2747,49 @@ export function ReportsView() {
                                 <div className="space-y-1.5 text-sm">
                                   {report.totalMultas > 0 && (
                                     <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Total em Multas:</span>
+                                      <span className="text-muted-foreground">
+                                        Total em Multas:
+                                      </span>
                                       <span className="font-medium text-red-600">
-                                        {report.totalMultas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                        {report.totalMultas.toLocaleString(
+                                          "pt-BR",
+                                          {
+                                            style: "currency",
+                                            currency: "BRL",
+                                          },
+                                        )}
                                       </span>
                                     </div>
                                   )}
                                   {report.totalManutencoes > 0 && (
                                     <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Total em Manutenções:</span>
+                                      <span className="text-muted-foreground">
+                                        Total em Manutenções:
+                                      </span>
                                       <span className="font-medium text-amber-600">
-                                        {report.totalManutencoes.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                        {report.totalManutencoes.toLocaleString(
+                                          "pt-BR",
+                                          {
+                                            style: "currency",
+                                            currency: "BRL",
+                                          },
+                                        )}
                                       </span>
                                     </div>
                                   )}
                                   {report.totalSinistros > 0 && (
                                     <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Total em Sinistros:</span>
+                                      <span className="text-muted-foreground">
+                                        Total em Sinistros:
+                                      </span>
                                       <span className="font-medium text-slate-600">
-                                        {report.totalSinistros.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                        {report.totalSinistros.toLocaleString(
+                                          "pt-BR",
+                                          {
+                                            style: "currency",
+                                            currency: "BRL",
+                                          },
+                                        )}
                                       </span>
                                     </div>
                                   )}
@@ -2864,7 +2797,14 @@ export function ReportsView() {
                                   <div className="flex justify-between font-medium">
                                     <span>Total Geral:</span>
                                     <span>
-                                      {(report.totalMultas + report.totalManutencoes + report.totalSinistros).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                      {(
+                                        report.totalMultas +
+                                        report.totalManutencoes +
+                                        report.totalSinistros
+                                      ).toLocaleString("pt-BR", {
+                                        style: "currency",
+                                        currency: "BRL",
+                                      })}
                                     </span>
                                   </div>
                                 </div>
@@ -2872,8 +2812,8 @@ export function ReportsView() {
                             )}
 
                             {/* Botão de Download */}
-                            <Button 
-                              className="w-full gap-2" 
+                            <Button
+                              className="w-full gap-2"
                               variant="default"
                               onClick={() => handleDownloadHistoryPDF(report)}
                               disabled={downloadingReportId === report.id}
@@ -2913,11 +2853,16 @@ export function ReportsView() {
                   Preview do Relatório Oficial
                 </DialogTitle>
                 <DialogDescription>
-                  Visualização prévia do documento em formato A4. Clique em &quot;Baixar PDF&quot; para fazer download.
+                  Visualização prévia do documento em formato A4. Clique em
+                  &quot;Baixar PDF&quot; para fazer download.
                 </DialogDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button onClick={handleDownloadPDF} disabled={isGeneratingPdf} className="no-print">
+                <Button
+                  onClick={handleDownloadPDF}
+                  disabled={isGeneratingPdf}
+                  className="no-print"
+                >
                   {isGeneratingPdf ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -2930,7 +2875,11 @@ export function ReportsView() {
                     </>
                   )}
                 </Button>
-                <Button variant="outline" onClick={() => setIsPreviewOpen(false)} className="no-print">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsPreviewOpen(false)}
+                  className="no-print"
+                >
                   Fechar
                 </Button>
               </div>
@@ -2975,10 +2924,20 @@ export function ReportsView() {
                 {/* Header */}
                 <div className="relative z-10 flex items-start justify-between mb-8 pb-4 border-b-2 border-slate-300">
                   <div className="flex items-center gap-4">
-                    <Image src="/images/image.png" alt="TRL Transporte" width={70} height={70} className="rounded" />
+                    <Image
+                      src="/images/image.png"
+                      alt="TRL Transporte"
+                      width={70}
+                      height={70}
+                      className="rounded"
+                    />
                     <div>
-                      <h1 className="text-xl font-bold text-slate-800 tracking-tight">{empresaData.nome}</h1>
-                      <p className="text-sm text-slate-600">Transporte Rodoviário de Cargas</p>
+                      <h1 className="text-xl font-bold text-slate-800 tracking-tight">
+                        {empresaData.nome}
+                      </h1>
+                      <p className="text-sm text-slate-600">
+                        Transporte Rodoviário de Cargas
+                      </p>
                     </div>
                   </div>
                   <div className="text-right text-xs text-slate-600">
@@ -3008,31 +2967,48 @@ export function ReportsView() {
                 <div className="relative z-10 mb-8 p-5 bg-slate-50 rounded border border-slate-200">
                   <div className="grid grid-cols-2 gap-5 text-xs">
                     <div>
-                      <p className="text-slate-500 text-xs font-medium uppercase">Veículos Analisados:</p>
+                      <p className="text-slate-500 text-xs font-medium uppercase">
+                        Veículos Analisados:
+                      </p>
                       <p className="font-medium text-slate-800">
-                        {selectedVehicles.length > 0 ? selectedVehicles.join(", ") : "Todos"}
+                        {selectedVehicles.length > 0
+                          ? selectedVehicles.join(", ")
+                          : "Todos"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-slate-500 text-xs font-medium uppercase">Gerado em:</p>
-                      <p className="font-medium text-slate-800">{format(new Date(), "dd/MM/yyyy 'às' HH:mm:ss")}</p>
+                      <p className="text-slate-500 text-xs font-medium uppercase">
+                        Gerado em:
+                      </p>
+                      <p className="font-medium text-slate-800">
+                        {format(new Date(), "dd/MM/yyyy 'às' HH:mm:ss")}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-slate-500 text-xs font-medium uppercase">Status do Documento:</p>
+                      <p className="text-slate-500 text-xs font-medium uppercase">
+                        Status do Documento:
+                      </p>
                       <p className="font-medium text-green-700 flex items-center gap-1">
                         <FileCheck className="h-4 w-4" />
                         Protegido por Senha
                       </p>
                     </div>
                     <div>
-                      <p className="text-slate-500 text-xs font-medium uppercase">ID do Documento:</p>
-                      <p className="font-mono font-medium text-slate-800">{docHash}</p>
+                      <p className="text-slate-500 text-xs font-medium uppercase">
+                        ID do Documento:
+                      </p>
+                      <p className="font-mono font-medium text-slate-800">
+                        {docHash}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 {/* AI ANALYSIS */}
-                {(includeMultas || includeManutencoes || includeSinistros || includeLicenciamento) && (
+                {(includeMultas ||
+                  includeManutencoes ||
+                  includeSinistros ||
+                  includeLicenciamento) && (
                   <div className="relative z-10 mb-8 p-6 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="flex items-start gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 shrink-0">
@@ -3041,9 +3017,13 @@ export function ReportsView() {
                       <div>
                         <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
                           Análise Executiva Inteligente
-                          <Badge className="bg-blue-600 text-white text-xs">AI</Badge>
+                          <Badge className="bg-blue-600 text-white text-xs">
+                            AI
+                          </Badge>
                         </h3>
-                        <p className="text-slate-700 text-xs leading-relaxed">{generateAIAnalysis}</p>
+                        <p className="text-slate-700 text-xs leading-relaxed">
+                          {generateAIAnalysis}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -3058,29 +3038,50 @@ export function ReportsView() {
                     <div className="grid grid-cols-3 gap-5">
                       {includeMultas && (
                         <div className="p-3 bg-red-50 rounded border border-red-100">
-                          <p className="text-xs text-red-600 font-medium">Total em Multas</p>
-                          <p className="text-base font-bold text-red-700">
-                            {totalMultasValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          <p className="text-xs text-red-600 font-medium">
+                            Total em Multas
                           </p>
-                          <p className="text-xs text-slate-500">{filteredMultas.length} ocorrência(s)</p>
+                          <p className="text-base font-bold text-red-700">
+                            {totalMultasValor.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {filteredMultas.length} ocorrência(s)
+                          </p>
                         </div>
                       )}
                       {includeManutencoes && (
                         <div className="p-3 bg-amber-50 rounded border border-amber-100">
-                          <p className="text-xs text-amber-600 font-medium">Total em Manutenções</p>
-                          <p className="text-base font-bold text-amber-700">
-                            {totalManutencoesValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          <p className="text-xs text-amber-600 font-medium">
+                            Total em Manutenções
                           </p>
-                          <p className="text-xs text-slate-500">{filteredManutencoes.length} serviço(s)</p>
+                          <p className="text-base font-bold text-amber-700">
+                            {totalManutencoesValor.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {filteredManutencoes.length} serviço(s)
+                          </p>
                         </div>
                       )}
                       {includeSinistros && selectedSinistros.length > 0 && (
                         <div className="p-3 bg-slate-50 rounded border border-slate-200">
-                          <p className="text-xs text-slate-600 font-medium">Total em Sinistros</p>
-                          <p className="text-base font-bold text-slate-700">
-                            {totalSinistrosValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          <p className="text-xs text-slate-600 font-medium">
+                            Total em Sinistros
                           </p>
-                          <p className="text-xs text-slate-500">{selectedSinistros.length} sinistro(s)</p>
+                          <p className="text-base font-bold text-slate-700">
+                            {totalSinistrosValor.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {selectedSinistros.length} sinistro(s)
+                          </p>
                         </div>
                       )}
                     </div>
@@ -3097,12 +3098,24 @@ export function ReportsView() {
                     <table className="w-full text-xs border-collapse">
                       <thead>
                         <tr className="bg-slate-100">
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Data/Hora</th>
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Local</th>
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Motorista</th>
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Descrição</th>
-                          <th className="p-2 text-right border border-slate-300 font-semibold">Valor</th>
-                          <th className="p-2 text-center border border-slate-300 font-semibold">Status</th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Data/Hora
+                          </th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Local
+                          </th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Motorista
+                          </th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Descrição
+                          </th>
+                          <th className="p-2 text-right border border-slate-300 font-semibold">
+                            Valor
+                          </th>
+                          <th className="p-2 text-center border border-slate-300 font-semibold">
+                            Status
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3111,23 +3124,36 @@ export function ReportsView() {
                             <td className="p-2 border border-slate-200">
                               {format(parseISO(multa.data), "dd/MM/yyyy")}
                               <br />
-                              <span className="text-slate-500">{multa.hora}</span>
+                              <span className="text-slate-500">
+                                {multa.hora}
+                              </span>
                             </td>
                             <td className="p-2 border border-slate-200">
-                              <span className="font-mono text-xs font-bold">{multa.placa}</span>
+                              <span className="font-mono text-xs font-bold">
+                                {multa.placa}
+                              </span>
                               <br />
                               {multa.local}
                             </td>
-                            <td className="p-2 border border-slate-200">{multa.motorista}</td>
-                            <td className="p-2 border border-slate-200">{multa.infracao}</td>
+                            <td className="p-2 border border-slate-200">
+                              {multa.motorista}
+                            </td>
+                            <td className="p-2 border border-slate-200">
+                              {multa.infracao}
+                            </td>
                             <td className="p-2 border border-slate-200 text-right font-medium">
-                              {multa.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                              {multa.valor.toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              })}
                             </td>
                             <td className="p-2 border border-slate-200 text-center">
                               <span
                                 className={cn(
                                   "px-2 py-0.5 rounded text-xs font-semibold",
-                                  multa.status === "Paga" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700",
+                                  multa.status === "Paga"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700",
                                 )}
                               >
                                 {multa.status}
@@ -3138,11 +3164,17 @@ export function ReportsView() {
                       </tbody>
                       <tfoot>
                         <tr className="bg-slate-50 font-bold">
-                          <td colSpan={4} className="p-2 border border-slate-300 text-right">
+                          <td
+                            colSpan={4}
+                            className="p-2 border border-slate-300 text-right"
+                          >
                             TOTAL:
                           </td>
                           <td className="p-2 border border-slate-300 text-right">
-                            {totalMultasValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                            {totalMultasValor.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
                           </td>
                           <td className="p-2 border border-slate-300"></td>
                         </tr>
@@ -3161,24 +3193,42 @@ export function ReportsView() {
                     <table className="w-full text-xs border-collapse">
                       <thead>
                         <tr className="bg-slate-100">
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Placa</th>
-                          <th className="p-2 text-center border border-slate-300 font-semibold">Tipo Doc.</th>
-                          <th className="p-2 text-center border border-slate-300 font-semibold">CRLV</th>
-                          <th className="p-2 text-center border border-slate-300 font-semibold">IPVA</th>
-                          <th className="p-2 text-center border border-slate-300 font-semibold">Licenciamento</th>
-                          <th className="p-2 text-center border border-slate-300 font-semibold">Vencimento</th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Placa
+                          </th>
+                          <th className="p-2 text-center border border-slate-300 font-semibold">
+                            Tipo Doc.
+                          </th>
+                          <th className="p-2 text-center border border-slate-300 font-semibold">
+                            CRLV
+                          </th>
+                          <th className="p-2 text-center border border-slate-300 font-semibold">
+                            IPVA
+                          </th>
+                          <th className="p-2 text-center border border-slate-300 font-semibold">
+                            Licenciamento
+                          </th>
+                          <th className="p-2 text-center border border-slate-300 font-semibold">
+                            Vencimento
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredLicenciamentos.map((lic) => (
                           <tr key={lic.placa}>
-                            <td className="p-2 border border-slate-200 font-mono font-bold">{lic.placa}</td>
-                            <td className="p-2 border border-slate-200 text-center">{lic.tipoDoc}</td>
+                            <td className="p-2 border border-slate-200 font-mono font-bold">
+                              {lic.placa}
+                            </td>
+                            <td className="p-2 border border-slate-200 text-center">
+                              {lic.tipoDoc}
+                            </td>
                             <td className="p-2 border border-slate-200 text-center">
                               <span
                                 className={cn(
                                   "px-2 py-0.5 rounded text-xs font-semibold",
-                                  lic.crlv === "Válido" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700",
+                                  lic.crlv === "Válido"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700",
                                 )}
                               >
                                 {lic.crlv}
@@ -3228,12 +3278,24 @@ export function ReportsView() {
                     <table className="w-full text-xs border-collapse">
                       <thead>
                         <tr className="bg-slate-100">
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Data</th>
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Placa/Tipo</th>
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Peças Utilizadas</th>
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Oficina</th>
-                          <th className="p-2 text-right border border-slate-300 font-semibold">Custo</th>
-                          <th className="p-2 text-center border border-slate-300 font-semibold">NF</th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Data
+                          </th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Placa/Tipo
+                          </th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Peças Utilizadas
+                          </th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Oficina
+                          </th>
+                          <th className="p-2 text-right border border-slate-300 font-semibold">
+                            Custo
+                          </th>
+                          <th className="p-2 text-center border border-slate-300 font-semibold">
+                            NF
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3243,7 +3305,9 @@ export function ReportsView() {
                               {format(parseISO(manut.data), "dd/MM/yyyy")}
                             </td>
                             <td className="p-2 border border-slate-200">
-                              <span className="font-mono text-xs font-bold">{manut.placa}</span>
+                              <span className="font-mono text-xs font-bold">
+                                {manut.placa}
+                              </span>
                               <br />
                               <span
                                 className={cn(
@@ -3256,10 +3320,17 @@ export function ReportsView() {
                                 {manut.tipo}
                               </span>
                             </td>
-                            <td className="p-2 border border-slate-200 text-xs">{manut.pecas}</td>
-                            <td className="p-2 border border-slate-200">{manut.oficina}</td>
+                            <td className="p-2 border border-slate-200 text-xs">
+                              {manut.pecas}
+                            </td>
+                            <td className="p-2 border border-slate-200">
+                              {manut.oficina}
+                            </td>
                             <td className="p-2 border border-slate-200 text-right font-medium">
-                              {manut.custo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                              {manut.custo.toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              })}
                             </td>
                             <td className="p-2 border border-slate-200 text-center font-mono text-xs">
                               {manut.notaFiscal}
@@ -3269,11 +3340,17 @@ export function ReportsView() {
                       </tbody>
                       <tfoot>
                         <tr className="bg-slate-50 font-bold">
-                          <td colSpan={4} className="p-2 border border-slate-300 text-right">
+                          <td
+                            colSpan={4}
+                            className="p-2 border border-slate-300 text-right"
+                          >
                             TOTAL:
                           </td>
                           <td className="p-2 border border-slate-300 text-right">
-                            {totalManutencoesValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                            {totalManutencoesValor.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
                           </td>
                           <td className="p-2 border border-slate-300"></td>
                         </tr>
@@ -3292,11 +3369,21 @@ export function ReportsView() {
                     <table className="w-full text-xs border-collapse">
                       <thead>
                         <tr className="bg-slate-100">
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Data/Veículo</th>
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Tipo</th>
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Motorista</th>
-                          <th className="p-2 text-left border border-slate-300 font-semibold">Descrição</th>
-                          <th className="p-2 text-right border border-slate-300 font-semibold">Custo Est.</th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Data/Veículo
+                          </th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Tipo
+                          </th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Motorista
+                          </th>
+                          <th className="p-2 text-left border border-slate-300 font-semibold">
+                            Descrição
+                          </th>
+                          <th className="p-2 text-right border border-slate-300 font-semibold">
+                            Custo Est.
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3307,24 +3394,41 @@ export function ReportsView() {
                               <td className="p-2 border border-slate-200">
                                 {format(parseISO(sinistro.data), "dd/MM/yyyy")}
                                 <br />
-                                <strong className="font-mono">{sinistro.placa}</strong>
+                                <strong className="font-mono">
+                                  {sinistro.placa}
+                                </strong>
                               </td>
-                              <td className="p-2 border border-slate-200">{sinistro.tipo}</td>
-                              <td className="p-2 border border-slate-200">{sinistro.motorista}</td>
-                              <td className="p-2 border border-slate-200">{sinistro.descricao}</td>
+                              <td className="p-2 border border-slate-200">
+                                {sinistro.tipo}
+                              </td>
+                              <td className="p-2 border border-slate-200">
+                                {sinistro.motorista}
+                              </td>
+                              <td className="p-2 border border-slate-200">
+                                {sinistro.descricao}
+                              </td>
                               <td className="p-2 border border-slate-200 text-right font-medium">
-                                {sinistro.custo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                {sinistro.custo.toLocaleString("pt-BR", {
+                                  style: "currency",
+                                  currency: "BRL",
+                                })}
                               </td>
                             </tr>
                           ))}
                       </tbody>
                       <tfoot>
                         <tr className="bg-slate-50 font-bold">
-                          <td colSpan={4} className="p-2 border border-slate-300 text-right">
+                          <td
+                            colSpan={4}
+                            className="p-2 border border-slate-300 text-right"
+                          >
                             TOTAL:
                           </td>
                           <td className="p-2 border border-slate-300 text-right">
-                            {totalSinistrosValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                            {totalSinistrosValor.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
                           </td>
                         </tr>
                       </tfoot>
@@ -3336,7 +3440,9 @@ export function ReportsView() {
                 <div className="relative z-10 mt-12 pt-6 border-t-2 border-slate-300">
                   <div className="flex justify-between items-start mb-8">
                     <div className="text-slate-600 text-xs">
-                      <p className="font-bold text-slate-800">{empresaData.nome}</p>
+                      <p className="font-bold text-slate-800">
+                        {empresaData.nome}
+                      </p>
                       <p>{empresaData.endereco}</p>
                       <p>
                         CNPJ: {empresaData.cnpj} | {empresaData.telefone}
@@ -3344,17 +3450,25 @@ export function ReportsView() {
                       <p>{empresaData.email}</p>
                     </div>
                     <div className="text-right text-xs">
-                      <p className="text-slate-500 mb-4">Assinaturas Digitais Autorizadas:</p>
+                      <p className="text-slate-500 mb-4">
+                        Assinaturas Digitais Autorizadas:
+                      </p>
                       <div className="flex gap-8">
                         <div className="text-center">
                           <div className="w-28 border-b-2 border-slate-400 mb-2 h-8" />
-                          <p className="font-bold text-slate-800">Luiz Henrique</p>
+                          <p className="font-bold text-slate-800">
+                            Luiz Henrique
+                          </p>
                           <p className="text-slate-500">Diretor Operacional</p>
                         </div>
                         <div className="text-center">
                           <div className="w-28 border-b-2 border-slate-400 mb-2 h-8" />
-                          <p className="font-bold text-slate-800">Franciele Silva</p>
-                          <p className="text-slate-500">Gerente Administrativa</p>
+                          <p className="font-bold text-slate-800">
+                            Franciele Silva
+                          </p>
+                          <p className="text-slate-500">
+                            Gerente Administrativa
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -3364,12 +3478,19 @@ export function ReportsView() {
                   <div className="flex justify-between items-center pt-4 border-t border-slate-200 text-[10px] text-slate-400">
                     <div>
                       <p>
-                        Documento gerado em {format(new Date(), "dd/MM/yyyy 'às' HH:mm:ss")} | Sistema TRL Frota v2.0
+                        Documento gerado em{" "}
+                        {format(new Date(), "dd/MM/yyyy 'às' HH:mm:ss")} |
+                        Sistema TRL Frota v2.0
                       </p>
-                      <p className="font-mono">Doc ID: {docHash} | Classificação: CONFIDENCIAL - USO INTERNO</p>
+                      <p className="font-mono">
+                        Doc ID: {docHash} | Classificação: CONFIDENCIAL - USO
+                        INTERNO
+                      </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-slate-500 italic">(Paginação automática no PDF)</p>
+                      <p className="text-slate-500 italic">
+                        (Paginação automática no PDF)
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -3379,5 +3500,5 @@ export function ReportsView() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

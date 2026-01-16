@@ -149,6 +149,71 @@ export async function concluirManutencaoAPI(id: number) {
   return handleResponse(response);
 }
 
+// --- MÓDULO: RELATÓRIOS (INTEGRAÇÃO REAL) ---
+
+export interface ReportFilter {
+  startDate: string;
+  endDate: string;
+  vehiclePlate: string;
+}
+
+// Adaptador para converter dados do Banco (snake_case) para o Frontend (camelCase)
+function adapterRelatorio(data: any) {
+  return {
+    incidents: (data.incidents || []).map((i: any) => ({
+      id: i.id,
+      date: i.data_ocorrencia, // Nome exato da coluna no banco
+      type: i.tipo,
+      plate: i.veiculo_placa,
+      driver: i.motorista_nome,
+      cost: Number(i.custo_estimado || 0),
+    })),
+    maintenances: (data.maintenances || []).map((m: any) => ({
+      id: m.id,
+      date: m.scheduled_date, // Confirme se no banco é scheduled_date ou data_agendada
+      type: m.type,
+      plate: m.vehicle_plate,
+      cost: Number(m.cost || 0),
+      items: m.description || "Manutenção Geral",
+    })),
+    summary: {
+      totalCost: data.summary?.totalCost || 0,
+      totalIncidents: data.summary?.totalIncidents || 0,
+      totalMaintenances: data.summary?.totalMaintenances || 0,
+      analysisText: data.summary?.analysisText || "Sem dados suficientes para análise.",
+    }
+  };
+}
+
+export async function buscarDadosRelatorioAPI(filtros: ReportFilter) {
+  const query = new URLSearchParams({
+    startDate: filtros.startDate,
+    endDate: filtros.endDate,
+    vehiclePlate: filtros.vehiclePlate,
+  }).toString();
+
+  const response = await fetch(`${API_BASE_URL}/reports/data?${query}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) throw new Error("Erro ao carregar dados do relatório");
+  
+  const rawData = await response.json();
+  return adapterRelatorio(rawData);
+}
+
+export async function salvarRelatorioGeradoAPI(formData: FormData) {
+  const response = await fetch(`${API_BASE_URL}/reports/upload`, {
+    method: "POST",
+    body: formData, // Envia arquivo + metadados
+  });
+
+  if (!response.ok) throw new Error("Erro ao arquivar relatório no sistema");
+  return response.json();
+}
+
+
 // --- MÓDULO: MULTAS ---
 
 export async function buscarMultasAPI() {
