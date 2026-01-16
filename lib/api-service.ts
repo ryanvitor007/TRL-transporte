@@ -63,7 +63,7 @@ async function handleResponse(response: Response) {
 
 export async function consultarDetranAPI(
   placa: string,
-  renavam: string
+  renavam: string,
 ): Promise<VeiculoDetran> {
   try {
     const response = await fetch(
@@ -71,7 +71,7 @@ export async function consultarDetranAPI(
       {
         method: "GET",
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
     return handleResponse(response);
   } catch (error) {
@@ -82,7 +82,7 @@ export async function consultarDetranAPI(
 
 export async function consultarVeiculoAPI(placa: string, cpfCnpj?: string) {
   console.warn(
-    "Atenção: Consulta direta por placa requer RENAVAM na API real."
+    "Atenção: Consulta direta por placa requer RENAVAM na API real.",
   );
   return { placa, marca_modelo: "Consulte via Detran para detalhes" };
 }
@@ -160,28 +160,49 @@ export interface ReportFilter {
 // Adaptador para converter dados do Banco (snake_case) para o Frontend (camelCase)
 function adapterRelatorio(data: any) {
   return {
+    // 1. Mapeia os Sinistros (Incidents)
     incidents: (data.incidents || []).map((i: any) => ({
       id: i.id,
-      date: i.data_ocorrencia, // Nome exato da coluna no banco
+      date: i.data_ocorrencia,
       type: i.tipo,
       plate: i.veiculo_placa,
       driver: i.motorista_nome,
+      description: i.descricao, // Garante que a descrição seja passada
       cost: Number(i.custo_estimado || 0),
     })),
+
+    // 2. Mapeia as Multas (Fines) - NOVO CAMPO
+    fines: (data.fines || []).map((f: any) => ({
+      id: f.id,
+      date: f.data_infracao || f.created_at, // Ajuste conforme seu banco
+      time: f.hora_infracao || "00:00",
+      plate: f.veiculo_placa,
+      driver: f.motorista_nome || "Não identificado",
+      location: f.local_infracao || "Não informado",
+      description: f.descricao_infracao || "Infração de Trânsito",
+      cost: Number(f.valor || f.amount || 0),
+      status: f.status || "Pendente",
+    })),
+
+    // 3. Mapeia Manutenções
     maintenances: (data.maintenances || []).map((m: any) => ({
       id: m.id,
-      date: m.scheduled_date, // Confirme se no banco é scheduled_date ou data_agendada
+      date: m.scheduled_date,
       type: m.type,
       plate: m.vehicle_plate,
       cost: Number(m.cost || 0),
       items: m.description || "Manutenção Geral",
+      notaFiscal: m.nota_fiscal || "-",
+      oficina: m.oficina || "Oficina Credenciada",
     })),
+
     summary: {
       totalCost: data.summary?.totalCost || 0,
       totalIncidents: data.summary?.totalIncidents || 0,
       totalMaintenances: data.summary?.totalMaintenances || 0,
-      analysisText: data.summary?.analysisText || "Sem dados suficientes para análise.",
-    }
+      analysisText:
+        data.summary?.analysisText || "Sem dados suficientes para análise.",
+    },
   };
 }
 
@@ -198,7 +219,7 @@ export async function buscarDadosRelatorioAPI(filtros: ReportFilter) {
   });
 
   if (!response.ok) throw new Error("Erro ao carregar dados do relatório");
-  
+
   const rawData = await response.json();
   return adapterRelatorio(rawData);
 }
@@ -213,6 +234,21 @@ export async function salvarRelatorioGeradoAPI(formData: FormData) {
   return response.json();
 }
 
+// FUNÇÃO: Salvar Histórico (Metadata)
+export async function salvarRelatorioHistoricoAPI(dadosRelatorio: any) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/reports`, {
+      // Endpoint POST para salvar no banco
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dadosRelatorio),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("Erro ao salvar histórico:", error);
+    return null;
+  }
+}
 
 // --- MÓDULO: MULTAS ---
 
@@ -340,7 +376,7 @@ export const salvarTacografoAPI = async (dados: any) => {
   };
   localStorage.setItem(
     "trl_tachographs",
-    JSON.stringify([novoRegistro, ...currentData])
+    JSON.stringify([novoRegistro, ...currentData]),
   );
   return novoRegistro;
 };
