@@ -94,6 +94,12 @@ export function SettingsView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Delete Driver State
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [driverToDelete, setDriverToDelete] = useState<string | number | null>(
+    null,
+  );
+
   const [editingDriverId, setEditingDriverId] = useState<
     string | number | null
   >(null);
@@ -220,18 +226,25 @@ export function SettingsView() {
     setIsDriverDialogOpen(true);
   };
 
-  const handleDeleteDriver = async (driverId: string | number) => {
-    if (
-      !confirm(
-        "Tem certeza que deseja excluir este funcionário permanentemente?",
-      )
-    )
-      return;
+  const handleDeleteClick = (driverId: string | number) => {
+    setDriverToDelete(driverId);
+    setIsDeleteOpen(true);
+  };
+
+  // 2. Executa a exclusão de fato (chamada pelo botão do modal)
+  const confirmDelete = async () => {
+    if (!driverToDelete) return;
 
     try {
-      await excluirFuncionarioAPI(driverId);
-      setDrivers((prev) => prev.filter((d) => d.id !== driverId));
-      toast.success("Excluído", "Funcionário removido do banco de dados.");
+      await excluirFuncionarioAPI(driverToDelete);
+
+      // Atualiza visualmente
+      setDrivers((prev) => prev.filter((d) => d.id !== driverToDelete));
+      toast.success("Excluído", "Funcionário removido com sucesso.");
+
+      // Fecha o modal e limpa o estado
+      setIsDeleteOpen(false);
+      setDriverToDelete(null);
     } catch (error) {
       console.error(error);
       toast.error("Erro", "Não foi possível excluir o funcionário.");
@@ -716,14 +729,53 @@ export function SettingsView() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {/* Botão da Lixeira Atualizado */}
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteDriver(driver.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDeleteClick(driver.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
+
+                        {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
+                        <Dialog
+                          open={isDeleteOpen}
+                          onOpenChange={setIsDeleteOpen}
+                        >
+                          <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                              <DialogTitle className="flex items-center gap-2 text-red-600">
+                                <Trash2 className="h-5 w-5" />
+                                Confirmar Exclusão
+                              </DialogTitle>
+                              <DialogDescription className="py-2">
+                                Tem certeza que deseja excluir este funcionário
+                                permanentemente?
+                                <br />
+                                <span className="font-semibold text-foreground mt-2 block">
+                                  Essa ação não pode ser desfeita.
+                                </span>
+                              </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter className="gap-2 sm:gap-0">
+                              <Button
+                                variant="outline"
+                                onClick={() => setIsDeleteOpen(false)}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                                onClick={confirmDelete}
+                              >
+                                Sim, Excluir
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </TableCell>
                   </TableRow>

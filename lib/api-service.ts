@@ -534,7 +534,7 @@ export async function atualizarFuncionarioAPI(id: string | number, dados: any) {
     Object.assign(payload, { password: dados.password });
   }
 
-  const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/employees/${id}`, { 
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
