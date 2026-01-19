@@ -529,8 +529,6 @@ export async function atualizarFuncionarioAPI(id: string | number, dados: any) {
     role: dados.role || "Motorista",
   };
 
-  
-
   // Só envia senha se o usuário digitou uma nova
   if (dados.password && dados.password.length > 0) {
     Object.assign(payload, { password: dados.password });
@@ -542,7 +540,14 @@ export async function atualizarFuncionarioAPI(id: string | number, dados: any) {
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok) throw new Error("Erro ao atualizar funcionário");
+  if (!response.ok) {
+    let errorMsg = "Erro ao atualizar funcionário";
+    try {
+      const errorData = await response.json();
+      errorMsg = errorData.message || errorMsg;
+    } catch {}
+    throw new Error(errorMsg);
+  }
   return response.json();
 }
 
