@@ -1,6 +1,6 @@
 // API Service - Conexão Real com Backend NestJS e Adapters
 
-const API_BASE_URL = "http://localhost:3001";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
 // --- INTERFACES DE TIPAGEM ---
 
@@ -452,4 +452,122 @@ export async function buscarJornadaAtualAPI(motoristaId: string) {
 
 export async function registrarPontoJornadaAPI(dados: any) {
   return { success: true };
+}
+
+// CAMPO DE CONFIGURAÇÕES GERAIS
+
+// --- MÓDULO: FUNCIONÁRIOS / LOGIN ---
+export async function cadastrarFuncionarioAPI(driverForm: any) {
+  // Converter campos camelCase do formulário para snake_case do banco/DTO
+  const payload = {
+    name: driverForm.name,
+    cpf: driverForm.cpf,
+    rg: driverForm.rg,
+    birth_date: driverForm.birthDate || null,
+    phone: driverForm.phone,
+    email: driverForm.email,
+    address: driverForm.address,
+    city: driverForm.city,
+    state: driverForm.state,
+    zip_code: driverForm.zipCode,
+    cnh: driverForm.cnh,
+    cnh_category: driverForm.cnhCategory,
+    cnh_expiry: driverForm.cnhExpiry || null,
+    mopp: driverForm.mopp,
+    mopp_expiry: driverForm.moppExpiry || null,
+    admission_date: driverForm.admissionDate || null,
+    branch: driverForm.branch,
+    password: driverForm.password,
+    role: "Motorista", // Define padrão como Motorista pelo formulário
+  };
+
+  const response = await fetch(`${API_BASE_URL}/employees`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Erro ao cadastrar funcionário");
+  }
+  return response.json();
+}
+
+export async function loginAPI(credentials: any) {
+  const response = await fetch(`${API_BASE_URL}/employees/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(credentials),
+  });
+
+  if (!response.ok) throw new Error("Credenciais inválidas");
+  return response.json();
+}
+
+// Função para atualizar dados do funcionário
+export async function atualizarFuncionarioAPI(id: string | number, dados: any) {
+  // Mapear dados do form (camelCase) para o banco (snake_case)
+  const payload = {
+    name: dados.name,
+    cpf: dados.cpf,
+    rg: dados.rg,
+    birth_date: dados.birthDate || null,
+    phone: dados.phone,
+    email: dados.email,
+    address: dados.address,
+    city: dados.city,
+    state: dados.state,
+    zip_code: dados.zipCode,
+    cnh: dados.cnh,
+    cnh_category: dados.cnhCategory,
+    cnh_expiry: dados.cnhExpiry || null,
+    mopp: dados.mopp,
+    mopp_expiry: dados.moppExpiry || null,
+    admission_date: dados.admissionDate || null,
+    branch: dados.branch,
+    role: dados.role || "Motorista",
+  };
+
+  
+
+  // Só envia senha se o usuário digitou uma nova
+  if (dados.password && dados.password.length > 0) {
+    Object.assign(payload, { password: dados.password });
+  }
+
+  const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) throw new Error("Erro ao atualizar funcionário");
+  return response.json();
+}
+
+export async function excluirFuncionarioAPI(id: string | number) {
+  const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Erro ao excluir: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function listarFuncionariosAPI() {
+  const response = await fetch(`${API_BASE_URL}/employees`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Erro ao listar: ${response.statusText}`);
+  }
+  
+  return response.json();
 }

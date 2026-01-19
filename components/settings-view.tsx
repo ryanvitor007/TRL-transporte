@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -52,29 +52,15 @@ import {
   Loader2,
 } from "lucide-react";
 import { useToastNotification } from "@/contexts/toast-context";
+import {
+  cadastrarFuncionarioAPI,
+  listarFuncionariosAPI,
+  atualizarFuncionarioAPI,
+  excluirFuncionarioAPI,
+} from "@/lib/api-service";
 
-interface DriverFormData {
-  name: string;
-  cpf: string;
-  rg: string;
-  birthDate: string;
-  phone: string;
-  email: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  cnh: string;
-  cnhCategory: string;
-  cnhExpiry: string;
-  mopp: boolean;
-  moppExpiry: string;
-  admissionDate: string;
-  branch: string;
-  password: string;
-}
-
-const initialDriverForm: DriverFormData = {
+// Objeto com todos os campos necessários
+const initialDriverForm = {
   name: "",
   cpf: "",
   rg: "",
@@ -93,65 +79,39 @@ const initialDriverForm: DriverFormData = {
   admissionDate: "",
   branch: "",
   password: "",
+  role: "Motorista",
 };
-
-// Mock drivers data
-const mockDriversList = [
-  {
-    id: "d1",
-    name: "João Pereira",
-    cpf: "123.456.789-00",
-    cnh: "12345678901",
-    cnhCategory: "E",
-    cnhExpiry: "2027-05-15",
-    phone: "(11) 99999-1111",
-    branch: "São Paulo",
-    status: "Ativo",
-  },
-  {
-    id: "d2",
-    name: "Carlos Silva",
-    cpf: "234.567.890-11",
-    cnh: "23456789012",
-    cnhCategory: "E",
-    cnhExpiry: "2026-08-20",
-    phone: "(11) 99999-2222",
-    branch: "São Paulo",
-    status: "Ativo",
-  },
-  {
-    id: "d3",
-    name: "Roberto Mendes",
-    cpf: "345.678.901-22",
-    cnh: "34567890123",
-    cnhCategory: "D",
-    cnhExpiry: "2028-01-10",
-    phone: "(81) 99999-3333",
-    branch: "Recife",
-    status: "Ativo",
-  },
-  {
-    id: "d4",
-    name: "Antonio Costa",
-    cpf: "456.789.012-33",
-    cnh: "45678901234",
-    cnhCategory: "E",
-    cnhExpiry: "2026-11-30",
-    phone: "(81) 99999-4444",
-    branch: "Recife",
-    status: "Inativo",
-  },
-];
 
 export function SettingsView() {
   const toast = useToastNotification();
   const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
-  const [driverForm, setDriverForm] =
-    useState<DriverFormData>(initialDriverForm);
-  const [drivers, setDrivers] = useState(mockDriversList);
+
+  const [driverForm, setDriverForm] = useState(initialDriverForm);
+
+  // Explicitamente <any[]> para aceitar dados do banco em snake_case
+  const [drivers, setDrivers] = useState<any[]>([]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
+
+  const [editingDriverId, setEditingDriverId] = useState<
+    string | number | null
+  >(null);
+
+  // Carrega lista ao iniciar
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      const data = await listarFuncionariosAPI();
+      setDrivers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Erro ao carregar:", error);
+      toast.error("Erro", "Falha ao carregar motoristas.");
+    }
+  };
 
   const formatCPF = (value: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -176,10 +136,10 @@ export function SettingsView() {
   };
 
   const handleInputChange = (
-    field: keyof DriverFormData,
-    value: string | boolean
+    field: keyof typeof initialDriverForm,
+    value: string | boolean,
   ) => {
-    let formattedValue = value;
+    let formattedValue: any = value;
 
     if (typeof value === "string") {
       if (field === "cpf") formattedValue = formatCPF(value);
@@ -191,7 +151,7 @@ export function SettingsView() {
   };
 
   const handleSubmitDriver = async () => {
-    // Validation
+    // Validação básica
     if (
       !driverForm.name ||
       !driverForm.cpf ||
@@ -200,7 +160,7 @@ export function SettingsView() {
     ) {
       toast.error(
         "Erro de Validação",
-        "Preencha todos os campos obrigatórios."
+        "Preencha todos os campos obrigatórios.",
       );
       return;
     }
@@ -208,92 +168,81 @@ export function SettingsView() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/drivers', {
-      //   method: editingDriverId ? 'PUT' : 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     ...driverForm,
-      //     id: editingDriverId || undefined,
-      //   }),
-      // })
-      // const data = await response.json()
-
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       if (editingDriverId) {
-        setDrivers((prev) =>
-          prev.map((d) =>
-            d.id === editingDriverId
-              ? {
-                  ...d,
-                  name: driverForm.name,
-                  cpf: driverForm.cpf,
-                  cnh: driverForm.cnh,
-                  cnhCategory: driverForm.cnhCategory,
-                  cnhExpiry: driverForm.cnhExpiry,
-                  phone: driverForm.phone,
-                  branch: driverForm.branch,
-                }
-              : d
-          )
-        );
+        // --- EDIÇÃO REAL ---
+        await atualizarFuncionarioAPI(editingDriverId, driverForm);
         toast.success("Sucesso", "Motorista atualizado com sucesso!");
       } else {
-        const newDriver = {
-          id: `d${drivers.length + 1}`,
-          name: driverForm.name,
-          cpf: driverForm.cpf,
-          cnh: driverForm.cnh,
-          cnhCategory: driverForm.cnhCategory,
-          cnhExpiry: driverForm.cnhExpiry,
-          phone: driverForm.phone,
-          branch: driverForm.branch,
-          status: "Ativo",
-        };
-        setDrivers((prev) => [...prev, newDriver]);
+        // --- CADASTRO REAL ---
+        await cadastrarFuncionarioAPI(driverForm);
         toast.success("Sucesso", "Motorista cadastrado com sucesso!");
       }
 
+      // --- CRÍTICO: Recarrega do banco para ter os IDs reais (numéricos) ---
+      await loadUsers();
+
+      // Limpa tudo
       setDriverForm(initialDriverForm);
       setEditingDriverId(null);
       setIsDriverDialogOpen(false);
-    } catch {
-      toast.error("Erro", "Falha ao salvar motorista.");
+    } catch (error: any) {
+      console.error(error);
+      toast.error("Erro", error.message || "Falha ao salvar motorista.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleEditDriver = (driver: (typeof mockDriversList)[0]) => {
+  const handleEditDriver = (driver: any) => {
+    // Mapeia dados do banco (snake_case) para o formulário (camelCase)
     setDriverForm({
-      ...initialDriverForm,
-      name: driver.name,
-      cpf: driver.cpf,
-      cnh: driver.cnh,
-      cnhCategory: driver.cnhCategory,
-      cnhExpiry: driver.cnhExpiry,
-      phone: driver.phone,
-      branch: driver.branch,
+      name: driver.name || "",
+      cpf: driver.cpf || "",
+      rg: driver.rg || "",
+      birthDate: driver.birthDate || driver.birth_date || "",
+      phone: driver.phone || "",
+      email: driver.email || "",
+      address: driver.address || "",
+      city: driver.city || "",
+      state: driver.state || "",
+      zipCode: driver.zipCode || driver.zip_code || "",
+      cnh: driver.cnh || "",
+      cnhCategory: driver.cnhCategory || driver.cnh_category || "",
+      cnhExpiry: driver.cnhExpiry || driver.cnh_expiry || "",
+      mopp: driver.mopp || false,
+      moppExpiry: driver.moppExpiry || driver.mopp_expiry || "",
+      admissionDate: driver.admissionDate || driver.admission_date || "",
+      branch: driver.branch || "",
+      password: "", // Senha nunca vem preenchida por segurança
+      role: driver.role || "Motorista",
     });
     setEditingDriverId(driver.id);
     setIsDriverDialogOpen(true);
   };
 
-  const handleDeleteDriver = async (driverId: string) => {
-    // TODO: Replace with actual API call
-    // await fetch(`/api/drivers/${driverId}`, { method: 'DELETE' })
+  const handleDeleteDriver = async (driverId: string | number) => {
+    if (
+      !confirm(
+        "Tem certeza que deseja excluir este funcionário permanentemente?",
+      )
+    )
+      return;
 
-    setDrivers((prev) => prev.filter((d) => d.id !== driverId));
-    toast.success("Sucesso", "Motorista removido com sucesso!");
+    try {
+      await excluirFuncionarioAPI(driverId);
+      setDrivers((prev) => prev.filter((d) => d.id !== driverId));
+      toast.success("Excluído", "Funcionário removido do banco de dados.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro", "Não foi possível excluir o funcionário.");
+    }
   };
 
   const getCNHStatusBadge = (expiryDate: string) => {
     const today = new Date();
     const expiry = new Date(expiryDate);
     const daysUntil = Math.ceil(
-      (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
     );
 
     if (daysUntil < 0) {
@@ -733,25 +682,29 @@ export function SettingsView() {
                     <TableCell className="font-mono text-sm">
                       {driver.cnh}
                     </TableCell>
-                    <TableCell>{driver.cnhCategory}</TableCell>
+                    <TableCell>
+                      {driver.cnhCategory || driver.cnh_category}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {new Date(driver.cnhExpiry).toLocaleDateString("pt-BR")}
-                        {getCNHStatusBadge(driver.cnhExpiry)}
+                        {driver.cnhExpiry || driver.cnh_expiry
+                          ? new Date(
+                              driver.cnhExpiry || driver.cnh_expiry,
+                            ).toLocaleDateString("pt-BR")
+                          : "-"}
+
+                        {(driver.cnhExpiry || driver.cnh_expiry) &&
+                          getCNHStatusBadge(
+                            driver.cnhExpiry || driver.cnh_expiry,
+                          )}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{driver.branch}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        className={
-                          driver.status === "Ativo"
-                            ? "bg-green-100 text-green-800 hover:bg-green-100"
-                            : "bg-gray-100 text-gray-800 hover:bg-gray-100"
-                        }
-                      >
-                        {driver.status}
+                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                        Ativo
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
