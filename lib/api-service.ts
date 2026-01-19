@@ -158,50 +158,63 @@ export interface ReportFilter {
 }
 
 // Adaptador para converter dados do Banco (snake_case) para o Frontend (camelCase)
+// Em lib/api-service.ts
+
 function adapterRelatorio(data: any) {
   return {
-    // 1. Mapeia os Sinistros (Incidents)
+    // 1. Incidentes / Sinistros
     incidents: (data.incidents || []).map((i: any) => ({
-      id: i.id,
-      date: i.data_ocorrencia,
-      type: i.tipo,
-      plate: i.veiculo_placa,
-      driver: i.motorista_nome,
-      description: i.descricao, // Garante que a descrição seja passada
+      id: String(i.id),
+      date: i.data_ocorrencia || i.created_at,
+      type: i.tipo || "Sinistro",
+      plate: i.veiculo_placa || i.vehicle?.placa || "Placa N/A",
+      driver: i.motorista_nome || "Não informado",
+      description: i.descricao || "Sem descrição",
       cost: Number(i.custo_estimado || 0),
     })),
 
-    // 2. Mapeia as Multas (Fines) - NOVO CAMPO
+    // 2. Multas
     fines: (data.fines || []).map((f: any) => ({
-      id: f.id,
-      date: f.data_infracao || f.created_at, // Ajuste conforme seu banco
+      id: String(f.id),
+      date: f.data_infracao || f.created_at,
       time: f.hora_infracao || "00:00",
-      plate: f.veiculo_placa,
+      plate: f.veiculo_placa || f.vehicle?.placa || "Placa N/A",
       driver: f.motorista_nome || "Não identificado",
-      location: f.local_infracao || "Não informado",
-      description: f.descricao_infracao || "Infração de Trânsito",
+      location: f.local_infracao || "Local não informado",
+      description: f.descricao_infracao || f.infracao || "Infração",
       cost: Number(f.valor || f.amount || 0),
       status: f.status || "Pendente",
     })),
 
-    // 3. Mapeia Manutenções
+    // 3. Manutenções
     maintenances: (data.maintenances || []).map((m: any) => ({
-      id: m.id,
-      date: m.scheduled_date,
-      type: m.type,
-      plate: m.vehicle_plate,
+      id: String(m.id),
+      date: m.scheduled_date || m.data_agendada,
+      type: m.type || "Manutenção",
+      plate: m.vehicle_plate || m.vehicle?.placa || "Placa N/A",
       cost: Number(m.cost || 0),
-      items: m.description || "Manutenção Geral",
+      items: m.description || "Itens diversos",
       notaFiscal: m.nota_fiscal || "-",
       oficina: m.oficina || "Oficina Credenciada",
+    })),
+
+    // 4. Documentos / Licenciamento (NOVO CORRIGIDO)
+    documents: (data.documents || []).map((d: any) => ({
+      id: String(d.id),
+      // Tenta pegar a placa de várias formas para evitar o erro de "carro não encontrado"
+      plate: d.placa || d.veiculo_placa || d.vehicle?.placa || "Placa Pendente",
+      tipoDoc: d.tipo || d.document_type || "Documento",
+      crlv: d.status === "Válido" ? "Válido" : "Pendente", // Lógica simples baseada no status
+      ipvaStatus: d.ipva_status || "Em dia",
+      licenciamentoStatus: d.status || "Regular",
+      vencimento: d.vencimento || d.expiry_date || d.validade || null,
     })),
 
     summary: {
       totalCost: data.summary?.totalCost || 0,
       totalIncidents: data.summary?.totalIncidents || 0,
       totalMaintenances: data.summary?.totalMaintenances || 0,
-      analysisText:
-        data.summary?.analysisText || "Sem dados suficientes para análise.",
+      analysisText: data.summary?.analysisText || "Dados insuficientes.",
     },
   };
 }
@@ -247,6 +260,51 @@ export async function salvarRelatorioHistoricoAPI(dadosRelatorio: any) {
   } catch (error) {
     console.error("Erro ao salvar histórico:", error);
     return null;
+  }
+}
+
+// Adicione esta função para buscar a lista de relatórios do banco
+export async function buscarHistoricoRelatoriosAPI() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/reports`, {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+
+    // Adaptador simples para garantir que os campos batam com a interface do Front
+    return data.map((r: any) => ({
+      id: r.id,
+      dataGeracao: r.created_at || r.data_geracao, // Ajuste conforme seu banco
+      horaGeracao:
+        r.hora_geracao ||
+        new Date(r.created_at).toLocaleTimeString() ||
+        "00:00",
+      periodoInicio: r.periodo_inicio,
+      periodoFim: r.periodo_fim,
+      veiculos: r.veiculos_ids || [], // Pode precisar de ajuste se o banco retornar apenas IDs
+      conteudo: {
+        multas: true, // Ou mapear de r.tipo se houver essa info detalhada
+        licenciamento: true,
+        manutencoes: true,
+        sinistros: true,
+      },
+      // Se o backend salvar o resumo financeiro, mapear aqui:
+      totalMultas: r.resumo_financeiro?.multas || 0,
+      totalManutencoes: r.resumo_financeiro?.manutencoes || 0,
+      totalSinistros: r.resumo_financeiro?.sinistros || 0,
+      quantidadeMultas: 0, // Campos opcionais para visualização rápida
+      quantidadeManutencoes: 0,
+      quantidadeSinistros: 0,
+      docHash: r.id.toString().substring(0, 8).toUpperCase(), // Gera um hash visual se não tiver
+      geradoPor: r.criado_por || "Sistema",
+    }));
+  } catch (error) {
+    console.error("Erro ao buscar histórico de relatórios:", error);
+    return [];
   }
 }
 

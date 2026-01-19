@@ -34,7 +34,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { buscarFrotaAPI, buscarDadosRelatorioAPI } from "@/lib/api-service";
+import {
+  buscarFrotaAPI,
+  buscarDadosRelatorioAPI,
+  buscarHistoricoRelatoriosAPI,
+  salvarRelatorioHistoricoAPI,
+} from "@/lib/api-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -161,6 +166,7 @@ export function ReportsView() {
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   });
+  const [reportHistory, setReportHistory] = useState<ReportHistory[]>([]);
 
   const [includeMultas, setIncludeMultas] = useState(false);
   const [includeLicenciamento, setIncludeLicenciamento] = useState(false);
@@ -188,6 +194,7 @@ export function ReportsView() {
     incidents: [] as any[],
     fines: [] as any[],
     maintenances: [] as any[],
+    documents: [] as any[],
     summary: {
       totalCost: 0,
       totalIncidents: 0,
@@ -211,22 +218,23 @@ export function ReportsView() {
     loadVehicles();
   }, []);
 
+  useEffect(() => {
+    const loadHistory = async () => {
+      const historyData = await buscarHistoricoRelatoriosAPI();
+      setReportHistory(historyData);
+    };
+    loadHistory();
+  }, []);
+
   // --- 2. VARIÁVEIS DERIVADAS (Declaradas APÓS o reportData existir) ---
   const filteredMultas = reportData.fines || [];
   const filteredSinistros = reportData.incidents || [];
   const filteredManutencoes = reportData.maintenances || [];
 
-  const filteredLicenciamentos: any[] =
-    selectedVehicles.length > 0
-      ? selectedVehicles.map((placa) => ({
-          placa,
-          tipoDoc: "CRLV Digital",
-          crlv: "Válido",
-          ipvaStatus: "Pago",
-          licenciamentoStatus: "Regular",
-          vencimento: new Date().toISOString(),
-        }))
-      : [];
+  const filteredLicenciamentos = (reportData.documents || []).filter(
+    (doc: any) =>
+      selectedVehicles.length === 0 || selectedVehicles.includes(doc.plate),
+  );
 
   const generateAIAnalysis =
     reportData.summary?.analysisText || "Aguardando dados do relatório...";
@@ -293,34 +301,43 @@ export function ReportsView() {
   };
 
   // Função para baixar o PDF usando impressão do navegador
+  // Função atualizada para baixar e salvar histórico
   const handleDownloadPDF = async () => {
     setIsGeneratingPdf(true);
 
     try {
-      // 1. Aciona a impressão do navegador
+      // 1. Aciona a impressão do navegador (Gera o arquivo visual)
       window.print();
 
-      // 2. Salva no Histórico do Banco de Dados (em segundo plano)
-      // Importante: Importe salvarRelatorioHistoricoAPI do api-service
-      const { salvarRelatorioHistoricoAPI } = await import("@/lib/api-service");
-
-      await salvarRelatorioHistoricoAPI({
+      // 2. Prepara os dados para salvar no banco
+      const novoRelatorio = {
         titulo: `Relatório Frota - ${format(new Date(), "dd/MM/yyyy")}`,
         periodo_inicio: dateRange?.from,
         periodo_fim: dateRange?.to,
-        veiculos_ids: selectedVehicles, // Array de placas
-        criado_por: "Usuário Atual", // Pegar do contexto de Auth se tiver
+        veiculos_ids:
+          selectedVehicles.length > 0
+            ? selectedVehicles
+            : vehicles.map((v) => v.placa),
+        criado_por: "Usuário Atual",
         tipo: "Completo",
         resumo_financeiro: {
           multas: totalMultasValor,
           manutencoes: totalManutencoesValor,
           sinistros: totalSinistrosValor,
         },
-      });
+      };
+
+      // 3. Salva no Backend
+      await salvarRelatorioHistoricoAPI(novoRelatorio);
+
+      // 4. Atualiza a lista de histórico na tela imediatamente
+      const historicoAtualizado = await buscarHistoricoRelatoriosAPI();
+      setReportHistory(historicoAtualizado);
 
       console.log("Relatório salvo no histórico com sucesso.");
     } catch (error) {
       console.error("Erro ao processar download:", error);
+      alert("O arquivo foi gerado, mas houve um erro ao salvar no histórico.");
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -333,9 +350,9 @@ export function ReportsView() {
 
   // Dados da empresa
   const empresaData = {
-    nome: "TRL Transporte e Logística LTDA",
+    nome: "TRL Transporte",
     cnpj: "12.345.678/0001-90",
-    endereco: "Av. Brasil, 1500 - Galpão 3, São Paulo - SP, CEP 01310-100",
+    endereco: "Av. Patos, 1500 - Galpão 3, São Paulo - SP, CEP 01310-100",
     telefone: "(11) 3456-7890",
     site: "www.trltransporte.com.br",
     email: "contato@trltransporte.com.br",
@@ -827,13 +844,40 @@ export function ReportsView() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {mockReportHistory.length === 0 ? (
+            {/* ALTERAÇÃO: Use reportHistory.length em vez de mockReportHistory */}
+            {reportHistory.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
                 <p>Nenhum relatório foi gerado ainda.</p>
               </div>
             ) : (
-              <p>Histórico disponível</p>
+              <div className="space-y-2">
+                {reportHistory.map((report) => (
+                  <div
+                    key={report.id}
+                    className="border rounded-lg overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">
+                          Relatório {safeFormat(report.dataGeracao, "dd/MM")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {safeFormat(report.periodoInicio)} a{" "}
+                          {safeFormat(report.periodoFim)}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadHistoryPDF(report)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1078,6 +1122,81 @@ export function ReportsView() {
                   </div>
                 )}
 
+                {/* TABELA DOCUMENTAÇÃO (LICENCIAMENTO) */}
+                {includeLicenciamento && filteredLicenciamentos.length > 0 && (
+                  <div className="mb-8 relative z-10">
+                    <h4 className="text-xs font-bold uppercase border-b pb-1 mb-3 flex items-center gap-2">
+                      <ShieldCheck className="h-3 w-3 text-green-600" /> Status
+                      de Documentação
+                    </h4>
+                    <table className="w-full text-xs border-collapse">
+                      <thead className="bg-slate-100">
+                        <tr>
+                          <th className="p-2 border text-left">Placa</th>
+                          <th className="p-2 border text-center">Tipo Doc.</th>
+                          <th className="p-2 border text-center">CRLV</th>
+                          <th className="p-2 border text-center">IPVA</th>
+                          <th className="p-2 border text-center">
+                            Licenciamento
+                          </th>
+                          <th className="p-2 border text-center">Vencimento</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredLicenciamentos.map((lic: any) => (
+                          <tr key={lic.id || lic.plate}>
+                            <td className="p-2 border font-mono font-bold">
+                              {lic.plate}
+                            </td>
+                            <td className="p-2 border text-center">
+                              {lic.tipoDoc}
+                            </td>
+                            <td className="p-2 border text-center">
+                              <span
+                                className={cn(
+                                  "px-1 rounded",
+                                  lic.crlv === "Válido"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700",
+                                )}
+                              >
+                                {lic.crlv}
+                              </span>
+                            </td>
+                            <td className="p-2 border text-center">
+                              <span
+                                className={cn(
+                                  "px-1 rounded",
+                                  lic.ipvaStatus === "Pago" ||
+                                    lic.ipvaStatus === "Em dia"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-amber-100 text-amber-700",
+                                )}
+                              >
+                                {lic.ipvaStatus}
+                              </span>
+                            </td>
+                            <td className="p-2 border text-center">
+                              <span
+                                className={cn(
+                                  "px-1 rounded",
+                                  lic.licenciamentoStatus === "Regular"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700",
+                                )}
+                              >
+                                {lic.licenciamentoStatus}
+                              </span>
+                            </td>
+                            <td className="p-2 border text-center">
+                              {safeFormat(lic.vencimento)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 {/* TABELA MULTAS - CORRIGIDA */}
                 {includeMultas && filteredMultas.length > 0 && (
                   <div className="mb-8 relative z-10">
@@ -1286,6 +1405,83 @@ export function ReportsView() {
                           </td>
                         </tr>
                       </tfoot>
+                    </table>
+                  </div>
+                )}
+
+                {/* LICENCIAMENTO TABLE - ATUALIZADO */}
+                {includeLicenciamento && filteredLicenciamentos.length > 0 && (
+                  <div className="mb-8 relative z-10">
+                    <h4 className="text-xs font-bold uppercase border-b pb-1 mb-3 flex items-center gap-2">
+                      <ShieldCheck className="h-3 w-3 text-green-600" /> Status
+                      de Documentação
+                    </h4>
+                    <table className="w-full text-xs border-collapse">
+                      <thead className="bg-slate-100">
+                        <tr>
+                          <th className="p-2 border text-left">Placa</th>
+                          <th className="p-2 border text-center">Tipo Doc.</th>
+                          <th className="p-2 border text-center">CRLV</th>
+                          <th className="p-2 border text-center">IPVA</th>
+                          <th className="p-2 border text-center">
+                            Licenciamento
+                          </th>
+                          <th className="p-2 border text-center">Vencimento</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredLicenciamentos.map((lic: any) => (
+                          <tr key={lic.id || lic.plate}>
+                            <td className="p-2 border font-mono font-bold">
+                              {/* CORREÇÃO: Usar .plate em vez de .placa */}
+                              {lic.plate}
+                            </td>
+                            <td className="p-2 border text-center">
+                              {lic.tipoDoc}
+                            </td>
+                            <td className="p-2 border text-center">
+                              <span
+                                className={cn(
+                                  "px-1 rounded",
+                                  lic.crlv === "Válido"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700",
+                                )}
+                              >
+                                {lic.crlv}
+                              </span>
+                            </td>
+                            <td className="p-2 border text-center">
+                              <span
+                                className={cn(
+                                  "px-1 rounded",
+                                  lic.ipvaStatus === "Pago" ||
+                                    lic.ipvaStatus === "Em dia"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-amber-100 text-amber-700",
+                                )}
+                              >
+                                {lic.ipvaStatus}
+                              </span>
+                            </td>
+                            <td className="p-2 border text-center">
+                              <span
+                                className={cn(
+                                  "px-1 rounded",
+                                  lic.licenciamentoStatus === "Regular"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700",
+                                )}
+                              >
+                                {lic.licenciamentoStatus}
+                              </span>
+                            </td>
+                            <td className="p-2 border text-center">
+                              {safeFormat(lic.vencimento)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
                     </table>
                   </div>
                 )}
