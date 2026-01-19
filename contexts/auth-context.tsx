@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { loginAPI } from "@/lib/api-service";
 
 export type UserRole = "admin" | "motorista";
 
@@ -79,34 +80,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      // Chamada real à API
+      const data = await loginAPI({ email, password });
 
-    // TODO: Replace with actual API call
-    // const response = await fetch('/api/auth/login', {
-    //   method: 'POST',
-    //   body: JSON.stringify({ email, password }),
-    // })
-    // const data = await response.json()
-    // if (data.success) {
-    //   setUser(data.user)
-    //   localStorage.setItem("trl_user", JSON.stringify(data.user))
-    //   return true
-    // }
-    // return false
+      // Mapeia a resposta do banco para o formato de usuário do front-end
+      const userData: User = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        // Garante que o role seja 'admin' ou 'motorista' (lowercase)
+        role: (data.role || "motorista").toLowerCase() as UserRole,
+        cpf: data.cpf,
+        cnh: data.cnh,
+      };
 
-    // Mock validation - check against mock users
-    const foundUser = mockUsers.find(
-      (u) =>
-        u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-
-    if (foundUser) {
-      setUser(foundUser.user);
-      localStorage.setItem("trl_user", JSON.stringify(foundUser.user));
+      setUser(userData);
+      localStorage.setItem("trl_user", JSON.stringify(userData));
       return true;
+    } catch (error) {
+      console.error("Erro ao fazer login:", error);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {
