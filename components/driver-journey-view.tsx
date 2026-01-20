@@ -4,7 +4,12 @@ import type React from "react";
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import { useJourney, type JourneyStatus } from "@/contexts/journey-context";
+import {
+  useJourney,
+  type JourneyStatus,
+  type VehicleData,
+} from "@/contexts/journey-context";
+import { buscarFrotaAPI } from "@/lib/api-service";
 import {
   Card,
   CardContent,
@@ -25,6 +30,19 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   PlayCircle,
@@ -55,6 +73,9 @@ import {
   Car,
   Minimize2,
   Home,
+  ChevronsUpDown,
+  Search,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -67,6 +88,15 @@ interface InspectionItem {
   icon: React.ReactNode;
   checked: boolean | null;
   problem?: string;
+}
+
+interface APIVehicle {
+  id: number;
+  placa: string;
+  marca: string;
+  modelo: string;
+  ano: number;
+  status: string;
 }
 
 interface JourneyRecord {
@@ -141,9 +171,6 @@ const mockJourneyHistory: JourneyRecord[] = [
   },
 ];
 
-// Default vehicle data
-const defaultVehicle = { plate: "ABC-1234", model: "Volvo FH 460" };
-
 // --- SKELETON COMPONENTS ---
 function JourneyCardSkeleton() {
   return (
@@ -184,10 +211,41 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+// --- STEPPER COMPONENT ---
+function JourneyStepper({ currentStep }: { currentStep: number }) {
+  const steps = ["Veiculo", "Vistoria", "Check-in", "Em Viagem"];
+
+  return (
+    <div className="flex items-center justify-center gap-1 py-2">
+      {steps.map((step, i) => (
+        <div key={step} className="flex items-center">
+          <div
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition-colors",
+              i === currentStep
+                ? "bg-primary text-primary-foreground"
+                : i < currentStep
+                  ? "bg-green-500 text-white"
+                  : "bg-muted text-muted-foreground",
+            )}
+          >
+            {i < currentStep ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+          </div>
+          {i < steps.length - 1 && (
+            <ChevronRight className="mx-0.5 h-3.5 w-3.5 text-muted-foreground" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function DriverJourneyView() {
   const { user } = useAuth();
   const {
     journey,
+    selectVehicle,
+    confirmVehicleSelection,
     startInspection,
     updateInspectionItem,
     completeInspection,
@@ -201,11 +259,19 @@ export function DriverJourneyView() {
     getDrivingSeconds,
     getRestSeconds,
     getMealSeconds,
+    cancelJourney,
   } = useJourney();
 
   // --- LOADING/ERROR STATES ---
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+
+  // --- VEHICLE SELECTION STATE ---
+  const [vehicles, setVehicles] = useState<APIVehicle[]>([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(false);
+  const [vehiclesError, setVehiclesError] = useState(false);
+  const [vehicleSearchOpen, setVehicleSearchOpen] = useState(false);
+  const [vehicleSearchQuery, setVehicleSearchQuery] = useState("");
 
   // --- LOCAL UI STATES ---
   const [journeyHistory, setJourneyHistory] = useState<JourneyRecord[]>([]);
@@ -273,12 +339,25 @@ export function DriverJourneyView() {
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
 
   // --- CURRENT STEP FOR UI ---
-  const currentStep =
-    journey.status === "inspection"
-      ? 0
-      : journey.status === "ready_to_start"
-        ? 1
-        : 2;
+  const getCurrentStep = () => {
+    switch (journey.status) {
+      case "vehicle_selection":
+        return 0;
+      case "inspection":
+        return 1;
+      case "ready_to_start":
+        return 2;
+      case "on_journey":
+      case "resting":
+      case "meal":
+      case "checkout":
+        return 3;
+      default:
+        return 0;
+    }
+  };
+
+  const currentStep = getCurrentStep();
 
   // --- LOAD DATA ---
   const loadData = useCallback(async () => {
@@ -294,9 +373,30 @@ export function DriverJourneyView() {
     }
   }, []);
 
+  // --- LOAD VEHICLES ---
+  const loadVehicles = useCallback(async () => {
+    setVehiclesLoading(true);
+    setVehiclesError(false);
+    try {
+      const data = await buscarFrotaAPI();
+      setVehicles(data || []);
+    } catch {
+      setVehiclesError(true);
+    } finally {
+      setVehiclesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Load vehicles when entering vehicle selection
+  useEffect(() => {
+    if (journey.status === "vehicle_selection") {
+      loadVehicles();
+    }
+  }, [journey.status, loadVehicles]);
 
   // --- SIMULATE GPS ---
   useEffect(() => {
@@ -364,7 +464,28 @@ export function DriverJourneyView() {
     return format(date, "dd/MM", { locale: ptBR });
   };
 
-  // --- HANDLERS ---
+  // --- VEHICLE HANDLERS ---
+  const handleSelectVehicle = (vehicle: APIVehicle) => {
+    const vehicleData: VehicleData = {
+      id: vehicle.id,
+      plate: vehicle.placa,
+      model: `${vehicle.marca} ${vehicle.modelo}`,
+    };
+    selectVehicle(vehicleData);
+    setVehicleSearchOpen(false);
+  };
+
+  const handleConfirmVehicle = () => {
+    if (journey.selectedVehicle) {
+      confirmVehicleSelection();
+      // Reset inspection items for new journey
+      setInspectionItems((prev) =>
+        prev.map((item) => ({ ...item, checked: null, problem: undefined })),
+      );
+    }
+  };
+
+  // --- INSPECTION HANDLERS ---
   const handleInspectionChange = (id: string, value: boolean) => {
     if (value === false) {
       setCurrentProblemItem(id);
@@ -420,9 +541,13 @@ export function DriverJourneyView() {
     }
   };
 
-  const handleCheckIn = () => {
+  const handleCheckIn = async () => {
     if (!startKm) return;
-    startJourney(startKm, defaultVehicle, currentLocation);
+    try {
+      await startJourney(startKm, currentLocation);
+    } catch (error) {
+      alert("Erro ao iniciar jornada. Tente novamente.");
+    }
   };
 
   const handlePause = (type: "rest" | "meal") => {
@@ -441,7 +566,7 @@ export function DriverJourneyView() {
     setShowSummaryDialog(true);
   };
 
-  const handleFinishJourney = () => {
+  const handleFinishJourney = async () => {
     // Reset all local states
     setInspectionItems((prev) =>
       prev.map((item) => ({ ...item, checked: null, problem: undefined })),
@@ -451,7 +576,7 @@ export function DriverJourneyView() {
     setObservations("");
     setShowSummaryDialog(false);
     // End journey in context
-    endJourney();
+    await endJourney(endKm, observations);
   };
 
   const handleCancelJourney = () => {
@@ -459,7 +584,7 @@ export function DriverJourneyView() {
       prev.map((item) => ({ ...item, checked: null, problem: undefined })),
     );
     setStartKm("");
-    endJourney();
+    cancelJourney();
   };
 
   const calculateDistance = () => {
@@ -480,6 +605,16 @@ export function DriverJourneyView() {
         minute: "2-digit",
       })
     : null;
+
+  // Filter vehicles by search
+  const filteredVehicles = vehicles.filter((v) => {
+    const query = vehicleSearchQuery.toLowerCase();
+    return (
+      v.placa.toLowerCase().includes(query) ||
+      v.modelo.toLowerCase().includes(query) ||
+      v.marca.toLowerCase().includes(query)
+    );
+  });
 
   // --- RENDER: LOADING ---
   if (isLoading) {
@@ -531,7 +666,7 @@ export function DriverJourneyView() {
               Iniciar Nova Jornada
             </h2>
             <p className="mb-6 text-sm text-muted-foreground max-w-xs">
-              Complete a vistoria diaria do veiculo antes de iniciar
+              Selecione o veiculo e complete a vistoria diaria
             </p>
             <Button
               size="lg"
@@ -539,7 +674,7 @@ export function DriverJourneyView() {
               onClick={handleStartInspection}
             >
               <PlayCircle className="h-5 w-5" />
-              Comecar Vistoria
+              Comecar Jornada
             </Button>
           </CardContent>
         </Card>
@@ -735,6 +870,194 @@ export function DriverJourneyView() {
   }
 
   // ============================================
+  // RENDER: VEHICLE SELECTION STATE
+  // ============================================
+  if (journey.status === "vehicle_selection") {
+    return (
+      <div className="space-y-4">
+        {/* Header */}
+        <div>
+          <h1 className="text-xl font-bold text-foreground sm:text-2xl">
+            Seleção de Veículo
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Escolha o veiculo para iniciar a jornada
+          </p>
+        </div>
+
+        {/* Progress Steps */}
+        <JourneyStepper currentStep={currentStep} />
+
+        {/* Vehicle Selection Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Truck className="h-5 w-5 text-primary" />
+              Veiculo da Jornada
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Busque pela placa ou modelo do veiculo
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Vehicle Search Combobox */}
+            {vehiclesLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ) : vehiclesError ? (
+              <div className="text-center py-6">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+                  <WifiOff className="h-6 w-6 text-red-500" />
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Erro ao carregar veiculos
+                </p>
+                <Button
+                  onClick={loadVehicles}
+                  variant="outline"
+                  className="bg-transparent"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Tentar Novamente
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Popover
+                  open={vehicleSearchOpen}
+                  onOpenChange={setVehicleSearchOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={vehicleSearchOpen}
+                      className="w-full h-12 justify-between bg-transparent"
+                    >
+                      {journey.selectedVehicle ? (
+                        <span className="flex items-center gap-2">
+                          <Truck className="h-4 w-4" />
+                          {journey.selectedVehicle.plate} -{" "}
+                          {journey.selectedVehicle.model}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          <Search className="h-4 w-4" />
+                          Buscar veiculo...
+                        </span>
+                      )}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput
+                        placeholder="Digite a placa ou modelo..."
+                        value={vehicleSearchQuery}
+                        onValueChange={setVehicleSearchQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>Nenhum veiculo encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredVehicles.map((vehicle) => (
+                            <CommandItem
+                              key={vehicle.id}
+                              value={`${vehicle.placa} ${vehicle.marca} ${vehicle.modelo}`}
+                              onSelect={() => handleSelectVehicle(vehicle)}
+                              className="flex items-center gap-3 py-3"
+                            >
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <Truck className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium">{vehicle.placa}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {vehicle.marca} {vehicle.modelo}
+                                </p>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "shrink-0 text-xs",
+                                  vehicle.status === "Ativo"
+                                    ? "border-green-200 bg-green-50 text-green-700"
+                                    : "border-amber-200 bg-amber-50 text-amber-700",
+                                )}
+                              >
+                                {vehicle.status}
+                              </Badge>
+                              {journey.selectedVehicle?.id === vehicle.id && (
+                                <Check className="h-4 w-4 text-primary shrink-0" />
+                              )}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Selected Vehicle Card */}
+                {journey.selectedVehicle && (
+                  <div className="rounded-xl border-2 border-primary/50 bg-primary/5 p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                        <Truck className="h-7 w-7" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-2xl font-bold tracking-wider">
+                          {journey.selectedVehicle.plate}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {journey.selectedVehicle.model}
+                        </p>
+                      </div>
+                      <Badge className="bg-green-100 text-green-700 shrink-0">
+                        Selecionado
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+
+                {vehicles.length === 0 && !vehiclesLoading && (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <p className="text-sm">Nenhum veiculo cadastrado</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1 h-12 bg-transparent"
+                onClick={handleCancelJourney}
+              >
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 h-12"
+                disabled={!journey.selectedVehicle}
+                onClick={handleConfirmVehicle}
+              >
+                Confirmar Veiculo
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ============================================
   // RENDER: INSPECTION STATE (Checklist)
   // ============================================
   if (journey.status === "inspection") {
@@ -753,27 +1076,22 @@ export function DriverJourneyView() {
         </div>
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-center gap-2 py-2">
-          {["Vistoria", "Check-in", "Em Viagem"].map((step, i) => (
-            <div key={step} className="flex items-center">
-              <div
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
-                  i === currentStep
-                    ? "bg-primary text-primary-foreground"
-                    : i < currentStep
-                      ? "bg-green-500 text-white"
-                      : "bg-muted text-muted-foreground",
-                )}
-              >
-                {i < currentStep ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
-              </div>
-              {i < 2 && (
-                <ChevronRight className="mx-1 h-4 w-4 text-muted-foreground" />
-              )}
+        <JourneyStepper currentStep={currentStep} />
+
+        {/* Selected Vehicle Info */}
+        {journey.selectedVehicle && (
+          <div className="rounded-xl border bg-muted/50 p-3 flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Truck className="h-5 w-5" />
             </div>
-          ))}
-        </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium">{journey.selectedVehicle.plate}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {journey.selectedVehicle.model}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Checklist Items */}
         <Card>
@@ -1004,27 +1322,7 @@ export function DriverJourneyView() {
         </div>
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-center gap-2 py-2">
-          {["Vistoria", "Check-in", "Em Viagem"].map((step, i) => (
-            <div key={step} className="flex items-center">
-              <div
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
-                  i === currentStep
-                    ? "bg-primary text-primary-foreground"
-                    : i < currentStep
-                      ? "bg-green-500 text-white"
-                      : "bg-muted text-muted-foreground",
-                )}
-              >
-                {i < currentStep ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
-              </div>
-              {i < 2 && (
-                <ChevronRight className="mx-1 h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-          ))}
-        </div>
+        <JourneyStepper currentStep={currentStep} />
 
         {/* Inspection Completed Badge */}
         <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex items-center gap-3">
@@ -1050,6 +1348,24 @@ export function DriverJourneyView() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Vehicle Info */}
+            {journey.selectedVehicle && (
+              <div className="rounded-xl border bg-muted/50 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-primary/10 p-3">
+                    <Truck className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Veiculo</p>
+                    <p className="font-medium">
+                      {journey.selectedVehicle.plate} -{" "}
+                      {journey.selectedVehicle.model}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* GPS Location */}
             <div className="rounded-xl border bg-muted/50 p-4">
               <div className="flex items-center gap-3">
@@ -1180,174 +1496,170 @@ export function DriverJourneyView() {
               Jornada em Andamento
             </h1>
             <p className="text-sm text-muted-foreground">
-              Iniciada as {journeyStartTimeDisplay}
+              {isPaused
+                ? journey.status === "resting"
+                  ? "Em descanso"
+                  : "Em refeicao"
+                : "Dirigindo"}
             </p>
           </div>
-          {/* This button is more for desktop - on mobile the user can just use the bottom nav */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs bg-transparent hidden sm:flex"
-            onClick={() => {
-              // On desktop, this would need to be handled by parent
-              // For now, it's just informational
-            }}
-          >
-            <Minimize2 className="h-4 w-4" />
-            Minimizar
-          </Button>
         </div>
 
-        {/* KPI Grid 2x2 */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
-              <Car className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-mono text-lg font-bold leading-none truncate">
-                {formatTimeShort(displayTimes.driving)}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">Direcao</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-              <Coffee className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-mono text-lg font-bold leading-none truncate">
-                {formatTimeShort(displayTimes.rest)}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">Descanso</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-100 text-purple-700">
-              <Utensils className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-mono text-lg font-bold leading-none truncate">
-                {formatTimeShort(displayTimes.meal)}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">Refeicao</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-700">
-              <Navigation className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg font-bold leading-none text-green-600">
-                Ativo
-              </p>
-              <p className="text-xs text-muted-foreground truncate">GPS</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Chronometer Card */}
+        {/* Main Timer Card */}
         <Card
           className={cn(
             "border-2",
             isPaused
-              ? "border-amber-500 bg-amber-50 dark:bg-amber-950"
-              : "border-green-500 bg-green-50 dark:bg-green-950",
+              ? "border-amber-300 bg-amber-50"
+              : "border-green-300 bg-green-50",
           )}
         >
-          <CardContent className="py-6 text-center">
-            <div className="mb-4 flex items-center justify-center gap-2">
-              {journey.status === "resting" ? (
-                <>
-                  <Coffee className="h-5 w-5 text-amber-600" />
-                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                    Parada para Descanso
-                  </span>
-                </>
-              ) : journey.status === "meal" ? (
-                <>
-                  <Utensils className="h-5 w-5 text-purple-600" />
-                  <span className="text-sm font-medium text-purple-700 dark:text-purple-400">
-                    Parada para Refeicao
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="relative flex h-3 w-3">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                    <span className="relative inline-flex h-3 w-3 rounded-full bg-green-500" />
-                  </span>
-                  <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                    Em Viagem - Rastreamento Ativo
-                  </span>
-                </>
-              )}
-            </div>
-            <div className="mb-4">
-              <p className="text-xs text-muted-foreground mb-1">
-                Tempo Total de Jornada
+          <CardContent className="pt-6">
+            {/* Big Timer Display */}
+            <div className="text-center mb-6">
+              <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">
+                Tempo Total
               </p>
-              <p className="font-mono text-5xl font-bold tracking-wider">
+              <p className="text-5xl font-bold tracking-tight tabular-nums">
                 {formatTime(displayTimes.total)}
               </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Iniciado as {journeyStartTimeDisplay}
+              </p>
             </div>
-            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {journey.lastLocation || currentLocation}
-              </span>
-              <span className="flex items-center gap-1">
-                <Gauge className="h-3 w-3" />
-                KM: {journey.startKm}
-              </span>
+
+            {/* Time Breakdown */}
+            <div className="grid grid-cols-3 gap-2 mb-6">
+              <div
+                className={cn(
+                  "rounded-xl p-3 text-center",
+                  journey.status === "on_journey"
+                    ? "bg-green-500 text-white"
+                    : "bg-white border",
+                )}
+              >
+                <Car className="h-5 w-5 mx-auto mb-1" />
+                <p className="text-xs opacity-80">Direcao</p>
+                <p className="font-bold tabular-nums">
+                  {formatTimeShort(displayTimes.driving)}
+                </p>
+              </div>
+              <div
+                className={cn(
+                  "rounded-xl p-3 text-center",
+                  journey.status === "resting"
+                    ? "bg-amber-500 text-white"
+                    : "bg-white border",
+                )}
+              >
+                <Coffee className="h-5 w-5 mx-auto mb-1" />
+                <p className="text-xs opacity-80">Descanso</p>
+                <p className="font-bold tabular-nums">
+                  {formatTimeShort(displayTimes.rest)}
+                </p>
+              </div>
+              <div
+                className={cn(
+                  "rounded-xl p-3 text-center",
+                  journey.status === "meal"
+                    ? "bg-orange-500 text-white"
+                    : "bg-white border",
+                )}
+              >
+                <Utensils className="h-5 w-5 mx-auto mb-1" />
+                <p className="text-xs opacity-80">Refeicao</p>
+                <p className="font-bold tabular-nums">
+                  {formatTimeShort(displayTimes.meal)}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              {isPaused ? (
+                <Button
+                  size="lg"
+                  className="w-full h-14 text-base font-semibold bg-green-500 hover:bg-green-600 active:scale-95 transition-transform"
+                  onClick={handleResume}
+                >
+                  <PlayCircle className="mr-2 h-5 w-5" />
+                  Retomar Viagem
+                </Button>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-14 text-sm font-medium bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
+                    onClick={() => handlePause("rest")}
+                  >
+                    <Coffee className="mr-2 h-5 w-5" />
+                    Descanso
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-14 text-sm font-medium bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
+                    onClick={() => handlePause("meal")}
+                  >
+                    <Utensils className="mr-2 h-5 w-5" />
+                    Refeicao
+                  </Button>
+                </div>
+              )}
+
+              <Button
+                size="lg"
+                variant="destructive"
+                className="w-full h-14 text-base font-semibold active:scale-95 transition-transform"
+                onClick={handleStartCheckout}
+              >
+                <StopCircle className="mr-2 h-5 w-5" />
+                Finalizar Jornada
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Action Buttons */}
-        <div className="space-y-3">
-          {isPaused ? (
-            <Button
-              size="lg"
-              className="w-full h-14 bg-green-500 hover:bg-green-600 text-base font-semibold active:scale-95 transition-transform"
-              onClick={handleResume}
-            >
-              <PlayCircle className="mr-2 h-5 w-5" />
-              Retomar Viagem
-            </Button>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-14 border-amber-500 text-amber-600 hover:bg-amber-50 bg-transparent active:scale-95 transition-transform"
-                onClick={() => handlePause("rest")}
-              >
-                <Coffee className="mr-2 h-5 w-5" />
-                Descanso
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-14 border-purple-500 text-purple-600 hover:bg-purple-50 bg-transparent active:scale-95 transition-transform"
-                onClick={() => handlePause("meal")}
-              >
-                <Utensils className="mr-2 h-5 w-5" />
-                Refeicao
-              </Button>
+        {/* Journey Info Card */}
+        <Card>
+          <CardContent className="pt-4 space-y-3">
+            {/* Vehicle */}
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-muted p-2">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Veiculo</p>
+                <p className="font-medium truncate">
+                  {journey.vehicleData?.plate} - {journey.vehicleData?.model}
+                </p>
+              </div>
             </div>
-          )}
 
-          <Button
-            size="lg"
-            variant="destructive"
-            className="w-full h-14 text-base font-semibold active:scale-95 transition-transform"
-            onClick={handleStartCheckout}
-          >
-            <StopCircle className="mr-2 h-5 w-5" />
-            Encerrar Jornada
-          </Button>
-        </div>
+            {/* Location */}
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-muted p-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Localizacao</p>
+                <p className="font-medium truncate">{journey.lastLocation}</p>
+              </div>
+            </div>
+
+            {/* KM */}
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-muted p-2">
+                <Gauge className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">KM Inicial</p>
+                <p className="font-medium">{journey.startKm}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -1361,35 +1673,50 @@ export function DriverJourneyView() {
         {/* Header */}
         <div>
           <h1 className="text-xl font-bold text-foreground sm:text-2xl">
-            Check-out
+            Finalizar Jornada
           </h1>
-          <p className="text-sm text-muted-foreground">Finalize sua jornada</p>
+          <p className="text-sm text-muted-foreground">
+            Preencha os dados finais
+          </p>
         </div>
 
         {/* Summary Card */}
-        <Card>
+        <Card className="border-2 border-primary/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Encerramento de Jornada</CardTitle>
-            <CardDescription className="text-xs">
-              Jornada iniciada as {journeyStartTimeDisplay}
-            </CardDescription>
+            <CardTitle className="text-base">Resumo da Jornada</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Time Summary */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border bg-muted/50 p-3 text-center">
-                <p className="text-xs text-muted-foreground">KM Inicial</p>
-                <p className="text-xl font-bold">{journey.startKm}</p>
-              </div>
-              <div className="rounded-xl border bg-muted/50 p-3 text-center">
+              <div className="rounded-xl bg-muted p-3 text-center">
+                <Timer className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
                 <p className="text-xs text-muted-foreground">Tempo Total</p>
-                <p className="font-mono text-xl font-bold">
-                  {formatTime(displayTimes.total)}
+                <p className="font-bold">{formatTime(displayTimes.total)}</p>
+              </div>
+              <div className="rounded-xl bg-green-50 p-3 text-center">
+                <Car className="h-5 w-5 mx-auto text-green-600 mb-1" />
+                <p className="text-xs text-muted-foreground">Direcao</p>
+                <p className="font-bold text-green-700">
+                  {formatTime(displayTimes.driving)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-amber-50 p-3 text-center">
+                <Coffee className="h-5 w-5 mx-auto text-amber-600 mb-1" />
+                <p className="text-xs text-muted-foreground">Descanso</p>
+                <p className="font-bold text-amber-700">
+                  {formatTime(displayTimes.rest)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-orange-50 p-3 text-center">
+                <Utensils className="h-5 w-5 mx-auto text-orange-600 mb-1" />
+                <p className="text-xs text-muted-foreground">Refeicao</p>
+                <p className="font-bold text-orange-700">
+                  {formatTime(displayTimes.meal)}
                 </p>
               </div>
             </div>
 
-            {/* KM Final Input */}
+            {/* End KM Input */}
             <div className="space-y-2">
               <Label
                 htmlFor="endKm"
@@ -1407,31 +1734,25 @@ export function DriverJourneyView() {
                 onChange={(e) => setEndKm(e.target.value)}
                 className="h-14 text-lg"
               />
+              {endKm && Number(endKm) > Number(journey.startKm) && (
+                <p className="text-sm text-green-600 flex items-center gap-1">
+                  <Route className="h-4 w-4" />
+                  Distancia percorrida: {calculateDistance()} km
+                </p>
+              )}
             </div>
-
-            {/* Distance Calculated */}
-            {endKm && (
-              <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-green-700">Distancia Percorrida</span>
-                  <span className="text-2xl font-bold text-green-700">
-                    {calculateDistance()} km
-                  </span>
-                </div>
-              </div>
-            )}
 
             {/* Observations */}
             <div className="space-y-2">
               <Label htmlFor="observations" className="text-sm">
-                Observacoes (Opcional)
+                Observacoes (opcional)
               </Label>
               <Textarea
                 id="observations"
-                placeholder="Registre ocorrencias ou observacoes..."
+                placeholder="Adicione observacoes sobre a viagem..."
                 value={observations}
                 onChange={(e) => setObservations(e.target.value)}
-                rows={3}
+                className="min-h-[100px]"
               />
             </div>
 
@@ -1446,102 +1767,81 @@ export function DriverJourneyView() {
                 Voltar
               </Button>
               <Button
-                className="flex-1 h-14 bg-red-500 hover:bg-red-600 text-base font-semibold active:scale-95 transition-transform"
-                disabled={!endKm}
+                className="flex-1 h-14 bg-primary text-base font-semibold active:scale-95 transition-transform"
+                disabled={!endKm || Number(endKm) <= Number(journey.startKm)}
                 onClick={handleConfirmCheckout}
               >
-                <StopCircle className="mr-2 h-5 w-5" />
-                CONFIRMAR
+                <CheckCircle2 className="mr-2 h-5 w-5" />
+                Confirmar
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Summary Dialog */}
+        {/* Summary Confirmation Dialog */}
         <Dialog open={showSummaryDialog} onOpenChange={setShowSummaryDialog}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-green-600">
                 <CheckCircle2 className="h-5 w-5" />
-                Jornada Finalizada!
+                Confirmar Finalizacao
               </DialogTitle>
+              <DialogDescription>
+                Revise os dados da jornada antes de finalizar
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="rounded-xl border p-4">
-                <h4 className="mb-3 font-medium text-sm">Resumo da Jornada</h4>
-                <div className="grid gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Data</span>
-                    <span className="font-medium">
-                      {journey.startTime
-                        ? new Date(journey.startTime).toLocaleDateString(
-                            "pt-BR",
-                          )
-                        : "-"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Horario</span>
-                    <span className="font-medium">
-                      {journeyStartTimeDisplay} -{" "}
-                      {new Date().toLocaleTimeString("pt-BR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Tempo de Direcao
-                    </span>
-                    <span className="font-mono font-medium">
-                      {formatTime(displayTimes.driving)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Tempo de Descanso
-                    </span>
-                    <span className="font-mono font-medium">
-                      {formatTime(displayTimes.rest)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Tempo de Refeicao
-                    </span>
-                    <span className="font-mono font-medium">
-                      {formatTime(displayTimes.meal)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-t pt-2">
-                    <span className="font-medium">Distancia Total</span>
-                    <span className="font-bold text-green-600">
-                      {calculateDistance()} km
-                    </span>
-                  </div>
+            <div className="py-4 space-y-4">
+              <div className="rounded-xl bg-green-50 p-4 text-center">
+                <p className="text-3xl font-bold text-green-700">
+                  {calculateDistance()} km
+                </p>
+                <p className="text-sm text-green-600">Distancia Percorrida</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground">KM Inicial</p>
+                  <p className="font-semibold">{journey.startKm}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground">KM Final</p>
+                  <p className="font-semibold">{endKm}</p>
                 </div>
               </div>
+              <div className="rounded-lg border p-3 text-sm">
+                <p className="text-muted-foreground">Tempo Total</p>
+                <p className="font-semibold">
+                  {formatTime(displayTimes.total)}
+                </p>
+              </div>
               {observations && (
-                <div className="rounded-xl border p-4">
-                  <h4 className="mb-2 font-medium text-sm">Observacoes</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {observations}
-                  </p>
+                <div className="rounded-lg border p-3 text-sm">
+                  <p className="text-muted-foreground">Observacoes</p>
+                  <p className="font-medium">{observations}</p>
                 </div>
               )}
             </div>
-            <Button
-              className="w-full h-12 active:scale-95 transition-transform"
-              onClick={handleFinishJourney}
-            >
-              Concluir
-            </Button>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowSummaryDialog(false)}
+                className="flex-1 sm:flex-none bg-transparent"
+              >
+                Revisar
+              </Button>
+              <Button
+                className="flex-1 sm:flex-none bg-green-500 hover:bg-green-600"
+                onClick={handleFinishJourney}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Finalizar Jornada
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
     );
   }
 
+  // Fallback
   return null;
 }

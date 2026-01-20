@@ -1,5 +1,3 @@
-// API Service - Conexão Real com Backend NestJS e Adapters
-
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
@@ -586,3 +584,85 @@ export async function listarFuncionariosAPI() {
 
   return response.json();
 }
+
+// --- MÓDULO: JORNADA ---
+
+export async function iniciarJornadaAPI(dados: {
+  driverId: number;
+  vehicleId: number;
+  startLocation: string;
+  startOdometer: number;
+  checklist: any;
+}) {
+  const response = await fetch(`${API_BASE_URL}/journeys`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return handleResponse(response);
+}
+
+export async function buscarJornadaAtivaAPI(motoristaId: number | string) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/journeys/active/${motoristaId}`,
+      {
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+
+    // Se não encontrar jornada ativa (retorno vazio ou 404), retornamos null
+    if (!response.ok) return null;
+
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Erro ao buscar jornada ativa:", error);
+    return null;
+  }
+}
+
+export async function registrarEventoJornadaAPI(dados: {
+  journeyId: number;
+  type: string;
+  location?: string;
+}) {
+  // types: 'start_rest', 'end_rest', 'start_meal', 'end_meal', etc.
+  const response = await fetch(`${API_BASE_URL}/journeys/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return handleResponse(response);
+}
+
+export async function finalizarJornadaAPI(
+  journeyId: number,
+  dados: {
+    endLocation: string;
+    endOdometer: number;
+    checklist: any;
+  },
+) {
+  const response = await fetch(`${API_BASE_URL}/journeys/${journeyId}/finish`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return handleResponse(response);
+}
+
+// Função utilitária para retornar mensagem padrão quando não houver dados
+export function naoTiver(dado: any, mensagem = "NÃO TIVER") {
+  if (
+    dado === undefined ||
+    dado === null ||
+    (Array.isArray(dado) && dado.length === 0) ||
+    (typeof dado === "string" && dado.trim() === "")
+  ) {
+    return mensagem;
+  }
+  return dado;
+}
+// API Service - Conexão Real com Backend NestJS e Adapters
