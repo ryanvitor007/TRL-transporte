@@ -2,9 +2,11 @@ import type React from "react";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { ThemeProvider } from "@/components/theme-provider";
 import { AppProvider } from "@/contexts/app-context";
 import { NotificationProvider } from "@/contexts/notification-context";
 import { AuthProvider } from "@/contexts/auth-context";
+import { JourneyProvider } from "@/contexts/journey-context";
 import "./globals.css";
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -43,13 +45,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        <AuthProvider>
-          <AppProvider>
-            <NotificationProvider>{children}</NotificationProvider>
-          </AppProvider>
-        </AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <JourneyProvider>
+              <AppProvider>
+                <NotificationProvider>{children}</NotificationProvider>
+              </AppProvider>
+            </JourneyProvider>
+          </AuthProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

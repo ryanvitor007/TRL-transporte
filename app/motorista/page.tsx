@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { useJourney } from "@/contexts/journey-context";
 import { DriverSidebar } from "@/components/driver-sidebar";
 import { DriverTopBar } from "@/components/driver-top-bar";
 import { DriverMobileNav } from "@/components/driver-mobile-nav";
@@ -11,15 +12,22 @@ import { DriverMaintenanceView } from "@/components/driver-maintenance-view";
 import { DriverIncidentsView } from "@/components/driver-incidents-view";
 import { DriverJourneyView } from "@/components/driver-journey-view";
 import { DriverProfileView } from "@/components/driver-profile-view";
+import { ActiveJourneyWidget } from "@/components/active-journey-widget";
 import { LoaderTRL } from "@/components/ui/custom-loader";
 import { useMobile } from "@/hooks/use-mobile";
 
 export default function DriverDashboard() {
   const [activeView, setActiveView] = useState("journey");
   const { isAuthenticated, user } = useAuth();
+  const { journey } = useJourney();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const isMobile = useMobile();
+
+  // Navigate to journey view
+  const navigateToJourney = useCallback(() => {
+    setActiveView("journey");
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -59,6 +67,12 @@ export default function DriverDashboard() {
     }
   };
 
+  // Check if we should show the journey widget (journey active but not on journey view)
+  const showJourneyWidget =
+    journey.isActive &&
+    ["on_journey", "resting", "meal"].includes(journey.status) &&
+    activeView !== "journey";
+
   // Mobile Layout
   if (isMobile) {
     return (
@@ -74,6 +88,13 @@ export default function DriverDashboard() {
             Ola, {user?.name?.split(" ")[0] || "Motorista"}
           </div>
         </header>
+
+        {/* Active Journey Widget (sticky below header) */}
+        {showJourneyWidget && (
+          <div className="sticky top-[57px] z-30 bg-background/95 backdrop-blur border-b border-border p-3">
+            <ActiveJourneyWidget onNavigateToJourney={navigateToJourney} />
+          </div>
+        )}
 
         {/* Main Content - with bottom padding for nav */}
         <main className="flex-1 overflow-auto p-4 pb-24">{renderView()}</main>
@@ -91,6 +112,12 @@ export default function DriverDashboard() {
       <div className="flex flex-1 flex-col">
         <DriverTopBar />
         <main className="flex-1 overflow-auto bg-background p-4 pt-6 lg:p-8 lg:pt-8 max-h-[calc(100vh-57px)]">
+          {/* Active Journey Widget (top of content area) */}
+          {showJourneyWidget && (
+            <div className="mb-6">
+              <ActiveJourneyWidget onNavigateToJourney={navigateToJourney} />
+            </div>
+          )}
           {renderView()}
         </main>
       </div>
