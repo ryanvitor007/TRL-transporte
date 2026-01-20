@@ -9,7 +9,7 @@ import {
   buscarFrotaAPI,
   excluirVeiculoAPI,
 } from "@/lib/api-service";
-import { useToastNotification } from "@/contexts/toast-context";
+import { useToastNotification } from "@/contexts/notification-context";
 import {
   Table,
   TableBody,
@@ -188,13 +188,13 @@ export function FleetView() {
 
         toast.success(
           "Veículo Excluído",
-          `O veículo ${vehicleToDelete.placa} e todos os seus dados foram removidos.`
+          `O veículo ${vehicleToDelete.placa} e todos os seus dados foram removidos.`,
         );
       } catch (error) {
         console.error("Erro ao excluir:", error);
         toast.error(
           "Erro na Exclusão",
-          "Não foi possível remover o veículo do banco de dados."
+          "Não foi possível remover o veículo do banco de dados.",
         );
       } finally {
         // 3. Fecha o modal de qualquer jeito
@@ -247,7 +247,7 @@ export function FleetView() {
     if (!searchPlate.trim()) {
       toast.error(
         "Placa obrigatória",
-        "Digite a placa do veículo para buscar."
+        "Digite a placa do veículo para buscar.",
       );
       return;
     }
@@ -272,13 +272,13 @@ export function FleetView() {
       setShowForm(true);
       toast.success(
         "Veículo encontrado!",
-        `Dados do ${dadosVeiculo.marca_modelo} carregados com sucesso.`
+        `Dados do ${dadosVeiculo.marca_modelo} carregados com sucesso.`,
       );
     } catch (error) {
       console.error(error);
       toast.error(
         "Erro na busca",
-        "Não foi possível encontrar o veículo. Preencha manualmente."
+        "Não foi possível encontrar o veículo. Preencha manualmente.",
       );
       setNewVehicle({
         placa: searchPlate,
@@ -301,7 +301,7 @@ export function FleetView() {
     if (!newVehicle.placa || !newVehicle.modelo || !newVehicle.ano) {
       toast.error(
         "Campos Obrigatórios",
-        "Por favor, preencha Placa, Modelo e Ano."
+        "Por favor, preencha Placa, Modelo e Ano.",
       );
       return;
     }
@@ -326,7 +326,7 @@ export function FleetView() {
 
       toast.success(
         "Veículo Cadastrado",
-        `${novoCarro.modelo} adicionado à frota!`
+        `${novoCarro.modelo} adicionado à frota!`,
       );
       handleCloseModal();
     } catch (error: any) {
@@ -388,16 +388,16 @@ export function FleetView() {
         setUploadedFile(file);
         toast.success(
           "Arquivo carregado",
-          `${file.name} pronto para processamento.`
+          `${file.name} pronto para processamento.`,
         );
       } else {
         toast.error(
           "Formato inválido",
-          "Por favor, envie um arquivo CSV ou PDF."
+          "Por favor, envie um arquivo CSV ou PDF.",
         );
       }
     },
-    [toast]
+    [toast],
   );
 
   const handleFileInput = useCallback(
@@ -413,16 +413,16 @@ export function FleetView() {
         setUploadedFile(file);
         toast.success(
           "Arquivo carregado",
-          `${file.name} pronto para processamento.`
+          `${file.name} pronto para processamento.`,
         );
       } else if (file) {
         toast.error(
           "Formato inválido",
-          "Por favor, envie um arquivo CSV ou PDF."
+          "Por favor, envie um arquivo CSV ou PDF.",
         );
       }
     },
-    [toast]
+    [toast],
   );
 
   const handleProcessFile = useCallback(async () => {
@@ -438,13 +438,13 @@ export function FleetView() {
         if (count > 0) {
           toast.success(
             "Importação Concluída",
-            `Extrato de ${metadata.referencePeriod} processado com sucesso.`
+            `Extrato de ${metadata.referencePeriod} processado com sucesso.`,
           );
         } else {
           // CORREÇÃO: Trocado de .warning para .error (com título de Atenção)
           toast.error(
             "Atenção",
-            "Nenhuma placa correspondente encontrada no arquivo."
+            "Nenhuma placa correspondente encontrada no arquivo.",
           );
         }
       } catch (error) {
@@ -837,7 +837,9 @@ export function FleetView() {
                   <TableHead>Modelo</TableHead>
                   <TableHead>Placa</TableHead>
                   {/* CORREÇÃO: Coluna Km Atual Restaurada */}
-                  <TableHead className="hidden md:table-cell">Km Atual</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    Km Atual
+                  </TableHead>
                   <TableHead className="hidden md:table-cell">Ano</TableHead>
                   <TableHead className="hidden md:table-cell">Status</TableHead>
                   {/* Alinhamento corrigido à direita */}
@@ -846,49 +848,49 @@ export function FleetView() {
               </TableHeader>
 
               {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
-                <Dialog
-                  open={isDeleteModalOpen}
-                  onOpenChange={setIsDeleteModalOpen}
-                >
-                  <DialogContent className="sm:max-w-[400px]">
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2 text-red-600">
-                        <AlertTriangle className="h-5 w-5" />
-                        Confirmar Exclusão
-                      </DialogTitle>
-                    </DialogHeader>
+              <Dialog
+                open={isDeleteModalOpen}
+                onOpenChange={setIsDeleteModalOpen}
+              >
+                <DialogContent className="sm:max-w-[400px]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-red-600">
+                      <AlertTriangle className="h-5 w-5" />
+                      Confirmar Exclusão
+                    </DialogTitle>
+                  </DialogHeader>
 
-                    <div className="py-4">
-                      <p className="text-sm text-muted-foreground">
-                        Você tem certeza que deseja excluir o veículo{" "}
-                        <span className="font-bold text-foreground">
-                          {vehicleToDelete?.modelo} ({vehicleToDelete?.placa})
-                        </span>
-                        ?
-                      </p>
-                      <p className="mt-2 text-xs text-red-500 font-medium">
-                        Esta ação não pode ser desfeita e removerá todos os
-                        dados associados.
-                      </p>
-                    </div>
+                  <div className="py-4">
+                    <p className="text-sm text-muted-foreground">
+                      Você tem certeza que deseja excluir o veículo{" "}
+                      <span className="font-bold text-foreground">
+                        {vehicleToDelete?.modelo} ({vehicleToDelete?.placa})
+                      </span>
+                      ?
+                    </p>
+                    <p className="mt-2 text-xs text-red-500 font-medium">
+                      Esta ação não pode ser desfeita e removerá todos os dados
+                      associados.
+                    </p>
+                  </div>
 
-                    <div className="flex justify-end gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsDeleteModalOpen(false)}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={confirmDelete}
-                        className="bg-red-600 hover:bg-red-700"
-                      >
-                        Excluir Veículo
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                  <div className="flex justify-end gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsDeleteModalOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={confirmDelete}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Excluir Veículo
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               <TableBody>
                 {filteredVehicles.map((vehicle) => (
@@ -909,29 +911,34 @@ export function FleetView() {
                       </div>
                     </TableCell>
                     <TableCell>{vehicle.placa}</TableCell>
-                    
+
                     {/* CORREÇÃO: Célula de Km Atual inserida para alinhar as colunas */}
                     <TableCell className="hidden md:table-cell">
-                      {vehicle.km_atual ? vehicle.km_atual.toLocaleString() : 0} km
+                      {vehicle.km_atual ? vehicle.km_atual.toLocaleString() : 0}{" "}
+                      km
                     </TableCell>
 
-                    <TableCell className="hidden md:table-cell">{vehicle.ano}</TableCell>
-                    
+                    <TableCell className="hidden md:table-cell">
+                      {vehicle.ano}
+                    </TableCell>
+
                     <TableCell className="hidden md:table-cell">
                       <Badge
-                        variant={vehicle.status === "Ativo" ? "default" : "secondary"}
+                        variant={
+                          vehicle.status === "Ativo" ? "default" : "secondary"
+                        }
                         className={
                           vehicle.status === "Ativo"
                             ? "bg-green-600 hover:bg-green-700"
                             : vehicle.status === "Em Oficina"
-                            ? "bg-yellow-600 hover:bg-yellow-700"
-                            : "bg-red-600 hover:bg-red-700"
+                              ? "bg-yellow-600 hover:bg-yellow-700"
+                              : "bg-red-600 hover:bg-red-700"
                         }
                       >
                         {vehicle.status}
                       </Badge>
                     </TableCell>
-                    
+
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
@@ -1051,7 +1058,7 @@ export function FleetView() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm">Licenciamento</span>
                           {getStatusBadge(
-                            vehicleDocuments.licenciamento.status
+                            vehicleDocuments.licenciamento.status,
                           )}
                         </div>
                         <div className="flex items-center justify-between">
@@ -1124,7 +1131,7 @@ export function FleetView() {
                             R${" "}
                             {vehicleDocuments.ipva.valor.toLocaleString(
                               "pt-BR",
-                              { minimumFractionDigits: 2 }
+                              { minimumFractionDigits: 2 },
                             )}
                           </p>
                         </div>
@@ -1143,7 +1150,7 @@ export function FleetView() {
                           </p>
                           <p className="text-lg font-medium">
                             {new Date(
-                              vehicleDocuments.ipva.vencimento
+                              vehicleDocuments.ipva.vencimento,
                             ).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
@@ -1187,7 +1194,7 @@ export function FleetView() {
                           </p>
                           <p className="font-medium">
                             {new Date(
-                              vehicleDocuments.crlvExpiry
+                              vehicleDocuments.crlvExpiry,
                             ).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
@@ -1196,7 +1203,7 @@ export function FleetView() {
                             Status
                           </p>
                           {getStatusBadge(
-                            vehicleDocuments.licenciamento.status
+                            vehicleDocuments.licenciamento.status,
                           )}
                         </div>
                       </div>
@@ -1207,7 +1214,7 @@ export function FleetView() {
                             R${" "}
                             {vehicleDocuments.licenciamento.valor.toLocaleString(
                               "pt-BR",
-                              { minimumFractionDigits: 2 }
+                              { minimumFractionDigits: 2 },
                             )}
                           </p>
                         </div>
@@ -1217,7 +1224,7 @@ export function FleetView() {
                           </p>
                           <p className="font-medium">
                             {new Date(
-                              vehicleDocuments.licenciamento.vencimento
+                              vehicleDocuments.licenciamento.vencimento,
                             ).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
@@ -1274,7 +1281,7 @@ export function FleetView() {
                           <p className="text-xl font-bold">
                             R${" "}
                             {vehicleDocuments.seguro.cobertura.toLocaleString(
-                              "pt-BR"
+                              "pt-BR",
                             )}
                           </p>
                         </div>
@@ -1284,7 +1291,7 @@ export function FleetView() {
                           </p>
                           <p className="font-medium">
                             {new Date(
-                              vehicleDocuments.seguro.vigenciaInicio
+                              vehicleDocuments.seguro.vigenciaInicio,
                             ).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
@@ -1294,7 +1301,7 @@ export function FleetView() {
                           </p>
                           <p className="font-medium">
                             {new Date(
-                              vehicleDocuments.seguro.vigenciaFim
+                              vehicleDocuments.seguro.vigenciaFim,
                             ).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
@@ -1405,7 +1412,7 @@ export function FleetView() {
                                   <p className="text-lg font-medium">
                                     R${" "}
                                     {Number(dadosAtuais.monthlySpend).toFixed(
-                                      2
+                                      2,
                                     )}
                                   </p>
                                 </div>
@@ -1416,7 +1423,7 @@ export function FleetView() {
                                   <div className="flex flex-col">
                                     <span className="font-medium">
                                       {new Date(
-                                        dadosAtuais.lastUpdate
+                                        dadosAtuais.lastUpdate,
                                       ).toLocaleDateString("pt-BR")}
                                     </span>
                                     <span className="text-xs text-muted-foreground">
@@ -1490,7 +1497,7 @@ export function FleetView() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="mt-2"
+                                    className="mt-2 bg-transparent"
                                     onClick={() =>
                                       fileInputRef.current?.click()
                                     }

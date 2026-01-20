@@ -1,15 +1,22 @@
-"use client"
+"use client";
 
-import { useApp } from "@/contexts/app-context"
-import { useAuth } from "@/contexts/auth-context"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
-import { Building2, MapPin, LogOut, User } from "lucide-react"
-import { branches } from "@/lib/mock-data"
+import { useApp } from "@/contexts/app-context";
+import { useAuth } from "@/contexts/auth-context";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Building2, MapPin, LogOut, User } from "lucide-react";
+import { branches } from "@/lib/mock-data";
+import { NotificationCenter } from "@/components/notification-center";
 
 export function TopBar() {
-  const { selectedBranch, setSelectedBranch } = useApp()
-  const { user, logout } = useAuth()
+  const { selectedBranch, setSelectedBranch } = useApp();
+  const { user, logout } = useAuth();
 
   return (
     <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 lg:px-6">
@@ -19,7 +26,12 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-4">
-        <Select value={selectedBranch} onValueChange={(value) => setSelectedBranch(value as typeof selectedBranch)}>
+        <Select
+          value={selectedBranch}
+          onValueChange={(value) =>
+            setSelectedBranch(value as typeof selectedBranch)
+          }
+        >
           <SelectTrigger className="w-[180px]">
             <MapPin className="mr-2 h-4 w-4" />
             <SelectValue placeholder="Selecione a filial" />
@@ -35,9 +47,14 @@ export function TopBar() {
         </Select>
 
         <div className="flex items-center gap-3 border-l border-border pl-4">
+          {/* Notification Center */}
+          <NotificationCenter />
+
           <div className="hidden sm:flex items-center gap-2 text-sm">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span className="text-foreground font-medium">{user?.name || "Usuário"}</span>
+            <span className="text-foreground font-medium">
+              {user?.name || "Usuário"}
+            </span>
           </div>
           <Button
             variant="outline"
@@ -51,5 +68,5 @@ export function TopBar() {
         </div>
       </div>
     </div>
-  )
+  );
 }

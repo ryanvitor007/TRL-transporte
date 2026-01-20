@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToastNotification } from "@/contexts/toast-context";
+import { useToastNotification } from "@/contexts/notification-context";
 import { useAuth } from "@/contexts/auth-context";
 import Image from "next/image";
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
     if (password.length < 6) {
       toast.error(
         "Erro de Validação",
-        "A senha deve ter pelo menos 6 caracteres."
+        "A senha deve ter pelo menos 6 caracteres.",
       );
       return;
     }

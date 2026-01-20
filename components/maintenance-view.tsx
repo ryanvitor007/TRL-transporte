@@ -54,7 +54,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { useToastNotification } from "@/contexts/toast-context";
+import { useToastNotification } from "@/contexts/notification-context";
 // Importações da API
 import {
   buscarFrotaAPI,
@@ -196,7 +196,7 @@ export function MaintenanceView() {
   // Helper para achar o veículo selecionado no array de frota
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => String(v.id) === String(selectedVehicleId)),
-    [selectedVehicleId, vehicles]
+    [selectedVehicleId, vehicles],
   );
 
   // --- LÓGICA DE FILTRAGEM ---
@@ -255,16 +255,16 @@ export function MaintenanceView() {
   // --- KPIs ---
   const totalCostMonth = filteredMaintenances.reduce(
     (sum, m) => sum + Number(m.cost || 0),
-    0
+    0,
   );
   const scheduledCount = filteredMaintenances.filter((m) =>
-    m.status.includes("Agendad")
+    m.status.includes("Agendad"),
   ).length;
   const inProgressCount = filteredMaintenances.filter(
-    (m) => m.status === "Em Andamento"
+    (m) => m.status === "Em Andamento",
   ).length;
   const completedCount = filteredMaintenances.filter(
-    (m) => m.status === "Concluída" || m.status === "Concluído"
+    (m) => m.status === "Concluída" || m.status === "Concluído",
   ).length;
 
   // --- FORMATADORES DE INPUT (MÁSCARAS) ---
@@ -353,7 +353,7 @@ export function MaintenanceView() {
 
       const rawKm = newMaintenance.kmAtMaintenance
         ? Number(
-            newMaintenance.kmAtMaintenance.replace(/\./g, "").replace(",", ".")
+            newMaintenance.kmAtMaintenance.replace(/\./g, "").replace(",", "."),
           )
         : selectedVehicle?.km_atual || 0;
 
@@ -434,7 +434,7 @@ export function MaintenanceView() {
                 className={cn(
                   "gap-2",
                   isAnyFilterActive &&
-                    "border-primary text-primary bg-primary/5"
+                    "border-primary text-primary bg-primary/5",
                 )}
               >
                 <Filter className="h-4 w-4" />
@@ -726,7 +726,7 @@ export function MaintenanceView() {
                     >
                       <TableCell>
                         {new Date(
-                          maintenance.scheduled_date
+                          maintenance.scheduled_date,
                         ).toLocaleDateString("pt-BR")}
                       </TableCell>
                       <TableCell>
@@ -931,7 +931,7 @@ export function MaintenanceView() {
                   "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors hover:bg-muted/50",
                   uploadedFile
                     ? "border-green-500 bg-green-50/50"
-                    : "border-muted-foreground/25"
+                    : "border-muted-foreground/25",
                 )}
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={handleDragOver}
@@ -1034,7 +1034,7 @@ export function MaintenanceView() {
                   <p className="text-sm text-muted-foreground">Data</p>
                   <p className="font-medium">
                     {new Date(
-                      selectedMaintenance.scheduled_date
+                      selectedMaintenance.scheduled_date,
                     ).toLocaleDateString("pt-BR")}
                   </p>
                 </div>

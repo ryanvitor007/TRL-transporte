@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { buscarMultasAPI, buscarDocumentosAPI } from "@/lib/api-service";
-import { useToastNotification } from "@/contexts/toast-context";
+import { useToastNotification } from "@/contexts/notification-context";
 
 // --- INTERFACES (Atualizadas com vehicle_plate) ---
 interface FineFromAPI {
@@ -128,17 +128,17 @@ export function DocumentsView() {
   // KPIs
   const totalMultasValor = filteredFines.reduce(
     (acc, fine) => acc + Number(fine.amount),
-    0
+    0,
   );
   const multasVencidas = filteredFines.filter(
-    (f) => f.status === "Vencido"
+    (f) => f.status === "Vencido",
   ).length;
 
   const expiringDocs = documents.filter(
     (doc) =>
       doc.ipva_status === "Pendente" ||
       doc.licenciamento_status === "Vencendo" ||
-      doc.licenciamento_status === "Vencido"
+      doc.licenciamento_status === "Vencido",
   );
 
   return (
@@ -308,10 +308,10 @@ export function DocumentsView() {
                                 fine.status === "Pago"
                                   ? "bg-green-100 text-green-800 hover:bg-green-200"
                                   : fine.status === "Vencido"
-                                  ? "bg-red-100 text-red-800 hover:bg-red-200"
-                                  : fine.status === "Pendente"
-                                  ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
-                                  : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                                    ? "bg-red-100 text-red-800 hover:bg-red-200"
+                                    : fine.status === "Pendente"
+                                      ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                                      : "bg-blue-100 text-blue-800 hover:bg-blue-200"
                               }
                             >
                               {fine.status}
@@ -321,12 +321,12 @@ export function DocumentsView() {
                             <div className="flex flex-col">
                               <span>
                                 {new Date(
-                                  fine.infraction_date
+                                  fine.infraction_date,
                                 ).toLocaleDateString("pt-BR")}
                               </span>
                               <span className="text-xs text-muted-foreground">
                                 {new Date(
-                                  fine.infraction_date
+                                  fine.infraction_date,
                                 ).toLocaleTimeString("pt-BR", {
                                   hour: "2-digit",
                                   minute: "2-digit",
@@ -430,7 +430,7 @@ export function DocumentsView() {
                           <TableCell>
                             {doc.crlv_validade
                               ? new Date(doc.crlv_validade).toLocaleDateString(
-                                  "pt-BR"
+                                  "pt-BR",
                                 )
                               : "---"}
                           </TableCell>
@@ -528,7 +528,7 @@ export function DocumentsView() {
                         </p>
                         <p className="text-lg font-bold">
                           {new Date(
-                            selectedFine.infraction_date
+                            selectedFine.infraction_date,
                           ).toLocaleDateString("pt-BR")}
                         </p>
                       </div>
@@ -584,8 +584,8 @@ export function DocumentsView() {
                           selectedFine.status === "Pago"
                             ? "bg-green-100 text-green-800 hover:bg-green-100 px-3 py-1 text-base"
                             : selectedFine.status === "Vencido"
-                            ? "bg-red-100 text-red-800 hover:bg-red-100 px-3 py-1 text-base"
-                            : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100 px-3 py-1 text-base"
+                              ? "bg-red-100 text-red-800 hover:bg-red-100 px-3 py-1 text-base"
+                              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100 px-3 py-1 text-base"
                         }
                       >
                         {selectedFine.status}
@@ -638,7 +638,7 @@ export function DocumentsView() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="gap-2 h-12 text-base"
+                    className="gap-2 h-12 text-base bg-transparent"
                     onClick={() =>
                       window.open("https://www.detran.sp.gov.br", "_blank")
                     }
@@ -653,7 +653,7 @@ export function DocumentsView() {
                   onClick={() =>
                     window.open(
                       selectedFine.detranUrl || "https://www.detran.sp.gov.br",
-                      "_blank"
+                      "_blank",
                     )
                   }
                 >
@@ -750,7 +750,7 @@ export function DocumentsView() {
                         <p className="text-2xl font-bold tracking-tight">
                           {selectedDocument.ipva_vencimento
                             ? new Date(
-                                selectedDocument.ipva_vencimento
+                                selectedDocument.ipva_vencimento,
                               ).toLocaleDateString("pt-BR")
                             : "---"}
                         </p>
@@ -794,7 +794,7 @@ export function DocumentsView() {
                         <span className="text-xl font-bold">
                           R${" "}
                           {Number(
-                            selectedDocument.ipva_valor || 0
+                            selectedDocument.ipva_valor || 0,
                           ).toLocaleString("pt-BR", {
                             minimumFractionDigits: 2,
                           })}
@@ -841,7 +841,7 @@ export function DocumentsView() {
                           <Clock className="h-4 w-4" />
                           {selectedDocument.crlv_validade
                             ? new Date(
-                                selectedDocument.crlv_validade
+                                selectedDocument.crlv_validade,
                               ).toLocaleDateString("pt-BR")
                             : "---"}
                         </span>

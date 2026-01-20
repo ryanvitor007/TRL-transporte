@@ -1,6 +1,7 @@
 // API Service - Conexão Real com Backend NestJS e Adapters
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
 // --- INTERFACES DE TIPAGEM ---
 
@@ -80,11 +81,20 @@ export async function consultarDetranAPI(
   }
 }
 
-export async function consultarVeiculoAPI(placa: string, cpfCnpj?: string) {
-  console.warn(
-    "Atenção: Consulta direta por placa requer RENAVAM na API real.",
-  );
-  return { placa, marca_modelo: "Consulte via Detran para detalhes" };
+export async function consultarVeiculoAPI(placa: string) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/vehicles/consultar?placa=${placa}`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+    return handleResponse(response);
+  } catch (error) {
+    console.error("Erro ao consultar veículo:", error);
+    throw error;
+  }
 }
 
 // --- MÓDULO: FROTA / VEÍCULOS ---
@@ -534,7 +544,7 @@ export async function atualizarFuncionarioAPI(id: string | number, dados: any) {
     Object.assign(payload, { password: dados.password });
   }
 
-  const response = await fetch(`${API_BASE_URL}/employees/${id}`, { 
+  const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -556,11 +566,11 @@ export async function excluirFuncionarioAPI(id: string | number) {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
   });
-  
+
   if (!response.ok) {
     throw new Error(`Erro ao excluir: ${response.statusText}`);
   }
-  
+
   return response.json();
 }
 
@@ -569,10 +579,10 @@ export async function listarFuncionariosAPI() {
     method: "GET",
     headers: { "Content-Type": "application/json" },
   });
-  
+
   if (!response.ok) {
     throw new Error(`Erro ao listar: ${response.statusText}`);
   }
-  
+
   return response.json();
 }

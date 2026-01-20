@@ -50,8 +50,9 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  Asterisk as Steering,
 } from "lucide-react";
-import { useToastNotification } from "@/contexts/toast-context";
+import { useToastNotification } from "@/contexts/notification-context";
 import {
   cadastrarFuncionarioAPI,
   listarFuncionariosAPI,
@@ -84,7 +85,11 @@ const initialDriverForm = {
 
 export function SettingsView() {
   const toast = useToastNotification();
-  const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [activeModule, setActiveModule] = useState<"drivers" | "admins" | null>(
+    null,
+  );
+  const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false); // Declare the variable here
 
   const [driverForm, setDriverForm] = useState(initialDriverForm);
 
@@ -158,12 +163,8 @@ export function SettingsView() {
 
   const handleSubmitDriver = async () => {
     // Validação básica
-    if (
-      !driverForm.name ||
-      !driverForm.cpf ||
-      !driverForm.cnh ||
-      !driverForm.email
-    ) {
+    const isDriver = activeModule === "drivers";
+    if (!driverForm.name || !driverForm.cpf || !driverForm.email) {
       toast.error(
         "Erro de Validação",
         "Preencha todos os campos obrigatórios.",
@@ -171,17 +172,38 @@ export function SettingsView() {
       return;
     }
 
+    // Se for motorista, valida CNH
+    if (isDriver && !driverForm.cnh) {
+      toast.error("Erro de Validação", "CNH é obrigatória para motoristas.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      const payload = {
+        ...driverForm,
+        role: isDriver ? "Motorista" : "admin",
+      };
+
       if (editingDriverId) {
         // --- EDIÇÃO REAL ---
-        await atualizarFuncionarioAPI(editingDriverId, driverForm);
-        toast.success("Sucesso", "Motorista atualizado com sucesso!");
+        await atualizarFuncionarioAPI(editingDriverId, payload);
+        toast.success(
+          "Sucesso",
+          isDriver
+            ? "Motorista atualizado com sucesso!"
+            : "Administrador atualizado com sucesso!",
+        );
       } else {
         // --- CADASTRO REAL ---
-        await cadastrarFuncionarioAPI(driverForm);
-        toast.success("Sucesso", "Motorista cadastrado com sucesso!");
+        await cadastrarFuncionarioAPI(payload);
+        toast.success(
+          "Sucesso",
+          isDriver
+            ? "Motorista cadastrado com sucesso!"
+            : "Administrador cadastrado com sucesso!",
+        );
       }
 
       // --- CRÍTICO: Recarrega do banco para ter os IDs reais (numéricos) ---
@@ -190,10 +212,10 @@ export function SettingsView() {
       // Limpa tudo
       setDriverForm(initialDriverForm);
       setEditingDriverId(null);
-      setIsDriverDialogOpen(false);
+      setIsFormDialogOpen(false);
     } catch (error: any) {
       console.error(error);
-      toast.error("Erro", error.message || "Falha ao salvar motorista.");
+      toast.error("Erro", error.message || "Falha ao salvar funcionário.");
     } finally {
       setIsSubmitting(false);
     }
@@ -223,7 +245,7 @@ export function SettingsView() {
       role: driver.role || "Motorista",
     });
     setEditingDriverId(driver.id);
-    setIsDriverDialogOpen(true);
+    setIsDriverDialogOpen(true); // Use the declared variable here
   };
 
   const handleDeleteClick = (driverId: string | number) => {
@@ -283,657 +305,806 @@ export function SettingsView() {
         </p>
       </div>
 
-      <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Cadastro de Motoristas
-                </CardTitle>
-                <CardDescription>
-                  Gerencie os motoristas da frota
-                </CardDescription>
-              </div>
-              <Dialog
-                open={isDriverDialogOpen}
-                onOpenChange={setIsDriverDialogOpen}
-              >
-                <DialogTrigger asChild>
-                  <Button
-                    className="bg-primary hover:bg-primary/90"
-                    onClick={() => {
-                      setDriverForm(initialDriverForm);
-                      setEditingDriverId(null);
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Novo Motorista
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingDriverId
-                        ? "Editar Motorista"
-                        : "Cadastrar Novo Motorista"}
-                    </DialogTitle>
-                    <DialogDescription>
-                      {editingDriverId
-                        ? "Atualize os dados do motorista"
-                        : "Preencha os dados para cadastrar um novo motorista"}
-                    </DialogDescription>
-                  </DialogHeader>
+      {/* Action Module Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Card: Gestão de Motoristas */}
+        <button
+          onClick={() => {
+            setActiveModule(activeModule === "drivers" ? null : "drivers");
+            setEditingDriverId(null);
+            setDriverForm(initialDriverForm);
+          }}
+          className={`relative group overflow-hidden rounded-lg border-2 transition-all duration-300 ${
+            activeModule === "drivers"
+              ? "border-blue-500 bg-blue-50 shadow-lg scale-105"
+              : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-md"
+          }`}
+        >
+          <div className="p-8 flex flex-col items-center justify-center gap-4">
+            <div
+              className={`p-4 rounded-full transition-colors duration-300 ${
+                activeModule === "drivers"
+                  ? "bg-blue-200"
+                  : "bg-blue-100 group-hover:bg-blue-150"
+              }`}
+            >
+              <Steering className="h-8 w-8 text-blue-600" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-foreground">
+                Gestão de Motoristas
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Gerenciar motoristas da frota
+              </p>
+            </div>
+          </div>
+          {activeModule === "drivers" && (
+            <div className="absolute inset-0 border-2 border-blue-500 rounded-lg pointer-events-none" />
+          )}
+        </button>
 
-                  <div className="grid gap-6 py-4">
-                    {/* Dados Pessoais */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-foreground border-b pb-2">
-                        Dados Pessoais
-                      </h3>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="name">
-                            Nome Completo{" "}
-                            <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            id="name"
-                            placeholder="Ex: João da Silva"
-                            value={driverForm.name}
-                            onChange={(e) =>
-                              handleInputChange("name", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="cpf">
-                            CPF <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            id="cpf"
-                            placeholder="000.000.000-00"
-                            value={driverForm.cpf}
-                            onChange={(e) =>
-                              handleInputChange("cpf", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="rg">RG</Label>
-                          <Input
-                            id="rg"
-                            placeholder="00.000.000-0"
-                            value={driverForm.rg}
-                            onChange={(e) =>
-                              handleInputChange("rg", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="birthDate">Data de Nascimento</Label>
-                          <Input
-                            id="birthDate"
-                            type="date"
-                            value={driverForm.birthDate}
-                            onChange={(e) =>
-                              handleInputChange("birthDate", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="phone">Telefone</Label>
-                          <Input
-                            id="phone"
-                            placeholder="(00) 00000-0000"
-                            value={driverForm.phone}
-                            onChange={(e) =>
-                              handleInputChange("phone", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">
-                          E-mail <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="motorista@trl.com"
-                          value={driverForm.email}
-                          onChange={(e) =>
-                            handleInputChange("email", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
+        {/* Card: Gestão de Administradores */}
+        <button
+          onClick={() => {
+            setActiveModule(activeModule === "admins" ? null : "admins");
+            setEditingDriverId(null);
+            setDriverForm(initialDriverForm);
+          }}
+          className={`relative group overflow-hidden rounded-lg border-2 transition-all duration-300 ${
+            activeModule === "admins"
+              ? "border-red-500 bg-red-50 shadow-lg scale-105"
+              : "border-gray-200 bg-white hover:border-red-300 hover:shadow-md"
+          }`}
+        >
+          <div className="p-8 flex flex-col items-center justify-center gap-4">
+            <div
+              className={`p-4 rounded-full transition-colors duration-300 ${
+                activeModule === "admins"
+                  ? "bg-red-200"
+                  : "bg-red-100 group-hover:bg-red-150"
+              }`}
+            >
+              <Shield className="h-8 w-8 text-red-600" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-foreground">
+                Gestão de Administradores
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Gerenciar administradores do sistema
+              </p>
+            </div>
+          </div>
+          {activeModule === "admins" && (
+            <div className="absolute inset-0 border-2 border-red-500 rounded-lg pointer-events-none" />
+          )}
+        </button>
+      </div>
 
-                    {/* Endereço */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-foreground border-b pb-2">
-                        Endereço
-                      </h3>
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <div className="md:col-span-2 space-y-2">
-                          <Label htmlFor="address">Endereço</Label>
-                          <Input
-                            id="address"
-                            placeholder="Rua, número, complemento"
-                            value={driverForm.address}
-                            onChange={(e) =>
-                              handleInputChange("address", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="zipCode">CEP</Label>
-                          <Input
-                            id="zipCode"
-                            placeholder="00000-000"
-                            value={driverForm.zipCode}
-                            onChange={(e) =>
-                              handleInputChange("zipCode", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="city">Cidade</Label>
-                          <Input
-                            id="city"
-                            placeholder="São Paulo"
-                            value={driverForm.city}
-                            onChange={(e) =>
-                              handleInputChange("city", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="state">Estado</Label>
-                          <Select
-                            value={driverForm.state}
-                            onValueChange={(v) => handleInputChange("state", v)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SP">São Paulo</SelectItem>
-                              <SelectItem value="PE">Pernambuco</SelectItem>
-                              <SelectItem value="PI">Piauí</SelectItem>
-                              <SelectItem value="RJ">Rio de Janeiro</SelectItem>
-                              <SelectItem value="MG">Minas Gerais</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
+      {/* Conditional Content - Smooth Transitions */}
+      {activeModule && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    {activeModule === "drivers" ? (
+                      <>
+                        <Steering className="h-5 w-5" />
+                        Cadastro de Motoristas
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="h-5 w-5" />
+                        Cadastro de Administradores
+                      </>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    {activeModule === "drivers"
+                      ? "Gerencie os motoristas da frota"
+                      : "Gerencie os administradores do sistema"}
+                  </CardDescription>
+                </div>
+                <Dialog
+                  open={isFormDialogOpen}
+                  onOpenChange={setIsFormDialogOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      className={
+                        activeModule === "drivers"
+                          ? "bg-blue-600 hover:bg-blue-700"
+                          : "bg-red-600 hover:bg-red-700"
+                      }
+                      onClick={() => {
+                        setDriverForm(initialDriverForm);
+                        setEditingDriverId(null);
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      {activeModule === "drivers"
+                        ? "Novo Motorista"
+                        : "Novo Admin"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingDriverId
+                          ? activeModule === "drivers"
+                            ? "Editar Motorista"
+                            : "Editar Administrador"
+                          : activeModule === "drivers"
+                            ? "Cadastrar Novo Motorista"
+                            : "Cadastrar Novo Administrador"}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {editingDriverId
+                          ? "Atualize os dados"
+                          : "Preencha os dados para cadastrar"}
+                      </DialogDescription>
+                    </DialogHeader>
 
-                    {/* Documentação */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-foreground border-b pb-2">
-                        Documentação
-                      </h3>
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="cnh">
-                            Número da CNH{" "}
-                            <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            id="cnh"
-                            placeholder="00000000000"
-                            value={driverForm.cnh}
-                            onChange={(e) =>
-                              handleInputChange("cnh", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="cnhCategory">Categoria</Label>
-                          <Select
-                            value={driverForm.cnhCategory}
-                            onValueChange={(v) =>
-                              handleInputChange("cnhCategory", v)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="A">A</SelectItem>
-                              <SelectItem value="B">B</SelectItem>
-                              <SelectItem value="C">C</SelectItem>
-                              <SelectItem value="D">D</SelectItem>
-                              <SelectItem value="E">E</SelectItem>
-                              <SelectItem value="AB">AB</SelectItem>
-                              <SelectItem value="AC">AC</SelectItem>
-                              <SelectItem value="AD">AD</SelectItem>
-                              <SelectItem value="AE">AE</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="cnhExpiry">Validade CNH</Label>
-                          <Input
-                            id="cnhExpiry"
-                            type="date"
-                            value={driverForm.cnhExpiry}
-                            onChange={(e) =>
-                              handleInputChange("cnhExpiry", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <Label>MOPP (Produtos Perigosos)</Label>
-                            <p className="text-sm text-muted-foreground">
-                              Habilitação para transporte de cargas perigosas
-                            </p>
-                          </div>
-                          <Switch
-                            checked={driverForm.mopp}
-                            onCheckedChange={(checked) =>
-                              handleInputChange("mopp", checked)
-                            }
-                          />
-                        </div>
-                        {driverForm.mopp && (
-                          <div className="space-y-2">
-                            <Label htmlFor="moppExpiry">Validade MOPP</Label>
-                            <Input
-                              id="moppExpiry"
-                              type="date"
-                              value={driverForm.moppExpiry}
-                              onChange={(e) =>
-                                handleInputChange("moppExpiry", e.target.value)
-                              }
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Dados de Contratação */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-foreground border-b pb-2">
-                        Dados de Contratação
-                      </h3>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="admissionDate">
-                            Data de Admissão
-                          </Label>
-                          <Input
-                            id="admissionDate"
-                            type="date"
-                            value={driverForm.admissionDate}
-                            onChange={(e) =>
-                              handleInputChange("admissionDate", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="branch">Filial</Label>
-                          <Select
-                            value={driverForm.branch}
-                            onValueChange={(v) =>
-                              handleInputChange("branch", v)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione a filial" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="São Paulo">
-                                São Paulo (Matriz)
-                              </SelectItem>
-                              <SelectItem value="Recife">Recife</SelectItem>
-                              <SelectItem value="Piauí">Piauí</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Acesso ao Sistema */}
-                    {!editingDriverId && (
+                    <div className="grid gap-6 py-4">
+                      {/* Dados Pessoais */}
                       <div className="space-y-4">
                         <h3 className="font-semibold text-foreground border-b pb-2">
-                          Acesso ao Sistema
+                          Dados Pessoais
                         </h3>
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">
-                            <Label htmlFor="password">Senha Inicial</Label>
-                            <div className="relative">
-                              <Input
-                                id="password"
-                                type={showPassword ? "text" : "password"}
-                                placeholder="Mínimo 6 caracteres"
-                                value={driverForm.password}
-                                onChange={(e) =>
-                                  handleInputChange("password", e.target.value)
-                                }
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                              >
-                                {showPassword ? (
-                                  <EyeOff className="h-4 w-4" />
-                                ) : (
-                                  <Eye className="h-4 w-4" />
-                                )}
-                              </button>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              O motorista usará o e-mail e esta senha para
-                              acessar o sistema
-                            </p>
+                            <Label htmlFor="name">
+                              Nome Completo{" "}
+                              <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                              id="name"
+                              placeholder="Ex: João da Silva"
+                              value={driverForm.name}
+                              onChange={(e) =>
+                                handleInputChange("name", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="cpf">
+                              CPF <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                              id="cpf"
+                              placeholder="000.000.000-00"
+                              value={driverForm.cpf}
+                              onChange={(e) =>
+                                handleInputChange("cpf", e.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="rg">RG</Label>
+                            <Input
+                              id="rg"
+                              placeholder="00.000.000-0"
+                              value={driverForm.rg}
+                              onChange={(e) =>
+                                handleInputChange("rg", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="birthDate">
+                              Data de Nascimento
+                            </Label>
+                            <Input
+                              id="birthDate"
+                              type="date"
+                              value={driverForm.birthDate}
+                              onChange={(e) =>
+                                handleInputChange("birthDate", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="phone">Telefone</Label>
+                            <Input
+                              id="phone"
+                              placeholder="(00) 00000-0000"
+                              value={driverForm.phone}
+                              onChange={(e) =>
+                                handleInputChange("phone", e.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email">
+                            E-mail <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder={
+                              activeModule === "drivers"
+                                ? "motorista@trl.com"
+                                : "admin@trl.com"
+                            }
+                            value={driverForm.email}
+                            onChange={(e) =>
+                              handleInputChange("email", e.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      {/* Endereço */}
+                      <div className="space-y-4">
+                        <h3 className="font-semibold text-foreground border-b pb-2">
+                          Endereço
+                        </h3>
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <div className="md:col-span-2 space-y-2">
+                            <Label htmlFor="address">Endereço</Label>
+                            <Input
+                              id="address"
+                              placeholder="Rua, número, complemento"
+                              value={driverForm.address}
+                              onChange={(e) =>
+                                handleInputChange("address", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="zipCode">CEP</Label>
+                            <Input
+                              id="zipCode"
+                              placeholder="00000-000"
+                              value={driverForm.zipCode}
+                              onChange={(e) =>
+                                handleInputChange("zipCode", e.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="city">Cidade</Label>
+                            <Input
+                              id="city"
+                              placeholder="São Paulo"
+                              value={driverForm.city}
+                              onChange={(e) =>
+                                handleInputChange("city", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="state">Estado</Label>
+                            <Select
+                              value={driverForm.state}
+                              onValueChange={(v) =>
+                                handleInputChange("state", v)
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="SP">São Paulo</SelectItem>
+                                <SelectItem value="PE">Pernambuco</SelectItem>
+                                <SelectItem value="PI">Piauí</SelectItem>
+                                <SelectItem value="RJ">
+                                  Rio de Janeiro
+                                </SelectItem>
+                                <SelectItem value="MG">Minas Gerais</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
 
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsDriverDialogOpen(false)}
-                      disabled={isSubmitting}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      onClick={handleSubmitDriver}
-                      disabled={isSubmitting}
-                      className="bg-primary hover:bg-primary/90"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Salvando...
-                        </>
-                      ) : editingDriverId ? (
-                        "Atualizar Motorista"
-                      ) : (
-                        "Cadastrar Motorista"
+                      {/* Documentação - Somente para Motoristas */}
+                      {activeModule === "drivers" && (
+                        <div className="space-y-4 animate-in fade-in duration-200">
+                          <h3 className="font-semibold text-foreground border-b pb-2">
+                            Documentação
+                          </h3>
+                          <div className="grid gap-4 md:grid-cols-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="cnh">
+                                Número da CNH{" "}
+                                <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="cnh"
+                                placeholder="00000000000"
+                                value={driverForm.cnh}
+                                onChange={(e) =>
+                                  handleInputChange("cnh", e.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="cnhCategory">Categoria</Label>
+                              <Select
+                                value={driverForm.cnhCategory}
+                                onValueChange={(v) =>
+                                  handleInputChange("cnhCategory", v)
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="A">A</SelectItem>
+                                  <SelectItem value="B">B</SelectItem>
+                                  <SelectItem value="C">C</SelectItem>
+                                  <SelectItem value="D">D</SelectItem>
+                                  <SelectItem value="E">E</SelectItem>
+                                  <SelectItem value="AB">AB</SelectItem>
+                                  <SelectItem value="AC">AC</SelectItem>
+                                  <SelectItem value="AD">AD</SelectItem>
+                                  <SelectItem value="AE">AE</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="cnhExpiry">Validade CNH</Label>
+                              <Input
+                                id="cnhExpiry"
+                                type="date"
+                                value={driverForm.cnhExpiry}
+                                onChange={(e) =>
+                                  handleInputChange("cnhExpiry", e.target.value)
+                                }
+                              />
+                            </div>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <Label>MOPP (Produtos Perigosos)</Label>
+                                <p className="text-sm text-muted-foreground">
+                                  Habilitação para transporte de cargas
+                                  perigosas
+                                </p>
+                              </div>
+                              <Switch
+                                checked={driverForm.mopp}
+                                onCheckedChange={(checked) =>
+                                  handleInputChange("mopp", checked)
+                                }
+                              />
+                            </div>
+                            {driverForm.mopp && (
+                              <div className="space-y-2 animate-in fade-in duration-200">
+                                <Label htmlFor="moppExpiry">
+                                  Validade MOPP
+                                </Label>
+                                <Input
+                                  id="moppExpiry"
+                                  type="date"
+                                  value={driverForm.moppExpiry}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "moppExpiry",
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       )}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>CPF</TableHead>
-                  <TableHead>CNH</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Validade CNH</TableHead>
-                  <TableHead>Filial</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {drivers.map((driver) => (
-                  <TableRow key={driver.id}>
-                    <TableCell className="font-medium">{driver.name}</TableCell>
-                    <TableCell>{driver.cpf}</TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {driver.cnh}
-                    </TableCell>
-                    <TableCell>
-                      {driver.cnhCategory || driver.cnh_category}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {driver.cnhExpiry || driver.cnh_expiry
-                          ? new Date(
-                              driver.cnhExpiry || driver.cnh_expiry,
-                            ).toLocaleDateString("pt-BR")
-                          : "-"}
 
-                        {(driver.cnhExpiry || driver.cnh_expiry) &&
-                          getCNHStatusBadge(
-                            driver.cnhExpiry || driver.cnh_expiry,
-                          )}
+                      {/* Dados de Contratação */}
+                      <div className="space-y-4">
+                        <h3 className="font-semibold text-foreground border-b pb-2">
+                          Dados de Contratação
+                        </h3>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="admissionDate">
+                              Data de Admissão
+                            </Label>
+                            <Input
+                              id="admissionDate"
+                              type="date"
+                              value={driverForm.admissionDate}
+                              onChange={(e) =>
+                                handleInputChange(
+                                  "admissionDate",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="branch">Filial</Label>
+                            <Select
+                              value={driverForm.branch}
+                              onValueChange={(v) =>
+                                handleInputChange("branch", v)
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione a filial" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="São Paulo">
+                                  São Paulo (Matriz)
+                                </SelectItem>
+                                <SelectItem value="Recife">Recife</SelectItem>
+                                <SelectItem value="Piauí">Piauí</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{driver.branch}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                        Ativo
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditDriver(driver)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {/* Botão da Lixeira Atualizado */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDeleteClick(driver.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
 
-                        {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
-                        <Dialog
-                          open={isDeleteOpen}
-                          onOpenChange={setIsDeleteOpen}
-                        >
-                          <DialogContent className="sm:max-w-[425px]">
-                            <DialogHeader>
-                              <DialogTitle className="flex items-center gap-2 text-red-600">
-                                <Trash2 className="h-5 w-5" />
-                                Confirmar Exclusão
-                              </DialogTitle>
-                              <DialogDescription className="py-2">
-                                Tem certeza que deseja excluir este funcionário
-                                permanentemente?
-                                <br />
-                                <span className="font-semibold text-foreground mt-2 block">
-                                  Essa ação não pode ser desfeita.
-                                </span>
-                              </DialogDescription>
-                            </DialogHeader>
-                            <DialogFooter className="gap-2 sm:gap-0">
-                              <Button
-                                variant="outline"
-                                onClick={() => setIsDeleteOpen(false)}
-                              >
-                                Cancelar
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                className="bg-red-600 hover:bg-red-700 text-white"
-                                onClick={confirmDelete}
-                              >
-                                Sim, Excluir
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </TableCell>
+                      {/* Acesso ao Sistema */}
+                      {!editingDriverId && (
+                        <div className="space-y-4">
+                          <h3 className="font-semibold text-foreground border-b pb-2">
+                            Acesso ao Sistema
+                          </h3>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="password">Senha Inicial</Label>
+                              <div className="relative">
+                                <Input
+                                  id="password"
+                                  type={showPassword ? "text" : "password"}
+                                  placeholder="Mínimo 6 caracteres"
+                                  value={driverForm.password}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "password",
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPassword(!showPassword)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                  {showPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </button>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {activeModule === "drivers"
+                                  ? "O motorista usará o e-mail e esta senha para acessar o sistema"
+                                  : "O administrador usará o e-mail e esta senha para acessar o sistema"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsFormDialogOpen(false)}
+                        disabled={isSubmitting}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleSubmitDriver}
+                        disabled={isSubmitting}
+                        className={
+                          activeModule === "drivers"
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-red-600 hover:bg-red-700"
+                        }
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Salvando...
+                          </>
+                        ) : editingDriverId ? (
+                          activeModule === "drivers" ? (
+                            "Atualizar Motorista"
+                          ) : (
+                            "Atualizar Admin"
+                          )
+                        ) : activeModule === "drivers" ? (
+                          "Cadastrar Motorista"
+                        ) : (
+                          "Cadastrar Admin"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>CPF</TableHead>
+                    {activeModule === "drivers" && (
+                      <>
+                        <TableHead>CNH</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Validade CNH</TableHead>
+                      </>
+                    )}
+                    <TableHead>Filial</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {drivers
+                    .filter((d) =>
+                      activeModule === "drivers"
+                        ? d.role === "Motorista" || !d.role
+                        : d.role === "admin",
+                    )
+                    .map((driver) => (
+                      <TableRow key={driver.id}>
+                        <TableCell className="font-medium">
+                          {driver.name}
+                        </TableCell>
+                        <TableCell>{driver.cpf}</TableCell>
+                        {activeModule === "drivers" && (
+                          <>
+                            <TableCell className="font-mono text-sm">
+                              {driver.cnh}
+                            </TableCell>
+                            <TableCell>
+                              {driver.cnhCategory || driver.cnh_category}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {driver.cnhExpiry || driver.cnh_expiry
+                                  ? new Date(
+                                      driver.cnhExpiry || driver.cnh_expiry,
+                                    ).toLocaleDateString("pt-BR")
+                                  : "-"}
 
-        {/* Informações da Empresa */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building className="h-5 w-5" />
-              Informações da Empresa
-            </CardTitle>
-            <CardDescription>
-              Dados cadastrais da transportadora
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="company-name">Razão Social</Label>
-                <Input
-                  id="company-name"
-                  defaultValue="TRL Transporte e Logística LTDA"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cnpj">CNPJ</Label>
-                <Input id="cnpj" defaultValue="12.345.678/0001-90" />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="company-email">E-mail</Label>
-                <Input
-                  id="company-email"
-                  type="email"
-                  defaultValue="contato@trltransporte.com.br"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company-phone">Telefone</Label>
-                <Input id="company-phone" defaultValue="(11) 3456-7890" />
-              </div>
-            </div>
-            <Button>Salvar Alterações</Button>
-          </CardContent>
-        </Card>
+                                {(driver.cnhExpiry || driver.cnh_expiry) &&
+                                  getCNHStatusBadge(
+                                    driver.cnhExpiry || driver.cnh_expiry,
+                                  )}
+                              </div>
+                            </TableCell>
+                          </>
+                        )}
+                        <TableCell>
+                          <Badge variant="outline">{driver.branch}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                            Ativo
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditDriver(driver)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteClick(driver.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
 
-        {/* Notificações */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notificações
-            </CardTitle>
-            <CardDescription>Configure os alertas do sistema</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Alertas de Documentos</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receber notificações sobre documentos vencendo
-                </p>
-              </div>
-              <Switch defaultChecked />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Alertas de Manutenção</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receber notificações sobre manutenções programadas
-                </p>
-              </div>
-              <Switch defaultChecked />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Alertas de Rodízio</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receber notificações diárias sobre rodízio
-                </p>
-              </div>
-              <Switch defaultChecked />
-            </div>
-            <Separator />
+                            {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
+                            <Dialog
+                              open={isDeleteOpen}
+                              onOpenChange={setIsDeleteOpen}
+                            >
+                              <DialogContent className="sm:max-w-[425px]">
+                                <DialogHeader>
+                                  <DialogTitle className="flex items-center gap-2 text-red-600">
+                                    <Trash2 className="h-5 w-5" />
+                                    Confirmar Exclusão
+                                  </DialogTitle>
+                                  <DialogDescription className="py-2">
+                                    Tem certeza que deseja excluir este
+                                    funcionário permanentemente?
+                                    <br />
+                                    <span className="font-semibold text-foreground mt-2 block">
+                                      Essa ação não pode ser desfeita.
+                                    </span>
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter className="gap-2 sm:gap-0">
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => setIsDeleteOpen(false)}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    className="bg-red-600 hover:bg-red-700 text-white"
+                                    onClick={confirmDelete}
+                                  >
+                                    Sim, Excluir
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Informações da Empresa */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building className="h-5 w-5" />
+            Informações da Empresa
+          </CardTitle>
+          <CardDescription>Dados cadastrais da transportadora</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="alert-days">
-                Dias de antecedência para alertas
-              </Label>
+              <Label htmlFor="company-name">Razão Social</Label>
               <Input
-                id="alert-days"
-                type="number"
-                defaultValue="15"
-                className="w-24"
+                id="company-name"
+                defaultValue="TRL Transporte e Logística LTDA"
               />
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <Label htmlFor="cnpj">CNPJ</Label>
+              <Input id="cnpj" defaultValue="12.345.678/0001-90" />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="company-email">E-mail</Label>
+              <Input
+                id="company-email"
+                type="email"
+                defaultValue="contato@trltransporte.com.br"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="company-phone">Telefone</Label>
+              <Input id="company-phone" defaultValue="(11) 3456-7890" />
+            </div>
+          </div>
+          <Button>Salvar Alterações</Button>
+        </CardContent>
+      </Card>
 
-        {/* Segurança */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Segurança
-            </CardTitle>
-            <CardDescription>Configurações de acesso e senha</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="current-password">Senha Atual</Label>
-              <Input id="current-password" type="password" />
+      {/* Notificações */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Notificações
+          </CardTitle>
+          <CardDescription>Configure os alertas do sistema</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Alertas de Documentos</Label>
+              <p className="text-sm text-muted-foreground">
+                Receber notificações sobre documentos vencendo
+              </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="new-password">Nova Senha</Label>
-                <Input id="new-password" type="password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirmar Senha</Label>
-                <Input id="confirm-password" type="password" />
-              </div>
+            <Switch defaultChecked />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Alertas de Manutenção</Label>
+              <p className="text-sm text-muted-foreground">
+                Receber notificações sobre manutenções programadas
+              </p>
             </div>
-            <Button>Alterar Senha</Button>
-          </CardContent>
-        </Card>
+            <Switch defaultChecked />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Alertas de Rodízio</Label>
+              <p className="text-sm text-muted-foreground">
+                Receber notificações diárias sobre rodízio
+              </p>
+            </div>
+            <Switch defaultChecked />
+          </div>
+          <Separator />
+          <div className="space-y-2">
+            <Label htmlFor="alert-days">
+              Dias de antecedência para alertas
+            </Label>
+            <Input
+              id="alert-days"
+              type="number"
+              defaultValue="15"
+              className="w-24"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* API */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5" />
-              Integração API
-            </CardTitle>
-            <CardDescription>
-              Configurações para integração com sistemas externos
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      {/* Segurança */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Segurança
+          </CardTitle>
+          <CardDescription>Configurações de acesso e senha</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="current-password">Senha Atual</Label>
+            <Input id="current-password" type="password" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="api-url">URL da API</Label>
-              <Input id="api-url" placeholder="https://api.exemplo.com.br/v1" />
+              <Label htmlFor="new-password">Nova Senha</Label>
+              <Input id="new-password" type="password" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="api-key">Chave de API</Label>
-              <Input id="api-key" type="password" placeholder="••••••••••••" />
+              <Label htmlFor="confirm-password">Confirmar Senha</Label>
+              <Input id="confirm-password" type="password" />
             </div>
-            <Button variant="outline">Testar Conexão</Button>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+          <Button>Alterar Senha</Button>
+        </CardContent>
+      </Card>
+
+      {/* API */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Integração API
+          </CardTitle>
+          <CardDescription>
+            Configurações para integração com sistemas externos
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="api-url">URL da API</Label>
+            <Input id="api-url" placeholder="https://api.exemplo.com.br/v1" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="api-key">Chave de API</Label>
+            <Input id="api-key" type="password" placeholder="••••••••••••" />
+          </div>
+          <Button variant="outline">Testar Conexão</Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
