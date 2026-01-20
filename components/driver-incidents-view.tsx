@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -35,6 +35,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertOctagon,
   Plus,
@@ -50,8 +51,12 @@ import {
   Phone,
   MapPin,
   X,
+  RefreshCw,
+  WifiOff,
+  ChevronRight,
 } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { format, subDays, formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -72,28 +77,32 @@ interface IncidentRecord {
   driverName: string;
 }
 
-// --- CONFIGURAÇÃO DE STATUS ---
+// --- CONFIGURACAO DE STATUS ---
 const statusConfig: Record<
   string,
-  { color: string; icon: React.ElementType; label: string }
+  { color: string; bgColor: string; icon: React.ElementType; label: string }
 > = {
   Aberto: {
-    color: "bg-red-100 text-red-800",
+    color: "text-red-700",
+    bgColor: "bg-red-100",
     icon: AlertOctagon,
     label: "Aberto",
   },
   "Em Reparo": {
-    color: "bg-yellow-100 text-yellow-800",
+    color: "text-yellow-700",
+    bgColor: "bg-yellow-100",
     icon: Wrench,
     label: "Em Reparo",
   },
   "Aguardando Seguro": {
-    color: "bg-blue-100 text-blue-800",
+    color: "text-blue-700",
+    bgColor: "bg-blue-100",
     icon: Clock,
-    label: "Aguardando Seguro",
+    label: "Ag. Seguro",
   },
   Fechado: {
-    color: "bg-green-100 text-green-800",
+    color: "text-green-700",
+    bgColor: "bg-green-100",
     icon: CheckCircle2,
     label: "Fechado",
   },
@@ -102,11 +111,11 @@ const statusConfig: Record<
 // --- TIPOS DE INCIDENTE ---
 const incidentTypes = [
   { value: "Acidente", label: "Acidente" },
-  { value: "Colisão Leve", label: "Colisão Leve" },
+  { value: "Colisao Leve", label: "Colisao Leve" },
   { value: "Avaria", label: "Avaria" },
   { value: "Roubo/Furto", label: "Roubo/Furto" },
   { value: "Tombamento", label: "Tombamento" },
-  { value: "Pane Mecânica", label: "Pane Mecânica" },
+  { value: "Pane Mecanica", label: "Pane Mecanica" },
   { value: "Outro", label: "Outro" },
 ];
 
@@ -120,11 +129,11 @@ const mockVehicles = [
 const generateDriverIncidents = (driverName: string): IncidentRecord[] => {
   const records: IncidentRecord[] = [];
   const statuses = ["Aberto", "Em Reparo", "Aguardando Seguro", "Fechado"];
-  const types = ["Acidente", "Colisão Leve", "Avaria", "Pane Mecânica"];
+  const types = ["Acidente", "Colisao Leve", "Avaria", "Pane Mecanica"];
   const locations = [
-    "BR-116, km 340 - Jundiaí/SP",
+    "BR-116, km 340 - Jundiai/SP",
     "Rod. Anhanguera, km 45 - Campinas/SP",
-    "Av. Brasil, 1500 - São Paulo/SP",
+    "Av. Brasil, 1500 - Sao Paulo/SP",
     "BR-381, km 120 - Betim/MG",
   ];
 
@@ -137,9 +146,7 @@ const generateDriverIncidents = (driverName: string): IncidentRecord[] => {
       vehicle_plate: vehicle.placa,
       vehicle_model: vehicle.modelo,
       type: types[i % 4],
-      description: `Ocorrência ${i + 1} - ${
-        types[i % 4]
-      } registrada pelo motorista`,
+      description: `Ocorrencia ${i + 1} - ${types[i % 4]} registrada pelo motorista durante viagem. Danos materiais no veiculo.`,
       location: locations[i % 4],
       status: statuses[i % 4],
       estimatedCost: Math.floor(1000 + Math.random() * 10000),
@@ -151,14 +158,87 @@ const generateDriverIncidents = (driverName: string): IncidentRecord[] => {
   return records;
 };
 
+// --- SKELETON COMPONENTS ---
+function StatCardSkeleton() {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+      <Skeleton className="h-9 w-9 rounded-lg" />
+      <div className="flex-1 space-y-1">
+        <Skeleton className="h-6 w-8" />
+        <Skeleton className="h-3 w-12" />
+      </div>
+    </div>
+  );
+}
+
+function IncidentCardSkeleton() {
+  return (
+    <div className="border-b border-border py-3 last:border-0">
+      <div className="flex items-start gap-3">
+        <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-5 w-16" />
+            <Skeleton className="h-4 w-14" />
+          </div>
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+        <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+      </div>
+    </div>
+  );
+}
+
+// --- ERROR STATE ---
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+        <WifiOff className="h-8 w-8 text-muted-foreground" />
+      </div>
+      <h3 className="font-semibold text-foreground mb-1">Sem conexao</h3>
+      <p className="text-sm text-muted-foreground mb-6 max-w-xs">
+        Nao foi possivel carregar os incidentes. Verifique sua conexao e tente
+        novamente.
+      </p>
+      <Button
+        onClick={onRetry}
+        size="lg"
+        className="gap-2 min-w-[200px] h-12 active:scale-95 transition-transform"
+      >
+        <RefreshCw className="h-4 w-4" />
+        Tentar Novamente
+      </Button>
+    </div>
+  );
+}
+
+// --- EMPTY STATE ---
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+      <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+        <CheckCircle2 className="h-8 w-8 text-green-600" />
+      </div>
+      <h3 className="font-semibold text-foreground mb-1">Nenhum incidente</h3>
+      <p className="text-sm text-muted-foreground">
+        Voce nao possui incidentes registrados
+      </p>
+    </div>
+  );
+}
+
 export function DriverIncidentsView() {
   const { user } = useAuth();
   const driverName = user?.name || "Motorista";
 
+  // --- ESTADOS DE LOADING/ERROR ---
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
   // --- ESTADOS DE DADOS ---
-  const [incidents] = useState<IncidentRecord[]>(() =>
-    generateDriverIncidents(driverName)
-  );
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
 
   // --- ESTADOS DOS MODAIS ---
   const [isNewIncidentOpen, setIsNewIncidentOpen] = useState(false);
@@ -166,7 +246,7 @@ export function DriverIncidentsView() {
   const [selectedIncident, setSelectedIncident] =
     useState<IncidentRecord | null>(null);
 
-  // --- ESTADOS DO FORMULÁRIO ---
+  // --- ESTADOS DO FORMULARIO ---
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
   const [newIncident, setNewIncident] = useState({
     type: "",
@@ -187,6 +267,27 @@ export function DriverIncidentsView() {
     type: "all",
   });
 
+  // --- SIMULAR CARREGAMENTO ---
+  const loadData = async () => {
+    setIsLoading(true);
+    setHasError(false);
+    try {
+      // Simula delay de rede
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      // Simula erro aleatoriamente (descomentar para testar)
+      // if (Math.random() > 0.7) throw new Error("Network error");
+      setIncidents(generateDriverIncidents(driverName));
+    } catch {
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [driverName]);
+
   const isAnyFilterActive = useMemo(() => {
     return (
       filters.vehicleId !== "all" ||
@@ -195,7 +296,7 @@ export function DriverIncidentsView() {
     );
   }, [filters]);
 
-  // --- LÓGICA DE FILTRAGEM ---
+  // --- LOGICA DE FILTRAGEM ---
   const filteredIncidents = useMemo(() => {
     return incidents.filter((item) => {
       if (
@@ -218,26 +319,16 @@ export function DriverIncidentsView() {
   const stats = useMemo(() => {
     const open = filteredIncidents.filter((i) => i.status === "Aberto").length;
     const inRepair = filteredIncidents.filter(
-      (i) => i.status === "Em Reparo"
+      (i) => i.status === "Em Reparo",
     ).length;
     const waitingInsurance = filteredIncidents.filter(
-      (i) => i.status === "Aguardando Seguro"
+      (i) => i.status === "Aguardando Seguro",
     ).length;
     const closed = filteredIncidents.filter(
-      (i) => i.status === "Fechado"
+      (i) => i.status === "Fechado",
     ).length;
-    const totalCost = filteredIncidents.reduce(
-      (acc, i) => acc + i.estimatedCost,
-      0
-    );
-    return { open, inRepair, waitingInsurance, closed, totalCost };
+    return { open, inRepair, waitingInsurance, closed };
   }, [filteredIncidents]);
-
-  // Helper para veículo selecionado
-  const selectedVehicle = useMemo(
-    () => mockVehicles.find((v) => String(v.id) === String(selectedVehicleId)),
-    [selectedVehicleId]
-  );
 
   // --- HANDLERS ---
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -266,19 +357,6 @@ export function DriverIncidentsView() {
 
     setIsSubmitting(true);
 
-    // TODO: Integrar com backend
-    // await api.post('/incidentes/registro', {
-    //   vehicle_id: selectedVehicleId,
-    //   type: newIncident.type,
-    //   date: newIncident.date,
-    //   time: newIncident.time,
-    //   location: newIncident.location,
-    //   description: newIncident.description,
-    //   has_victims: newIncident.hasVictims === 'sim',
-    //   driver_name: driverName,
-    //   photos: uploadedPhotos
-    // })
-
     setTimeout(() => {
       setIsSubmitting(false);
       setIsNewIncidentOpen(false);
@@ -292,6 +370,7 @@ export function DriverIncidentsView() {
       });
       setSelectedVehicleId("");
       setUploadedPhotos([]);
+      loadData();
     }, 1500);
   };
 
@@ -300,65 +379,76 @@ export function DriverIncidentsView() {
     setIsDetailsOpen(true);
   };
 
-  const getTypeIcon = (type: string) => {
+  const getTypeColor = (type: string) => {
     switch (type) {
       case "Acidente":
-        return <AlertOctagon className="h-5 w-5 text-red-500" />;
-      case "Colisão Leve":
-        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+        return "bg-red-100 text-red-700";
+      case "Colisao Leve":
+        return "bg-yellow-100 text-yellow-700";
       case "Avaria":
-        return <Wrench className="h-5 w-5 text-blue-500" />;
+        return "bg-blue-100 text-blue-700";
+      case "Pane Mecanica":
+        return "bg-orange-100 text-orange-700";
       default:
-        return <AlertOctagon className="h-5 w-5" />;
+        return "bg-gray-100 text-gray-700";
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* CABEÇALHO */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Incidentes & Sinistros
+    <div className="space-y-4">
+      {/* HEADER COMPACTO MOBILE */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold tracking-tight truncate md:text-2xl">
+            Incidentes
           </h1>
-          <p className="text-muted-foreground">
-            Registro e acompanhamento de ocorrências
+          <p className="text-xs text-muted-foreground md:text-sm">
+            Registro de ocorrencias
           </p>
         </div>
-        <div className="flex gap-2">
-          {/* Contato de Emergência */}
+
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Emergencia - Icone apenas em mobile */}
           <Button
             variant="outline"
-            className="gap-2 border-red-500 text-red-500 hover:bg-red-50 bg-transparent"
+            size="icon"
+            className="border-red-500 text-red-500 hover:bg-red-50 bg-transparent h-9 w-9 md:hidden active:scale-95 transition-transform"
           >
             <Phone className="h-4 w-4" />
-            <span className="hidden sm:inline">Emergência:</span> (11)
-            99999-9999
           </Button>
 
-          {/* FILTROS */}
+          {/* Emergencia Desktop */}
+          <Button
+            variant="outline"
+            className="hidden md:flex gap-2 border-red-500 text-red-500 hover:bg-red-50 bg-transparent"
+          >
+            <Phone className="h-4 w-4" />
+            (11) 99999-9999
+          </Button>
+
+          {/* Filtros */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
                 className={cn(
-                  "gap-2",
+                  "h-9 w-9 md:h-10 md:w-auto md:px-3 active:scale-95 transition-transform",
                   isAnyFilterActive &&
-                    "border-primary text-primary bg-primary/5"
+                    "border-primary text-primary bg-primary/5",
                 )}
               >
                 <Filter className="h-4 w-4" />
-                Filtros
+                <span className="hidden md:inline ml-2">Filtros</span>
                 {isAnyFilterActive && (
-                  <span className="flex h-2 w-2 rounded-full bg-primary" />
+                  <span className="flex h-2 w-2 rounded-full bg-primary ml-1" />
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-4" align="end">
-              <div className="space-y-4">
+            <PopoverContent className="w-72 p-3" align="end">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b">
-                  <h4 className="font-semibold leading-none">Filtros</h4>
+                  <h4 className="font-semibold text-sm">Filtros</h4>
                   {isAnyFilterActive && (
                     <Button
                       variant="ghost"
@@ -371,445 +461,478 @@ export function DriverIncidentsView() {
                   )}
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Veiculo</Label>
+                  <Select
+                    value={filters.vehicleId}
+                    onValueChange={(v) =>
+                      setFilters((prev) => ({ ...prev, vehicleId: v }))
+                    }
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {mockVehicles.map((v) => (
+                        <SelectItem key={v.id} value={v.placa}>
+                          {v.placa}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <Label className="text-xs">Veículo</Label>
+                    <Label className="text-xs">Status</Label>
                     <Select
-                      value={filters.vehicleId}
+                      value={filters.status}
                       onValueChange={(v) =>
-                        setFilters((prev) => ({ ...prev, vehicleId: v }))
+                        setFilters((prev) => ({ ...prev, status: v }))
                       }
                     >
-                      <SelectTrigger className="h-8">
+                      <SelectTrigger className="h-9">
                         <SelectValue placeholder="Todos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todos os veículos</SelectItem>
-                        {mockVehicles.map((v) => (
-                          <SelectItem key={v.id} value={v.placa}>
-                            {v.placa} - {v.modelo}
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="Aberto">Aberto</SelectItem>
+                        <SelectItem value="Em Reparo">Em Reparo</SelectItem>
+                        <SelectItem value="Aguardando Seguro">
+                          Ag. Seguro
+                        </SelectItem>
+                        <SelectItem value="Fechado">Fechado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select
+                      value={filters.type}
+                      onValueChange={(v) =>
+                        setFilters((prev) => ({ ...prev, type: v }))
+                      }
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {incidentTypes.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Status</Label>
-                      <Select
-                        value={filters.status}
-                        onValueChange={(v) =>
-                          setFilters((prev) => ({ ...prev, status: v }))
-                        }
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos</SelectItem>
-                          <SelectItem value="Aberto">Aberto</SelectItem>
-                          <SelectItem value="Em Reparo">Em Reparo</SelectItem>
-                          <SelectItem value="Aguardando Seguro">
-                            Aguardando Seguro
-                          </SelectItem>
-                          <SelectItem value="Fechado">Fechado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Tipo</Label>
-                      <Select
-                        value={filters.type}
-                        onValueChange={(v) =>
-                          setFilters((prev) => ({ ...prev, type: v }))
-                        }
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos</SelectItem>
-                          {incidentTypes.map((t) => (
-                            <SelectItem key={t.value} value={t.value}>
-                              {t.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
                 </div>
               </div>
             </PopoverContent>
           </Popover>
 
+          {/* Botao Novo Incidente */}
           <Button
             onClick={() => setIsNewIncidentOpen(true)}
-            className="gap-2 bg-red-600 hover:bg-red-700"
+            size="icon"
+            className="h-9 w-9 md:h-10 md:w-auto md:px-4 bg-red-600 hover:bg-red-700 active:scale-95 transition-transform"
           >
-            <Plus className="h-4 w-4" /> Registrar Incidente
+            <Plus className="h-4 w-4" />
+            <span className="hidden md:inline ml-2">Registrar</span>
           </Button>
         </div>
       </div>
 
-      {/* KPI CARDS */}
-      <div className="grid gap-4 md:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Abertos
-            </CardTitle>
-            <AlertOctagon className="h-5 w-5 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-600">{stats.open}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Em Reparo
-            </CardTitle>
-            <Wrench className="h-5 w-5 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
-              {stats.inRepair}
+      {/* KPI CARDS - GRID 2x2 COMPACTO */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
+          {/* Abertos */}
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 active:bg-muted/50 transition-colors">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100">
+              <AlertOctagon className="h-4 w-4 text-red-600" />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Aguardando Seguro
-            </CardTitle>
-            <Clock className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.waitingInsurance}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Fechados
-            </CardTitle>
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">
-              {stats.closed}
+            <div className="min-w-0">
+              <p className="text-2xl font-bold text-red-600">{stats.open}</p>
+              <p className="text-xs text-muted-foreground truncate">Abertos</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Custo Total
-            </CardTitle>
-            <DollarSign className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.totalCost.toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              })}
+          {/* Em Reparo */}
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 active:bg-muted/50 transition-colors">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-100">
+              <Wrench className="h-4 w-4 text-yellow-600" />
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold text-yellow-600">
+                {stats.inRepair}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                Em Reparo
+              </p>
+            </div>
+          </div>
 
-      {/* TABELA / LISTA DE INCIDENTES */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Meus Incidentes</CardTitle>
-          <CardDescription>
-            Histórico de ocorrências registradas
+          {/* Aguardando Seguro */}
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 active:bg-muted/50 transition-colors">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100">
+              <Clock className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold">{stats.waitingInsurance}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                Ag. Seguro
+              </p>
+            </div>
+          </div>
+
+          {/* Fechados */}
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 active:bg-muted/50 transition-colors">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold text-green-600">
+                {stats.closed}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">Fechados</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LISTA DE INCIDENTES - FEED STYLE */}
+      <Card className="overflow-hidden">
+        <CardHeader className="py-3 px-4 md:p-6">
+          <CardTitle className="text-base md:text-lg">
+            Meus Incidentes
+          </CardTitle>
+          <CardDescription className="text-xs md:text-sm">
+            {filteredIncidents.length} ocorrencia(s) encontrada(s)
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[400px]">
-            <div className="space-y-4">
-              {filteredIncidents.map((incident) => {
-                const config =
-                  statusConfig[incident.status] || statusConfig["Aberto"];
-                return (
-                  <div
-                    key={incident.id}
-                    className="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between"
-                  >
-                    <div className="flex gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        {getTypeIcon(incident.type)}
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{incident.type}</span>
-                          <Badge variant="outline">
-                            {incident.vehicle_plate}
-                          </Badge>
-                          <Badge className={cn("gap-1", config.color)}>
-                            {config.label}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {incident.vehicle_model}
-                        </p>
-                        <p className="text-sm">{incident.description}</p>
-                        <div className="flex flex-wrap gap-4 pt-2 text-xs text-muted-foreground">
-                          <span>
-                            <Clock className="mr-1 inline h-3 w-3" />
-                            {format(
-                              new Date(incident.date),
-                              "dd/MM/yyyy"
-                            )} às {incident.time}
-                          </span>
-                          <span>
-                            <MapPin className="mr-1 inline h-3 w-3" />
-                            {incident.location}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className="text-lg font-bold">
-                        {incident.estimatedCost.toLocaleString("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        })}
-                      </span>
-                      {incident.insuranceClaim && (
-                        <Badge variant="secondary" className="text-xs">
-                          <FileText className="mr-1 h-3 w-3" />
-                          Acionado Seguro
-                        </Badge>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openDetails(incident)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" /> Detalhes
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="px-4 pb-4 md:px-6 md:pb-6">
+              <IncidentCardSkeleton />
+              <IncidentCardSkeleton />
+              <IncidentCardSkeleton />
+              <IncidentCardSkeleton />
             </div>
-          </ScrollArea>
+          ) : hasError ? (
+            <ErrorState onRetry={loadData} />
+          ) : filteredIncidents.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <ScrollArea className="h-[400px] md:h-[450px]">
+              <div className="px-4 pb-4 md:px-6 md:pb-6">
+                {filteredIncidents.map((incident) => {
+                  const config =
+                    statusConfig[incident.status] || statusConfig["Aberto"];
+                  const StatusIcon = config.icon;
+                  const relativeDate = formatDistanceToNow(
+                    new Date(incident.date),
+                    {
+                      addSuffix: true,
+                      locale: ptBR,
+                    },
+                  );
+
+                  return (
+                    <button
+                      key={incident.id}
+                      onClick={() => openDetails(incident)}
+                      className="w-full text-left border-b border-border py-3 last:border-0 hover:bg-muted/30 active:bg-muted/50 transition-colors -mx-4 px-4 md:-mx-6 md:px-6"
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Icon */}
+                        <div
+                          className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                            config.bgColor,
+                          )}
+                        >
+                          <StatusIcon className={cn("h-4 w-4", config.color)} />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 space-y-1">
+                          {/* Header: Type Badge + Date */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge
+                              className={cn(
+                                "text-xs px-2 py-0.5 font-medium",
+                                getTypeColor(incident.type),
+                              )}
+                            >
+                              {incident.type}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {relativeDate}
+                            </span>
+                          </div>
+
+                          {/* Description - 2 lines max */}
+                          <p className="text-sm text-foreground line-clamp-2">
+                            {incident.description}
+                          </p>
+
+                          {/* Footer: Plate + Insurance */}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-mono">
+                              {incident.vehicle_plate}
+                            </span>
+                            {incident.insuranceClaim && (
+                              <>
+                                <span>•</span>
+                                <span className="flex items-center gap-1 text-blue-600">
+                                  <FileText className="h-3 w-3" />
+                                  Seguro
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Arrow */}
+                        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 mt-1" />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          )}
         </CardContent>
       </Card>
 
-      {/* DIALOG: NOVO INCIDENTE */}
+      {/* DIALOG: NOVO INCIDENTE - MOBILE OPTIMIZED */}
       <Dialog open={isNewIncidentOpen} onOpenChange={setIsNewIncidentOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Registrar Incidente</DialogTitle>
             <DialogDescription>
-              Preencha todos os detalhes da ocorrência
+              Preencha os detalhes da ocorrencia
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Veículo *</Label>
-                <Select
-                  value={selectedVehicleId}
-                  onValueChange={setSelectedVehicleId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockVehicles.map((v) => (
-                      <SelectItem key={v.id} value={String(v.id)}>
-                        {v.placa} - {v.modelo}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo de Incidente *</Label>
-                <Select
-                  value={newIncident.type}
-                  onValueChange={(v) =>
-                    setNewIncident((prev) => ({ ...prev, type: v }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {incidentTypes.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data *</Label>
-                <Input
-                  type="date"
-                  value={newIncident.date}
-                  onChange={(e) =>
-                    setNewIncident((prev) => ({
-                      ...prev,
-                      date: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Horário *</Label>
-                <Input
-                  type="time"
-                  value={newIncident.time}
-                  onChange={(e) =>
-                    setNewIncident((prev) => ({
-                      ...prev,
-                      time: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Local da Ocorrência *</Label>
-              <Input
-                placeholder="Ex: BR-116, km 340 ou Rua..."
-                value={newIncident.location}
-                onChange={(e) =>
-                  setNewIncident((prev) => ({
-                    ...prev,
-                    location: e.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Houve vítimas? *</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={cn(
-                    "h-10",
-                    newIncident.hasVictims === "sim" &&
-                      "border-red-500 bg-red-50 text-red-700"
-                  )}
-                  onClick={() =>
-                    setNewIncident((prev) => ({ ...prev, hasVictims: "sim" }))
-                  }
-                >
-                  Sim
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={cn(
-                    "h-10",
-                    newIncident.hasVictims === "nao" &&
-                      "border-green-500 bg-green-50 text-green-700"
-                  )}
-                  onClick={() =>
-                    setNewIncident((prev) => ({ ...prev, hasVictims: "nao" }))
-                  }
-                >
-                  Não
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Descrição Detalhada</Label>
-              <Textarea
-                placeholder="Descreva como aconteceu o incidente..."
-                value={newIncident.description}
-                onChange={(e) =>
-                  setNewIncident((prev) => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
-                }
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Fotos do Incidente (até 5)</Label>
-              <div
-                className={cn(
-                  "relative border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
-                  uploadedPhotos.length > 0
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
-                )}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  capture="environment"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                <Camera
-                  className={cn(
-                    "h-8 w-8 mx-auto mb-2",
-                    uploadedPhotos.length > 0
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  )}
-                />
-                {uploadedPhotos.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-primary">
-                      {uploadedPhotos.length} foto(s) selecionada(s)
-                    </p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {uploadedPhotos.map((photo, i) => (
-                        <Badge key={i} variant="secondary" className="gap-1">
-                          {photo}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removePhoto(i);
-                            }}
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-4 py-2">
+              {/* Veiculo e Tipo */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-sm">Veiculo *</Label>
+                  <Select
+                    value={selectedVehicleId}
+                    onValueChange={setSelectedVehicleId}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mockVehicles.map((v) => (
+                        <SelectItem key={v.id} value={String(v.id)}>
+                          {v.placa} - {v.modelo}
+                        </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Tipo *</Label>
+                  <Select
+                    value={newIncident.type}
+                    onValueChange={(v) =>
+                      setNewIncident((prev) => ({ ...prev, type: v }))
+                    }
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {incidentTypes.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Data e Hora */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm">Data *</Label>
+                  <Input
+                    type="date"
+                    className="h-11"
+                    value={newIncident.date}
+                    onChange={(e) =>
+                      setNewIncident((prev) => ({
+                        ...prev,
+                        date: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Hora *</Label>
+                  <Input
+                    type="time"
+                    className="h-11"
+                    value={newIncident.time}
+                    onChange={(e) =>
+                      setNewIncident((prev) => ({
+                        ...prev,
+                        time: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Local */}
+              <div className="space-y-2">
+                <Label className="text-sm">Local da Ocorrencia *</Label>
+                <Input
+                  placeholder="Ex: BR-116, km 340"
+                  className="h-11"
+                  value={newIncident.location}
+                  onChange={(e) =>
+                    setNewIncident((prev) => ({
+                      ...prev,
+                      location: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              {/* Vitimas */}
+              <div className="space-y-2">
+                <Label className="text-sm">Houve vitimas? *</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      "h-11 active:scale-95 transition-transform",
+                      newIncident.hasVictims === "sim" &&
+                        "border-red-500 bg-red-50 text-red-700",
+                    )}
+                    onClick={() =>
+                      setNewIncident((prev) => ({ ...prev, hasVictims: "sim" }))
+                    }
+                  >
+                    Sim
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      "h-11 active:scale-95 transition-transform",
+                      newIncident.hasVictims === "nao" &&
+                        "border-green-500 bg-green-50 text-green-700",
+                    )}
+                    onClick={() =>
+                      setNewIncident((prev) => ({ ...prev, hasVictims: "nao" }))
+                    }
+                  >
+                    Nao
+                  </Button>
+                </div>
+              </div>
+
+              {/* Descricao */}
+              <div className="space-y-2">
+                <Label className="text-sm">Descricao</Label>
+                <Textarea
+                  placeholder="Descreva como aconteceu..."
+                  className="min-h-[80px] resize-none"
+                  value={newIncident.description}
+                  onChange={(e) =>
+                    setNewIncident((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              {/* Fotos */}
+              <div className="space-y-2">
+                <Label className="text-sm">Fotos (ate 5)</Label>
+                <div
+                  className={cn(
+                    "relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors active:bg-muted/50",
+                    uploadedPhotos.length > 0
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50",
+                  )}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    capture="environment"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <Camera
+                    className={cn(
+                      "h-6 w-6 mx-auto mb-2",
+                      uploadedPhotos.length > 0
+                        ? "text-primary"
+                        : "text-muted-foreground",
+                    )}
+                  />
+                  {uploadedPhotos.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-primary">
+                        {uploadedPhotos.length} foto(s)
+                      </p>
+                      <div className="flex flex-wrap gap-1 justify-center">
+                        {uploadedPhotos.map((photo, i) => (
+                          <Badge
+                            key={i}
+                            variant="secondary"
+                            className="gap-1 text-xs"
+                          >
+                            {photo.substring(0, 10)}...
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removePhoto(i);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Clique para adicionar fotos
-                  </p>
-                )}
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Toque para adicionar
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-          <DialogFooter>
+          </ScrollArea>
+          <DialogFooter className="shrink-0 gap-2 pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => setIsNewIncidentOpen(false)}
+              className="flex-1 sm:flex-none"
             >
               Cancelar
             </Button>
@@ -822,95 +945,127 @@ export function DriverIncidentsView() {
                 !newIncident.hasVictims ||
                 isSubmitting
               }
-              className="bg-red-600 hover:bg-red-700"
+              className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 active:scale-95 transition-transform"
             >
-              {isSubmitting ? "Registrando..." : "Registrar Incidente"}
+              {isSubmitting ? "Registrando..." : "Registrar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG: DETALHES */}
+      {/* DIALOG: DETALHES - MOBILE OPTIMIZED */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Detalhes do Incidente</DialogTitle>
           </DialogHeader>
           {selectedIncident && (
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Veículo</p>
-                  <p className="font-medium">
-                    {selectedIncident.vehicle_plate} -{" "}
-                    {selectedIncident.vehicle_model}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="space-y-4 py-2">
+                {/* Status Badge Grande */}
+                <div className="flex items-center gap-3">
                   <Badge
                     className={cn(
-                      "gap-1",
-                      statusConfig[selectedIncident.status]?.color
+                      "text-sm px-3 py-1",
+                      statusConfig[selectedIncident.status]?.bgColor,
+                      statusConfig[selectedIncident.status]?.color,
                     )}
                   >
                     {selectedIncident.status}
                   </Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Tipo</p>
-                  <p className="font-medium">{selectedIncident.type}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Data/Hora</p>
-                  <p className="font-medium">
-                    {format(new Date(selectedIncident.date), "dd/MM/yyyy")} às{" "}
-                    {selectedIncident.time}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm text-muted-foreground">Local</p>
-                  <p className="font-medium">{selectedIncident.location}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Houve Vítimas</p>
-                  <p
+                  <Badge
                     className={cn(
-                      "font-medium",
-                      selectedIncident.hasVictims
-                        ? "text-red-600"
-                        : "text-green-600"
+                      "text-sm px-3 py-1",
+                      getTypeColor(selectedIncident.type),
                     )}
                   >
-                    {selectedIncident.hasVictims ? "Sim" : "Não"}
+                    {selectedIncident.type}
+                  </Badge>
+                </div>
+
+                {/* Info Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Veiculo</p>
+                    <p className="text-sm font-medium">
+                      {selectedIncident.vehicle_plate}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedIncident.vehicle_model}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Data/Hora</p>
+                    <p className="text-sm font-medium">
+                      {format(new Date(selectedIncident.date), "dd/MM/yyyy")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      as {selectedIncident.time}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Local */}
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    Local
+                  </p>
+                  <p className="text-sm font-medium">
+                    {selectedIncident.location}
                   </p>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Custo Estimado
-                  </p>
-                  <p className="font-medium">
-                    {selectedIncident.estimatedCost.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })}
-                  </p>
+
+                {/* Descricao */}
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Descricao</p>
+                  <p className="text-sm">{selectedIncident.description}</p>
                 </div>
+
+                {/* Info adicional */}
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Vitimas</p>
+                    <p
+                      className={cn(
+                        "text-sm font-medium",
+                        selectedIncident.hasVictims
+                          ? "text-red-600"
+                          : "text-green-600",
+                      )}
+                    >
+                      {selectedIncident.hasVictims ? "Sim" : "Nao"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Custo Est.</p>
+                    <p className="text-sm font-medium">
+                      {selectedIncident.estimatedCost.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedIncident.insuranceClaim && (
+                  <Badge
+                    variant="secondary"
+                    className="w-full justify-center py-2"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Seguro Acionado
+                  </Badge>
+                )}
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Descrição</p>
-                <p className="font-medium">{selectedIncident.description}</p>
-              </div>
-              {selectedIncident.insuranceClaim && (
-                <Badge variant="secondary">
-                  <FileText className="mr-1 h-3 w-3" />
-                  Seguro Acionado
-                </Badge>
-              )}
-            </div>
+            </ScrollArea>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
+          <DialogFooter className="shrink-0 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setIsDetailsOpen(false)}
+              className="w-full"
+            >
               Fechar
             </Button>
           </DialogFooter>
