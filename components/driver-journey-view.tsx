@@ -955,21 +955,31 @@ export function DriverJourneyView() {
                     className="w-[var(--radix-popover-trigger-width)] p-0"
                     align="start"
                   >
-                    <Command>
+                    {/* AQUI ESTÁ O TRUQUE: shouldFilter={false} */}
+                    <Command shouldFilter={false}>
                       <CommandInput
                         placeholder="Digite a placa ou modelo..."
                         value={vehicleSearchQuery}
                         onValueChange={setVehicleSearchQuery}
                       />
                       <CommandList>
-                        <CommandEmpty>Nenhum veiculo encontrado.</CommandEmpty>
+                        {filteredVehicles.length === 0 && (
+                          <CommandEmpty>
+                            Nenhum veiculo encontrado.
+                          </CommandEmpty>
+                        )}
                         <CommandGroup>
                           {filteredVehicles.map((vehicle) => (
                             <CommandItem
                               key={vehicle.id}
+                              // CORREÇÃO CRÍTICA: O value deve conter o texto que está sendo buscado (Placa/Modelo).
+                              // Se usarmos apenas o ID ("1"), o componente acha que não bate com a busca ("ABC") e desabilita o clique.
                               value={`${vehicle.placa} ${vehicle.marca} ${vehicle.modelo}`}
-                              onSelect={() => handleSelectVehicle(vehicle)}
-                              className="flex items-center gap-3 py-3"
+                              onSelect={() => {
+                                handleSelectVehicle(vehicle);
+                              }}
+                              // Força o cursor e remove restrições de ponteiro caso o estilo esteja bloqueando
+                              className="flex items-center gap-3 py-3 cursor-pointer aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:opacity-100 data-[disabled]:pointer-events-auto"
                             >
                               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                 <Truck className="h-5 w-5" />
@@ -984,7 +994,8 @@ export function DriverJourneyView() {
                                 variant="outline"
                                 className={cn(
                                   "shrink-0 text-xs",
-                                  vehicle.status === "Ativo"
+                                  vehicle.status === "Ativo" ||
+                                    vehicle.status === "ativo"
                                     ? "border-green-200 bg-green-50 text-green-700"
                                     : "border-amber-200 bg-amber-50 text-amber-700",
                                 )}
