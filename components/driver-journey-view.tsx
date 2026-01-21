@@ -649,10 +649,10 @@ export function DriverJourneyView() {
         {/* Header */}
         <div>
           <h1 className="text-xl font-bold text-foreground sm:text-2xl">
-            Gestao de Jornada
+            Gestão de Jornada
           </h1>
           <p className="text-sm text-muted-foreground">
-            Controle seu tempo de direcao e faca a vistoria diaria
+            Controle seu tempo de direção e faça a vistoria diária
           </p>
         </div>
 
