@@ -245,7 +245,6 @@ export function DriverJourneyView() {
   const {
     journey,
     selectVehicle,
-    confirmVehicleSelection,
     startInspection,
     updateInspectionItem,
     completeInspection,
@@ -259,7 +258,7 @@ export function DriverJourneyView() {
     getDrivingSeconds,
     getRestSeconds,
     getMealSeconds,
-    cancelJourney,
+    cancelJourney, // Certifique-se de que esta função está no Contexto
   } = useJourney();
 
   // --- LOADING/ERROR STATES ---
@@ -477,8 +476,7 @@ export function DriverJourneyView() {
 
   const handleConfirmVehicle = () => {
     if (journey.selectedVehicle) {
-      confirmVehicleSelection();
-      // Reset inspection items for new journey
+      startInspection();
       setInspectionItems((prev) =>
         prev.map((item) => ({ ...item, checked: null, problem: undefined })),
       );
@@ -542,9 +540,12 @@ export function DriverJourneyView() {
   };
 
   const handleCheckIn = async () => {
-    if (!startKm) return;
+    // Adicionado verificação do veículo selecionado
+    if (!startKm || !journey.selectedVehicle) return;
+
     try {
-      await startJourney(startKm, currentLocation);
+      // CORREÇÃO: Passando os 3 argumentos exigidos (Km, Veículo, Localização)
+      await startJourney(startKm, journey.selectedVehicle, currentLocation);
     } catch (error) {
       alert("Erro ao iniciar jornada. Tente novamente.");
     }

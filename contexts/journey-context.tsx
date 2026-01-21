@@ -16,12 +16,11 @@ import {
   buscarJornadaAtivaAPI,
 } from "@/lib/api-service";
 
-// --- TYPES ---
 export type JourneyStatus =
   | "inactive"
-  | "vehicle_selection"
   | "inspection"
   | "ready_to_start"
+  | "vehicle_selection"
   | "on_journey"
   | "resting"
   | "meal"
@@ -59,7 +58,6 @@ export interface JourneyState {
 interface JourneyContextType {
   journey: JourneyState;
   selectVehicle: (vehicle: VehicleData) => void;
-  confirmVehicleSelection: () => void;
   startInspection: () => void;
   updateInspectionItem: (
     id: string,
@@ -67,17 +65,22 @@ interface JourneyContextType {
     problem?: string,
   ) => void;
   completeInspection: (hasProblems: boolean) => void;
-  startJourney: (startKm: string, location: string) => Promise<void>;
+  startJourney: (
+    startKm: string,
+    vehicleData: VehicleData,
+    location: string,
+  ) => Promise<void>;
   pauseJourney: (type: "rest" | "meal") => Promise<void>;
   resumeJourney: () => Promise<void>;
   startCheckout: () => void;
-  endJourney: (endKm?: string, observations?: string) => Promise<void>;
+  endJourney: (endKm: string, observations?: string) => Promise<void>;
   updateLocation: (location: string) => void;
+  cancelJourney: () => void;
   getTotalElapsedSeconds: () => number;
   getDrivingSeconds: () => number;
   getRestSeconds: () => number;
   getMealSeconds: () => number;
-  cancelJourney: () => void;
+  confirmVehicleSelection: () => void;
 }
 
 const STORAGE_KEY = "trl_journey_state";
@@ -106,13 +109,12 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
   const [journey, setJourney] = useState<JourneyState>(defaultJourneyState);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Load from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as JourneyState;
-        if (parsed.isActive && parsed.startTime) {
+        if (parsed.isActive) {
           setJourney(parsed);
         }
       }
@@ -122,7 +124,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     setIsHydrated(true);
   }, []);
 
-  // Check for active journey in backend (sync)
   useEffect(() => {
     const checkActiveJourney = async () => {
       if (user?.id && !journey.isActive) {
@@ -130,6 +131,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           const active = await buscarJornadaAtivaAPI(user.id);
           if (active) {
             console.log("Jornada ativa encontrada no banco:", active);
+            // TODO: Restaurar estado do banco se necessário
           }
         } catch (e) {
           console.error(e);
@@ -139,7 +141,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     if (isHydrated) checkActiveJourney();
   }, [user, isHydrated, journey.isActive]);
 
-  // Save to localStorage on changes
   useEffect(() => {
     if (isHydrated) {
       try {
@@ -154,7 +155,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     }
   }, [journey, isHydrated]);
 
-  // --- TIME CALCULATIONS ---
+  // Cálculos de tempo (mantidos iguais)
   const getCurrentSegmentSeconds = useCallback(() => {
     if (!journey.currentSegmentStart) return 0;
     return Math.floor((Date.now() - journey.currentSegmentStart) / 1000);
@@ -194,7 +195,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     getCurrentSegmentSeconds,
   ]);
 
-  // --- ACTIONS ---
+  // --- AÇÕES ---
 
   const selectVehicle = useCallback((vehicle: VehicleData) => {
     setJourney((prev) => ({
@@ -202,27 +203,33 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       isActive: true,
       status: "vehicle_selection",
       selectedVehicle: vehicle,
+      vehicleData: vehicle,
     }));
   }, []);
 
   const confirmVehicleSelection = useCallback(() => {
-    setJourney((prev) => ({
-      ...prev,
-      status: "inspection",
-      inspectionItems: [],
-      hasProblems: false,
-    }));
+    setJourney((prev) => {
+      if (!prev.selectedVehicle) return prev;
+      return {
+        ...prev,
+        status: "inspection", // Avança para a vistoria
+      };
+    });
   }, []);
 
   const startInspection = useCallback(() => {
-    setJourney((prev) => ({
-      ...prev,
-      isActive: true,
-      status: "vehicle_selection",
-      selectedVehicle: null,
-      inspectionItems: [],
-      hasProblems: false,
-    }));
+    setJourney((prev) => {
+      if (prev.inspectionItems.length > 0) {
+        return { ...prev, status: "inspection" };
+      }
+      return {
+        ...prev,
+        isActive: true,
+        status: "inspection",
+        inspectionItems: [],
+        hasProblems: false,
+      };
+    });
   }, []);
 
   const updateInspectionItem = useCallback(
@@ -239,6 +246,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           newItems.push({ id, checked, problem });
         }
 
+        console.log("Checklist atualizado:", newItems); // Debug visual
         return { ...prev, inspectionItems: newItems };
       });
     },
@@ -253,21 +261,24 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  // --- START JOURNEY (INTEGRATED WITH BACKEND) ---
   const startJourney = useCallback(
-    async (startKm: string, location: string) => {
+    async (startKm: string, vehicleData: VehicleData, location: string) => {
       const now = Date.now();
 
-      // Convert inspection items to backend format
+      // DEBUG: Verificando o que está sendo convertido
+      console.log("Itens no Estado:", journey.inspectionItems);
+
       const checklistItemsMap = journey.inspectionItems.reduce(
-        (acc: Record<string, boolean>, item) => {
-          acc[item.id] = item.checked === true;
+        (acc: any, item) => {
+          acc[item.id] = item.checked;
           return acc;
         },
         {},
       );
 
-      // Capture problem notes
+      // DEBUG: Verificando o mapa final
+      console.log("Checklist MAP a enviar:", checklistItemsMap);
+
       const problemsNote = journey.inspectionItems
         .filter((i) => !i.checked && i.problem)
         .map((i) => `${i.id}: ${i.problem}`)
@@ -275,12 +286,10 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 
       try {
         if (!user?.id) throw new Error("Usuário não identificado");
-        if (!journey.selectedVehicle)
-          throw new Error("Veículo não selecionado");
 
         const data = await iniciarJornadaAPI({
           driverId: Number(user.id),
-          vehicleId: journey.selectedVehicle.id,
+          vehicleId: journey.selectedVehicle ? journey.selectedVehicle.id : 1,
           startLocation: location,
           startOdometer: Number(startKm),
           checklist: {
@@ -289,9 +298,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           },
         });
 
-        console.log("Jornada criada no backend:", data);
+        console.log("Resposta Backend Iniciar:", data);
 
-        // Update local state
         setJourney((prev) => ({
           ...prev,
           journeyId: data.id,
@@ -299,7 +307,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           startTime: now,
           currentSegmentStart: now,
           startKm,
-          vehicleData: prev.selectedVehicle,
+          vehicleData,
           lastLocation: location,
           accumulatedDrivingSeconds: 0,
           accumulatedRestSeconds: 0,
@@ -307,18 +315,16 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         }));
       } catch (error) {
         console.error("Erro ao iniciar jornada:", error);
-        throw error;
+        alert("Erro de conexão ao iniciar jornada. Tente novamente.");
       }
     },
     [journey.inspectionItems, journey.selectedVehicle, user],
   );
 
-  // --- PAUSE (INTEGRATED) ---
+  // ... (pauseJourney, resumeJourney, startCheckout mantidos iguais) ...
   const pauseJourney = useCallback(
     async (type: "rest" | "meal") => {
       const now = Date.now();
-
-      // Update backend
       if (journey.journeyId) {
         registrarEventoJornadaAPI({
           journeyId: journey.journeyId,
@@ -326,12 +332,10 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           location: journey.lastLocation,
         }).catch(console.error);
       }
-
       setJourney((prev) => {
         const segmentSeconds = prev.currentSegmentStart
           ? Math.floor((now - prev.currentSegmentStart) / 1000)
           : 0;
-
         return {
           ...prev,
           status: type === "rest" ? "resting" : "meal",
@@ -346,11 +350,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     [journey.journeyId, journey.lastLocation],
   );
 
-  // --- RESUME (INTEGRATED) ---
   const resumeJourney = useCallback(async () => {
     const now = Date.now();
-
-    // Update backend
     if (journey.journeyId) {
       const eventType = journey.status === "resting" ? "end_rest" : "end_meal";
       registrarEventoJornadaAPI({
@@ -359,12 +360,10 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         location: journey.lastLocation,
       }).catch(console.error);
     }
-
     setJourney((prev) => {
       const segmentSeconds = prev.currentSegmentStart
         ? Math.floor((now - prev.currentSegmentStart) / 1000)
         : 0;
-
       return {
         ...prev,
         status: "on_journey",
@@ -387,7 +386,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       const segmentSeconds = prev.currentSegmentStart
         ? Math.floor((now - prev.currentSegmentStart) / 1000)
         : 0;
-
       return {
         ...prev,
         status: "checkout",
@@ -400,7 +398,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // --- END JOURNEY (INTEGRATED) ---
   const endJourney = useCallback(
     async (endKm?: string, observations?: string) => {
       if (journey.journeyId && endKm) {
@@ -422,10 +419,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     [journey.journeyId, journey.lastLocation],
   );
 
-  const cancelJourney = useCallback(() => {
-    setJourney(defaultJourneyState);
-  }, []);
-
   const updateLocation = useCallback((location: string) => {
     setJourney((prev) => ({
       ...prev,
@@ -433,10 +426,12 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  // Don't render children until hydrated to prevent hydration mismatch
-  if (!isHydrated) {
-    return null;
-  }
+  const cancelJourney = useCallback(() => {
+    setJourney(defaultJourneyState);
+    localStorage.removeItem(STORAGE_KEY);
+  }, []);
+
+  if (!isHydrated) return null;
 
   return (
     <JourneyContext.Provider
@@ -453,11 +448,14 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         startCheckout,
         endJourney,
         updateLocation,
+
+        // ADICIONE AQUI NA LISTA DE EXPORTAÇÃO:
+        cancelJourney,
+
         getTotalElapsedSeconds,
         getDrivingSeconds,
         getRestSeconds,
         getMealSeconds,
-        cancelJourney,
       }}
     >
       {children}

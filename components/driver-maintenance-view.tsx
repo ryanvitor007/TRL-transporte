@@ -9,6 +9,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { buscarManutencoesAPI } from "@/lib/api-service";
+import { ChecklistMaintenanceModal } from "@/components/checklist-maintenance-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +85,8 @@ interface MaintenanceRecord {
   invoice_url?: string;
   requested_by: string;
   photos?: string[];
+  checklist_data?: any;
+  checklistData?: any;
 }
 
 // --- STATUS CONFIG ---
@@ -252,6 +256,7 @@ function EmptyState() {
 export function DriverMaintenanceView() {
   const { user } = useAuth();
   const driverName = user?.name || "Motorista";
+  const [showChecklistModal, setShowChecklistModal] = useState(false);
 
   // --- LOADING/ERROR STATES ---
   const [isLoading, setIsLoading] = useState(true);
@@ -443,10 +448,19 @@ export function DriverMaintenanceView() {
     setUploadedInvoice(null);
   };
 
+  // detalhes da manutencao
   const openDetails = (maintenance: MaintenanceRecord) => {
     setSelectedMaintenance(maintenance);
     setIsEditMode(false);
-    setIsDetailsOpen(true);
+
+    if (
+      maintenance.type === "Corretiva - Checklist" ||
+      maintenance.checklist_data
+    ) {
+      setShowChecklistModal(true);
+    } else {
+      setIsDetailsOpen(true); // Usando o nome correto da variável de estado existente
+    }
   };
 
   const openEditMode = () => {
@@ -1144,6 +1158,32 @@ export function DriverMaintenanceView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* --- MODAL ESPECÍFICO: DETALHES DO CHECKLIST --- */}
+      {/* CORREÇÃO: Adicionamos '&& showChecklistModal' para só renderizar se tiver aberto */}
+      {selectedMaintenance && showChecklistModal && (
+        <ChecklistMaintenanceModal
+          open={showChecklistModal}
+          onOpenChange={setShowChecklistModal}
+          maintenance={{
+            ...selectedMaintenance,
+            checklistData:
+              selectedMaintenance.checklist_data ||
+              selectedMaintenance.checklistData,
+            // Garante campos obrigatórios para evitar erros com dados mocados incompletos
+            id: selectedMaintenance.id,
+            vehicle_id: selectedMaintenance.vehicle_id,
+            vehicle_plate: selectedMaintenance.vehicle_plate || "N/A",
+            vehicle_model: selectedMaintenance.vehicle_model || "N/A",
+            type: selectedMaintenance.type,
+            description: selectedMaintenance.description,
+            scheduled_date: selectedMaintenance.scheduled_date,
+            cost: selectedMaintenance.cost || 0,
+            status: selectedMaintenance.status,
+            provider: selectedMaintenance.provider || "Interno",
+            km_at_maintenance: selectedMaintenance.km_at_maintenance || 0,
+          }}
+        />
+      )}
 
       {/* DIALOG: DETALHES - MOBILE OPTIMIZED */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
@@ -1544,7 +1584,6 @@ export function DriverMaintenanceView() {
               )}
             </div>
           </div>
-
           {/* Footer Controls */}
           <div
             className="shrink-0 p-4 bg-black/50 backdrop-blur-sm"
