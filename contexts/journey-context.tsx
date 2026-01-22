@@ -269,16 +269,14 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
 
       // TRANSFORMAÇÃO DE DADOS (CRUCIAL):
-      // Converte o Array da UI para o Objeto JSON que o Banco espera
-      const checklistItemsMap = journey.inspectionItems.reduce<
-        Record<string, boolean>
-      >((acc, item) => {
-        // Só envia itens que foram explicitamente marcados (true/false)
-        if (item.checked === true || item.checked === false) {
-          acc[item.id] = item.checked;
-        }
-        return acc;
-      }, {});
+      // Converte o Array da UI para a lista estruturada que a API espera
+      const checklistItemsPayload = journey.inspectionItems
+        .filter((item) => item.checked === true || item.checked === false)
+        .map((item) => ({
+          id: item.id,
+          checked: item.checked,
+          problem: item.problem || null,
+        }));
 
       // Monta as notas de problemas
       const problemsNote = journey.inspectionItems
@@ -303,7 +301,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           startLocation: location,
           startOdometer: Number(startKm),
           checklist: {
-            items: checklistItemsMap, // Envia o Objeto formatado { "pneu": false }
+            items: checklistItemsPayload,
             notes: problemsNote,
           },
         });
