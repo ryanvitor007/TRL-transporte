@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { useToastNotification } from "@/contexts/notification-context";
 import {
   iniciarJornadaAPI,
   finalizarJornadaAPI,
@@ -106,6 +107,7 @@ const JourneyContext = createContext<JourneyContextType | undefined>(undefined);
 
 export function JourneyProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const toast = useToastNotification();
   const [journey, setJourney] = useState<JourneyState>(defaultJourneyState);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -267,22 +269,25 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 
       // TRANSFORMAÇÃO DE DADOS (CRUCIAL):
       // Converte o Array da UI para o Objeto JSON que o Banco espera
-      const checklistItemsMap = journey.inspectionItems.reduce(
-        (acc: any, item) => {
-          // Só envia itens que foram explicitamente marcados (true/false)
-          if (item.checked !== null && item.checked !== undefined) {
-            acc[item.id] = item.checked;
-          }
-          return acc;
-        },
-        {},
-      );
+      const checklistItemsMap = journey.inspectionItems.reduce<
+        Record<string, boolean>
+      >((acc, item) => {
+        // Só envia itens que foram explicitamente marcados (true/false)
+        if (item.checked === true || item.checked === false) {
+          acc[item.id] = item.checked;
+        }
+        return acc;
+      }, {});
 
       // Monta as notas de problemas
       const problemsNote = journey.inspectionItems
         .filter((i) => i.checked === false && i.problem)
         .map((i) => `${i.id}: ${i.problem}`)
         .join("; ");
+
+      const hasRejectedItems =
+        journey.hasProblems ||
+        journey.inspectionItems.some((item) => item.checked === false);
 
       try {
         if (!user?.id) throw new Error("Usuário não identificado");
@@ -301,6 +306,13 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
             notes: problemsNote,
           },
         });
+
+        if (hasRejectedItems) {
+          toast.warning(
+            "Manutencao gerada automaticamente",
+            "Itens reprovados na vistoria foram enviados para manutencao.",
+          );
+        }
 
         // ... (o restante da função que atualiza o setJourney mantém igual)
         console.log("Resposta Backend Iniciar:", data);
@@ -323,7 +335,13 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         alert("Erro de conexão ao iniciar jornada. Tente novamente.");
       }
     },
-    [journey.inspectionItems, journey.selectedVehicle, user],
+    [
+      journey.inspectionItems,
+      journey.selectedVehicle,
+      journey.hasProblems,
+      toast,
+      user,
+    ],
   );
 
   // ... (pauseJourney, resumeJourney, startCheckout mantidos iguais) ...

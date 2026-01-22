@@ -54,11 +54,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <JourneyProvider>
-              <AppProvider>
-                <NotificationProvider>{children}</NotificationProvider>
-              </AppProvider>
-            </JourneyProvider>
+            <NotificationProvider>
+              <JourneyProvider>
+                <AppProvider>{children}</AppProvider>
+              </JourneyProvider>
+            </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>
         <Analytics />

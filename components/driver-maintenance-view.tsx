@@ -168,6 +168,7 @@ const generateDriverMaintenanceRecords = (
   for (let i = 0; i < 15; i++) {
     const vehicle = mockVehicles[i % 3];
     const status = statuses[i % 4];
+    const createdAt = format(subDays(new Date(), i * 3), "yyyy-MM-dd");
     records.push({
       id: i + 1,
       vehicle_id: vehicle.id,
@@ -175,13 +176,15 @@ const generateDriverMaintenanceRecords = (
       vehicle_model: vehicle.modelo,
       type: types[i % 3],
       description: `${problemTypes[i % 9].label} - Servico agendado para revisao completa do sistema`,
-      scheduled_date: format(subDays(new Date(), i * 3), "yyyy-MM-dd"),
+      scheduled_date: createdAt,
       completed_date:
         status === "Concluida"
           ? format(subDays(new Date(), i * 3 - 1), "yyyy-MM-dd")
           : undefined,
       cost: Math.floor(500 + Math.random() * 2000),
       status,
+      priority: status === "Urgente" ? "Critica" : "Media",
+      created_at: createdAt,
       provider: ["Oficina Central", "Auto Mecanica Silva", "Truck Service"][
         i % 3
       ],
@@ -351,15 +354,21 @@ export function DriverMaintenanceView() {
 
         // CORREÇÃO DO ERRO 2322 (Type string is not assignable)
         // Mapeamos e dizemos ao TS: "Confie em mim, isso é um MaintenanceRecord"
-        const safeData = sorted.map((item: any) => ({
-          ...item,
-          checklistData: item.checklist_data || item.checklistData,
-          // Preenche os campos auxiliares que o erro 2339 reclamou
-          vehicle_plate: item.vehicle?.placa,
-          vehicle_model: item.vehicle?.modelo,
-          status: item.status,
-          priority: item.priority,
-        })) as MaintenanceRecord[];
+        const safeData = sorted.map((item: any) => {
+          const fallbackDate =
+            item.scheduled_date || item.created_at || new Date().toISOString();
+          return {
+            ...item,
+            checklistData: item.checklist_data || item.checklistData,
+            // Preenche os campos auxiliares que o erro 2339 reclamou
+            vehicle_plate: item.vehicle?.placa,
+            vehicle_model: item.vehicle?.modelo,
+            status: item.status || "Agendada",
+            priority: item.priority || "Media",
+            created_at: item.created_at || fallbackDate,
+            scheduled_date: item.scheduled_date || fallbackDate,
+          };
+        }) as MaintenanceRecord[];
 
         setMaintenances(safeData);
       } catch (error) {
@@ -515,10 +524,15 @@ export function DriverMaintenanceView() {
         problemType: selectedMaintenance.description.split(" - ")[0],
         description: selectedMaintenance.description,
         urgency: selectedMaintenance.status === "Urgente" ? "alta" : "media",
-        scheduledDate: selectedMaintenance.scheduled_date,
-        km: String(selectedMaintenance.km_at_maintenance),
-        provider: selectedMaintenance.provider,
-        estimatedCost: String(selectedMaintenance.cost),
+        scheduledDate:
+          selectedMaintenance.scheduled_date ?? format(new Date(), "yyyy-MM-dd"),
+        km:
+          selectedMaintenance.km_at_maintenance != null
+            ? String(selectedMaintenance.km_at_maintenance)
+            : "",
+        provider: selectedMaintenance.provider ?? "",
+        estimatedCost:
+          selectedMaintenance.cost != null ? String(selectedMaintenance.cost) : "",
       });
       setSelectedVehicleId(String(selectedMaintenance.vehicle_id));
       setIsEditMode(true);
@@ -814,7 +828,9 @@ export function DriverMaintenanceView() {
                     statusConfig["Agendada"];
                   const StatusIcon = config.icon;
                   const relativeDate = formatDistanceToNow(
-                    new Date(maintenance.scheduled_date),
+                    new Date(
+                      maintenance.scheduled_date ?? maintenance.created_at,
+                    ),
                     {
                       addSuffix: true,
                       locale: ptBR,
@@ -1284,7 +1300,10 @@ export function DriverMaintenanceView() {
                     <p className="text-xs text-muted-foreground">Data</p>
                     <p className="text-sm font-medium">
                       {format(
-                        new Date(selectedMaintenance.scheduled_date),
+                        new Date(
+                          selectedMaintenance.scheduled_date ??
+                            selectedMaintenance.created_at,
+                        ),
                         "dd/MM/yy",
                       )}
                     </p>
@@ -1293,9 +1312,9 @@ export function DriverMaintenanceView() {
                     <Gauge className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
                     <p className="text-xs text-muted-foreground">KM</p>
                     <p className="text-sm font-medium">
-                      {(selectedMaintenance.km_at_maintenance / 1000).toFixed(
-                        0,
-                      )}
+                      {(
+                        (selectedMaintenance.km_at_maintenance ?? 0) / 1000
+                      ).toFixed(0)}
                       k
                     </p>
                   </div>
@@ -1303,7 +1322,7 @@ export function DriverMaintenanceView() {
                     <DollarSign className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
                     <p className="text-xs text-muted-foreground">Custo</p>
                     <p className="text-sm font-medium">
-                      R$ {selectedMaintenance.cost.toLocaleString()}
+                      R$ {(selectedMaintenance.cost ?? 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -1460,11 +1479,11 @@ export function DriverMaintenanceView() {
                 <p className="font-medium">
                   {selectedMaintenance.description.split(" - ")[0]}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  {selectedMaintenance.vehicle_plate} - R${" "}
-                  {selectedMaintenance.cost.toLocaleString()}
-                </p>
-              </div>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedMaintenance.vehicle_plate} - R${" "}
+                    {(selectedMaintenance.cost ?? 0).toLocaleString()}
+                  </p>
+                </div>
             )}
 
             {/* Invoice Upload */}
