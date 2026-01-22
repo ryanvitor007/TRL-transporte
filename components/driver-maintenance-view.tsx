@@ -136,6 +136,7 @@ const statusConfig: Record<
 const maintenanceTypes = [
   { value: "Preventiva", label: "Preventiva" },
   { value: "Corretiva", label: "Corretiva" },
+  { value: "Corretiva - Checklist", label: "Corretiva - Checklist" },
   { value: "Preditiva", label: "Preditiva" },
 ];
 
@@ -525,14 +526,17 @@ export function DriverMaintenanceView() {
         description: selectedMaintenance.description,
         urgency: selectedMaintenance.status === "Urgente" ? "alta" : "media",
         scheduledDate:
-          selectedMaintenance.scheduled_date ?? format(new Date(), "yyyy-MM-dd"),
+          selectedMaintenance.scheduled_date ??
+          format(new Date(), "yyyy-MM-dd"),
         km:
           selectedMaintenance.km_at_maintenance != null
             ? String(selectedMaintenance.km_at_maintenance)
             : "",
         provider: selectedMaintenance.provider ?? "",
         estimatedCost:
-          selectedMaintenance.cost != null ? String(selectedMaintenance.cost) : "",
+          selectedMaintenance.cost != null
+            ? String(selectedMaintenance.cost)
+            : "",
       });
       setSelectedVehicleId(String(selectedMaintenance.vehicle_id));
       setIsEditMode(true);
@@ -545,6 +549,8 @@ export function DriverMaintenanceView() {
         return "bg-blue-100 text-blue-700";
       case "Corretiva":
         return "bg-orange-100 text-orange-700";
+      case "Corretiva - Checklist":
+        return "bg-red-100 text-red-700 font-bold";
       case "Preditiva":
         return "bg-purple-100 text-purple-700";
       default:
@@ -1479,11 +1485,11 @@ export function DriverMaintenanceView() {
                 <p className="font-medium">
                   {selectedMaintenance.description.split(" - ")[0]}
                 </p>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedMaintenance.vehicle_plate} - R${" "}
-                    {(selectedMaintenance.cost ?? 0).toLocaleString()}
-                  </p>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  {selectedMaintenance.vehicle_plate} - R${" "}
+                  {(selectedMaintenance.cost ?? 0).toLocaleString()}
+                </p>
+              </div>
             )}
 
             {/* Invoice Upload */}

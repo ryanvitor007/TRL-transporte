@@ -221,13 +221,14 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 
   const startInspection = useCallback(() => {
     setJourney((prev) => {
-      if (prev.inspectionItems.length > 0) {
-        return { ...prev, status: "inspection" };
-      }
+      const hasSelectedVehicle = Boolean(prev.selectedVehicle);
+      const nextStatus: JourneyStatus = hasSelectedVehicle
+        ? "inspection"
+        : "vehicle_selection";
       return {
         ...prev,
         isActive: true,
-        status: "inspection",
+        status: nextStatus,
         inspectionItems: [],
         hasProblems: false,
       };

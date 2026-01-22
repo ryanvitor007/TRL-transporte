@@ -261,6 +261,13 @@ export function DriverJourneyView() {
     cancelJourney, // Certifique-se de que esta função está no Contexto
   } = useJourney();
 
+  const handleChangeVehicle = () => {
+    if (journey.selectedVehicle) {
+      // Ao "selecionar" o veiculo novamente, o Contexto reseta o status.
+      selectVehicle(journey.selectedVehicle);
+    }
+  };
+
   // --- LOADING/ERROR STATES ---
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -1102,6 +1109,14 @@ export function DriverJourneyView() {
                 {journey.selectedVehicle.model}
               </p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleChangeVehicle}
+              className="text-xs shrink-0 bg-transparent"
+            >
+              Trocar Veiculo
+            </Button>
           </div>
         )}
 
