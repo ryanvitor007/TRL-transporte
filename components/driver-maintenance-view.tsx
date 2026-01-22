@@ -69,24 +69,37 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 
 // --- INTERFACES ---
-interface MaintenanceRecord {
+// Localize a interface existente e SUBSTITUA por esta atualizada:
+export interface MaintenanceRecord {
   id: number;
   vehicle_id: number;
-  vehicle_plate: string;
-  vehicle_model: string;
   type: string;
   description: string;
-  scheduled_date: string;
-  completed_date?: string;
-  cost: number;
-  status: string;
-  provider: string;
-  km_at_maintenance: number;
-  invoice_url?: string;
-  requested_by: string;
-  photos?: string[];
+  // Adicionei | string para evitar erro se a API trouxer algo diferente, mas mantive as sugestões
+  status: "Pendente" | "Em Andamento" | "Concluída" | "Cancelada" | string;
+  priority: "Baixa" | "Média" | "Alta" | "Crítica" | string;
+  created_at: string;
+
+  // CORREÇÃO DOS ERROS 2339 (Propriedades faltando)
   checklist_data?: any;
   checklistData?: any;
+  vehicle_plate?: string; // Adicionado para compatibilidade
+  vehicle_model?: string; // Adicionado para compatibilidade
+
+  // Relacionamento com veículo
+  vehicle?: {
+    placa: string;
+    modelo?: string;
+  };
+
+  cost?: number;
+  provider?: string;
+  scheduled_date?: string;
+  completed_date?: string;
+  invoice_url?: string;
+  requested_by?: string;
+  photos?: string[];
+  km_at_maintenance?: number;
 }
 
 // --- STATUS CONFIG ---
@@ -322,9 +335,41 @@ export function DriverMaintenanceView() {
     }
   };
 
+  // Carrega dados reais da API
   useEffect(() => {
+    async function loadData() {
+      try {
+        setIsLoading(true); // Usando o nome correto da variável
+
+        const data = await buscarManutencoesAPI();
+
+        // Ordena por data
+        const sorted = (data || []).sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+
+        // CORREÇÃO DO ERRO 2322 (Type string is not assignable)
+        // Mapeamos e dizemos ao TS: "Confie em mim, isso é um MaintenanceRecord"
+        const safeData = sorted.map((item: any) => ({
+          ...item,
+          checklistData: item.checklist_data || item.checklistData,
+          // Preenche os campos auxiliares que o erro 2339 reclamou
+          vehicle_plate: item.vehicle?.placa,
+          vehicle_model: item.vehicle?.modelo,
+          status: item.status,
+          priority: item.priority,
+        })) as MaintenanceRecord[];
+
+        setMaintenances(safeData);
+      } catch (error) {
+        console.error("Erro ao carregar manutenções:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
     loadData();
-  }, [driverName]);
+  }, []);
 
   const isAnyFilterActive = useMemo(() => {
     return (
@@ -1160,23 +1205,31 @@ export function DriverMaintenanceView() {
       </Dialog>
       {/* --- MODAL ESPECÍFICO: DETALHES DO CHECKLIST --- */}
       {/* CORREÇÃO: Adicionamos '&& showChecklistModal' para só renderizar se tiver aberto */}
+      {/* MODAL DE CHECKLIST */}
+      {/* MODAL DE CHECKLIST */}
       {selectedMaintenance && showChecklistModal && (
         <ChecklistMaintenanceModal
           open={showChecklistModal}
           onOpenChange={setShowChecklistModal}
           maintenance={{
             ...selectedMaintenance,
+            // Garante que o modal receba o JSON correto
             checklistData:
               selectedMaintenance.checklist_data ||
               selectedMaintenance.checklistData,
-            // Garante campos obrigatórios para evitar erros com dados mocados incompletos
+
+            // Tratamento de campos obrigatórios para evitar crash
             id: selectedMaintenance.id,
             vehicle_id: selectedMaintenance.vehicle_id,
-            vehicle_plate: selectedMaintenance.vehicle_plate || "N/A",
-            vehicle_model: selectedMaintenance.vehicle_model || "N/A",
+            // Acessa o veículo com segurança usando ?. (optional chaining)
+            vehicle_plate: selectedMaintenance.vehicle?.placa || "N/A",
+            vehicle_model:
+              selectedMaintenance.vehicle?.modelo || "Modelo não inf.",
+
             type: selectedMaintenance.type,
             description: selectedMaintenance.description,
-            scheduled_date: selectedMaintenance.scheduled_date,
+            scheduled_date:
+              selectedMaintenance.scheduled_date || new Date().toISOString(),
             cost: selectedMaintenance.cost || 0,
             status: selectedMaintenance.status,
             provider: selectedMaintenance.provider || "Interno",

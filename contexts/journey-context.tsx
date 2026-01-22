@@ -265,39 +265,44 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     async (startKm: string, vehicleData: VehicleData, location: string) => {
       const now = Date.now();
 
-      // DEBUG: Verificando o que está sendo convertido
-      console.log("Itens no Estado:", journey.inspectionItems);
-
+      // TRANSFORMAÇÃO DE DADOS (CRUCIAL):
+      // Converte o Array da UI para o Objeto JSON que o Banco espera
       const checklistItemsMap = journey.inspectionItems.reduce(
         (acc: any, item) => {
-          acc[item.id] = item.checked;
+          // Só envia itens que foram explicitamente marcados (true/false)
+          if (item.checked !== null && item.checked !== undefined) {
+            acc[item.id] = item.checked;
+          }
           return acc;
         },
         {},
       );
 
-      // DEBUG: Verificando o mapa final
-      console.log("Checklist MAP a enviar:", checklistItemsMap);
-
+      // Monta as notas de problemas
       const problemsNote = journey.inspectionItems
-        .filter((i) => !i.checked && i.problem)
+        .filter((i) => i.checked === false && i.problem)
         .map((i) => `${i.id}: ${i.problem}`)
         .join("; ");
 
       try {
         if (!user?.id) throw new Error("Usuário não identificado");
 
+        // Garante o ID do veículo
+        const finalVehicleId = vehicleData?.id || journey.selectedVehicle?.id;
+        if (!finalVehicleId) throw new Error("Veículo não selecionado");
+
         const data = await iniciarJornadaAPI({
           driverId: Number(user.id),
-          vehicleId: journey.selectedVehicle ? journey.selectedVehicle.id : 1,
+          vehicleId: finalVehicleId,
           startLocation: location,
           startOdometer: Number(startKm),
           checklist: {
-            items: checklistItemsMap,
+            items: checklistItemsMap, // Envia o Objeto formatado { "pneu": false }
             notes: problemsNote,
           },
         });
 
+        // ... (o restante da função que atualiza o setJourney mantém igual)
         console.log("Resposta Backend Iniciar:", data);
 
         setJourney((prev) => ({
