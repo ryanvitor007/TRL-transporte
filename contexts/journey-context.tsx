@@ -307,7 +307,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           },
         };
 
-        console.log("PAYLOAD FINAL:", JSON.stringify(payload, null, 2));
+        console.log("PAYLOAD JSON INDO PRA API:", JSON.stringify(payload));
 
         const data = await iniciarJornadaAPI(payload);
 
