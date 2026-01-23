@@ -1,6 +1,20 @@
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
+const getAuthToken = () => {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("trl_auth_token");
+};
+
+const buildHeaders = (headers?: HeadersInit) => {
+  const token = getAuthToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(headers || {}),
+  };
+};
+
 // --- INTERFACES DE TIPAGEM ---
 
 export interface VeiculoDetran {
@@ -596,7 +610,7 @@ export async function iniciarJornadaAPI(dados: {
 }) {
   const response = await fetch(`${API_BASE_URL}/journeys`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify(dados),
   });
   return handleResponse(response);
@@ -608,7 +622,7 @@ export async function buscarJornadaAtivaAPI(motoristaId: number | string) {
       `${API_BASE_URL}/journeys/active/${motoristaId}`,
       {
         cache: "no-store",
-        headers: { "Content-Type": "application/json" },
+        headers: buildHeaders(),
       },
     );
 
@@ -631,7 +645,7 @@ export async function registrarEventoJornadaAPI(dados: {
   // types: 'start_rest', 'end_rest', 'start_meal', 'end_meal', etc.
   const response = await fetch(`${API_BASE_URL}/journeys/events`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify(dados),
   });
   return handleResponse(response);
@@ -647,7 +661,7 @@ export async function finalizarJornadaAPI(
 ) {
   const response = await fetch(`${API_BASE_URL}/journeys/${journeyId}/finish`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify(dados),
   });
   return handleResponse(response);
