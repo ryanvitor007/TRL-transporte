@@ -83,6 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Chamada real à API
       const data = await loginAPI({ email, password });
+      const token =
+        data.token || data.accessToken || data.access_token || data.jwt;
 
       // Mapeia a resposta do banco para o formato de usuário do front-end
       const userData: User = {
@@ -97,6 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(userData);
       localStorage.setItem("trl_user", JSON.stringify(userData));
+      if (token) {
+        localStorage.setItem("trl_auth_token", token);
+      }
       return true;
     } catch (error) {
       console.error("Erro ao fazer login:", error);
@@ -107,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem("trl_user");
+    localStorage.removeItem("trl_auth_token");
     router.push("/login");
   };
 
