@@ -269,12 +269,11 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
 
       // TRANSFORMAÇÃO DE DADOS (CRUCIAL):
-      // Converte o Array da UI para o Objeto JSON que o Banco espera
-      const checklistItemsMap = journey.inspectionItems.reduce<
+      // Converte o Array da UI para o Objeto JSON que o Backend espera
+      const checklistItemsPayload = journey.inspectionItems.reduce<
         Record<string, boolean>
       >((acc, item) => {
-        // Só envia itens que foram explicitamente marcados (true/false)
-        if (item.checked === true || item.checked === false) {
+        if (item.checked !== null && item.checked !== undefined) {
           acc[item.id] = item.checked;
         }
         return acc;
@@ -297,16 +296,20 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         const finalVehicleId = vehicleData?.id || journey.selectedVehicle?.id;
         if (!finalVehicleId) throw new Error("Veículo não selecionado");
 
-        const data = await iniciarJornadaAPI({
+        const payload = {
           driverId: Number(user.id),
           vehicleId: finalVehicleId,
           startLocation: location,
           startOdometer: Number(startKm),
           checklist: {
-            items: checklistItemsMap, // Envia o Objeto formatado { "pneu": false }
+            items: checklistItemsPayload,
             notes: problemsNote,
           },
-        });
+        };
+
+        console.log("PAYLOAD REAL:", JSON.stringify(payload));
+
+        const data = await iniciarJornadaAPI(payload);
 
         if (hasRejectedItems) {
           toast.warning(
