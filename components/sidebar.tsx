@@ -17,6 +17,7 @@ import {
   AlertOctagon,
   Gauge,
   ClipboardList,
+  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMobile } from "@/hooks/use-mobile";
@@ -28,6 +29,7 @@ interface SidebarProps {
 
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "monitoring", label: "Monitoramento", icon: Radio },
   { id: "fleet", label: "Frota", icon: Car },
   { id: "financials", label: "Financeiro & TCO", icon: DollarSign },
   { id: "tires", label: "Gestão de Pneus", icon: CircleDot },

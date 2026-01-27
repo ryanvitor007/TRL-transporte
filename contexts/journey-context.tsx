@@ -15,6 +15,7 @@ import {
   finalizarJornadaAPI,
   registrarEventoJornadaAPI,
   buscarJornadaAtivaAPI,
+  buscarStatusJornadaAPI,
 } from "@/lib/api-service";
 
 export type JourneyStatus =
@@ -22,10 +23,12 @@ export type JourneyStatus =
   | "inspection"
   | "ready_to_start"
   | "vehicle_selection"
+  | "pending_approval"
   | "on_journey"
   | "resting"
   | "meal"
-  | "checkout";
+  | "checkout"
+  | "blocked";
 
 export interface VehicleData {
   id: number;
@@ -54,6 +57,8 @@ export interface JourneyState {
   currentSegmentStart: number | null;
   inspectionItems: InspectionItemState[];
   hasProblems: boolean;
+  pendingApprovalSince: number | null;
+  blockReason: string | null;
 }
 
 interface JourneyContextType {
@@ -82,6 +87,9 @@ interface JourneyContextType {
   getRestSeconds: () => number;
   getMealSeconds: () => number;
   confirmVehicleSelection: () => void;
+  checkApprovalStatus: () => Promise<void>;
+  handleApprovalGranted: () => void;
+  handleJourneyBlocked: (reason: string) => void;
 }
 
 const STORAGE_KEY = "trl_journey_state";
@@ -101,6 +109,8 @@ const defaultJourneyState: JourneyState = {
   currentSegmentStart: null,
   inspectionItems: [],
   hasProblems: false,
+  pendingApprovalSince: null,
+  blockReason: null,
 };
 
 const JourneyContext = createContext<JourneyContextType | undefined>(undefined);
@@ -323,17 +333,28 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         console.log("[v0] === FIM DEBUG CHECKLIST ===");
 
         const data = await iniciarJornadaAPI(payload);
-
-        if (hasRejectedItems) {
-          toast.warning(
-            "Manutencao gerada automaticamente",
-            "Itens reprovados na vistoria foram enviados para manutencao.",
-          );
-        }
-
-        // ... (o restante da função que atualiza o setJourney mantém igual)
         console.log("Resposta Backend Iniciar:", data);
 
+        // Se tem itens rejeitados, entra em modo de espera de aprovacao
+        if (hasRejectedItems) {
+          toast.warning(
+            "Aguardando aprovacao",
+            "Checklist com problemas enviado para analise da central.",
+          );
+
+          setJourney((prev) => ({
+            ...prev,
+            journeyId: data.id,
+            status: "pending_approval",
+            pendingApprovalSince: now,
+            startKm,
+            vehicleData,
+            lastLocation: location,
+          }));
+          return;
+        }
+
+        // Jornada aprovada automaticamente (sem problemas no checklist)
         setJourney((prev) => ({
           ...prev,
           journeyId: data.id,
@@ -346,6 +367,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           accumulatedDrivingSeconds: 0,
           accumulatedRestSeconds: 0,
           accumulatedMealSeconds: 0,
+          pendingApprovalSince: null,
         }));
       } catch (error) {
         console.error("Erro ao iniciar jornada:", error);
@@ -471,6 +493,91 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
+  // Funcao para verificar status de aprovacao (polling)
+  const checkApprovalStatus = useCallback(async () => {
+    if (!journey.journeyId || journey.status !== "pending_approval") return;
+
+    try {
+      const status = await buscarStatusJornadaAPI(journey.journeyId);
+      
+      if (status === "active") {
+        // Admin aprovou - libera para jornada
+        const now = Date.now();
+        toast.success(
+          "Jornada autorizada",
+          "A central liberou sua viagem. Tenha uma boa jornada!",
+        );
+        setJourney((prev) => ({
+          ...prev,
+          status: "on_journey",
+          startTime: now,
+          currentSegmentStart: now,
+          pendingApprovalSince: null,
+          accumulatedDrivingSeconds: 0,
+          accumulatedRestSeconds: 0,
+          accumulatedMealSeconds: 0,
+        }));
+      } else if (status === "cancelled" || status === "blocked") {
+        // Admin bloqueou
+        toast.error(
+          "Jornada bloqueada",
+          "A central bloqueou esta viagem. Verifique com a manutencao.",
+        );
+        setJourney((prev) => ({
+          ...prev,
+          status: "blocked",
+          blockReason: "Bloqueado pela central - checklist reprovado",
+        }));
+      }
+    } catch (error) {
+      console.error("Erro ao verificar status de aprovacao:", error);
+    }
+  }, [journey.journeyId, journey.status, toast]);
+
+  // Handler quando aprovacao e concedida (chamado via socket ou polling)
+  const handleApprovalGranted = useCallback(() => {
+    const now = Date.now();
+    toast.success(
+      "Jornada autorizada",
+      "A central liberou sua viagem. Tenha uma boa jornada!",
+    );
+    setJourney((prev) => ({
+      ...prev,
+      status: "on_journey",
+      startTime: now,
+      currentSegmentStart: now,
+      pendingApprovalSince: null,
+      accumulatedDrivingSeconds: 0,
+      accumulatedRestSeconds: 0,
+      accumulatedMealSeconds: 0,
+    }));
+  }, [toast]);
+
+  // Handler quando jornada e bloqueada
+  const handleJourneyBlocked = useCallback((reason: string) => {
+    toast.error(
+      "Jornada bloqueada",
+      reason || "A central bloqueou esta viagem.",
+    );
+    setJourney((prev) => ({
+      ...prev,
+      status: "blocked",
+      blockReason: reason,
+    }));
+  }, [toast]);
+
+  // Polling automatico quando em estado de espera
+  useEffect(() => {
+    if (journey.status !== "pending_approval" || !journey.journeyId) return;
+
+    // Verifica a cada 5 segundos
+    const interval = setInterval(() => {
+      checkApprovalStatus();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [journey.status, journey.journeyId, checkApprovalStatus]);
+
   if (!isHydrated) return null;
 
   return (
@@ -489,8 +596,10 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         endJourney,
         updateLocation,
 
-        // ADICIONE AQUI NA LISTA DE EXPORTAÇÃO:
         cancelJourney,
+        checkApprovalStatus,
+        handleApprovalGranted,
+        handleJourneyBlocked,
 
         getTotalElapsedSeconds,
         getDrivingSeconds,

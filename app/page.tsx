@@ -15,6 +15,7 @@ import { TiresView } from "@/components/tires-view";
 import { IncidentsView } from "@/components/incidents-view";
 import { TachographView } from "@/components/tachograph-view";
 import { ReportsView } from "@/components/reports-view";
+import { MonitoringView } from "@/components/monitoring-view";
 import { Loader2 } from "lucide-react";
 
 export default function Home() {
@@ -46,6 +47,8 @@ export default function Home() {
     switch (activeView) {
       case "dashboard":
         return <DashboardView />;
+      case "monitoring":
+        return <MonitoringView />;
       case "fleet":
         return <FleetView />;
       case "financials":
