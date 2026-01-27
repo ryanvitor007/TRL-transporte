@@ -679,4 +679,164 @@ export function naoTiver(dado: any, mensagem = "NÃO TIVER") {
   }
   return dado;
 }
+
+// --- MÓDULO: MONITORAMENTO DE JORNADAS (ADMIN) ---
+
+export interface JornadaMonitoramento {
+  id: number;
+  driverId: number;
+  driverName: string;
+  driverPhoto?: string;
+  vehicleId: number;
+  vehiclePlate: string;
+  vehicleModel: string;
+  status:
+    | "pending_approval"
+    | "active"
+    | "resting"
+    | "meal"
+    | "finished"
+    | "cancelled";
+  startTime: string;
+  startLocation: string;
+  currentLocation?: string;
+  checklistItems?: Record<string, boolean>;
+  checklistNotes?: string;
+  rejectedItems?: string[];
+}
+
+// Adaptador para converter dados do banco para o frontend
+function adapterJornadaMonitoramento(data: any): JornadaMonitoramento {
+  // Processa itens rejeitados do checklist
+  let rejectedItems: string[] = [];
+  if (data.checklist?.items) {
+    rejectedItems = Object.entries(data.checklist.items)
+      .filter(([, value]) => value === false)
+      .map(([key]) => key);
+  }
+
+  return {
+    id: data.id,
+    driverId: data.driver_id || data.driverId,
+    driverName: data.driver?.name || data.driverName || "Motorista",
+    driverPhoto: data.driver?.photo || data.driverPhoto,
+    vehicleId: data.vehicle_id || data.vehicleId,
+    vehiclePlate: data.vehicle?.placa || data.vehiclePlate || "N/A",
+    vehicleModel: data.vehicle?.modelo
+      ? `${data.vehicle.marca} ${data.vehicle.modelo}`
+      : data.vehicleModel || "N/A",
+    status: data.status,
+    startTime: data.start_time || data.startTime || data.created_at,
+    startLocation: data.start_location || data.startLocation || "N/A",
+    currentLocation: data.current_location || data.currentLocation,
+    checklistItems: data.checklist?.items,
+    checklistNotes: data.checklist?.notes,
+    rejectedItems,
+  };
+}
+
+// Buscar todas as jornadas ativas para o painel de monitoramento
+export async function buscarJornadasMonitoramentoAPI(): Promise<
+  JornadaMonitoramento[]
+> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/journeys/monitoring`, {
+      method: "GET",
+      headers: buildHeaders(),
+      cache: "no-store",
+    });
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    return Array.isArray(data) ? data.map(adapterJornadaMonitoramento) : [];
+  } catch (error) {
+    console.error("Erro ao buscar jornadas para monitoramento:", error);
+    return [];
+  }
+}
+
+// Buscar historico de jornadas finalizadas do dia
+export async function buscarHistoricoJornadasDiaAPI(): Promise<
+  JornadaMonitoramento[]
+> {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const response = await fetch(
+      `${API_BASE_URL}/journeys/history?date=${today}`,
+      {
+        method: "GET",
+        headers: buildHeaders(),
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    return Array.isArray(data) ? data.map(adapterJornadaMonitoramento) : [];
+  } catch (error) {
+    console.error("Erro ao buscar historico de jornadas:", error);
+    return [];
+  }
+}
+
+// Autorizar jornada com risco (libera motorista com checklist reprovado)
+export async function autorizarJornadaComRiscoAPI(
+  journeyId: number,
+  adminNotes?: string,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/journeys/${journeyId}/authorize`,
+    {
+      method: "PATCH",
+      headers: buildHeaders(),
+      body: JSON.stringify({
+        status: "active",
+        adminNotes,
+        authorizedWithRisk: true,
+      }),
+    },
+  );
+  return handleResponse(response);
+}
+
+// Bloquear jornada e solicitar manutencao
+export async function bloquearJornadaAPI(journeyId: number, reason: string) {
+  const response = await fetch(`${API_BASE_URL}/journeys/${journeyId}/block`, {
+    method: "PATCH",
+    headers: buildHeaders(),
+    body: JSON.stringify({
+      status: "cancelled",
+      blockReason: reason,
+      createMaintenance: true,
+    }),
+  });
+  return handleResponse(response);
+}
+
+// Buscar status da jornada do motorista (para polling)
+export async function buscarStatusJornadaAPI(
+  journeyId: number,
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/journeys/${journeyId}/status`,
+      {
+        method: "GET",
+        headers: buildHeaders(),
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return data.status;
+  } catch (error) {
+    console.error("Erro ao buscar status da jornada:", error);
+    return null;
+  }
+}
+
 // API Service - Conexão Real com Backend NestJS e Adapters

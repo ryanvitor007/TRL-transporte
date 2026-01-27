@@ -649,6 +649,134 @@ export function DriverJourneyView() {
   }
 
   // ============================================
+  // RENDER: PENDING APPROVAL STATE (Waiting for Admin)
+  // ============================================
+  if (journey.status === "pending_approval") {
+    const waitingTime = journey.pendingApprovalSince
+      ? Math.floor((Date.now() - journey.pendingApprovalSince) / 1000)
+      : 0;
+    const waitingMins = Math.floor(waitingTime / 60);
+    const waitingSecs = waitingTime % 60;
+
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
+        <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-amber-100">
+          <div className="relative">
+            <Clock className="h-12 w-12 text-amber-600" />
+            <span className="absolute -right-1 -top-1 flex h-4 w-4">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex h-4 w-4 rounded-full bg-amber-500" />
+            </span>
+          </div>
+        </div>
+
+        <h2 className="mb-2 text-2xl font-bold text-foreground">
+          Aguardando Liberacao da Central
+        </h2>
+        <p className="mb-6 max-w-sm text-muted-foreground">
+          Seu checklist foi enviado para analise. A central precisa autorizar
+          sua viagem devido aos itens reprovados.
+        </p>
+
+        {/* Veiculo selecionado */}
+        {journey.vehicleData && (
+          <Card className="mb-6 w-full max-w-sm border-amber-200 bg-amber-50">
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100">
+                <Truck className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-semibold text-foreground">
+                  {journey.vehicleData.plate}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {journey.vehicleData.model}
+                </p>
+              </div>
+              <Badge className="bg-amber-500 text-white">Em Analise</Badge>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Tempo de espera */}
+        <div className="mb-6 rounded-lg border bg-muted/30 p-4">
+          <p className="text-sm text-muted-foreground">Tempo de espera</p>
+          <p className="text-3xl font-bold font-mono text-foreground">
+            {waitingMins.toString().padStart(2, "0")}:
+            {waitingSecs.toString().padStart(2, "0")}
+          </p>
+        </div>
+
+        {/* Info */}
+        <div className="mb-6 flex max-w-sm items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-left">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
+          <div className="text-sm">
+            <p className="font-medium text-amber-800">
+              Problemas detectados no checklist
+            </p>
+            <p className="mt-1 text-amber-700">
+              A central esta analisando os itens reprovados. Aguarde a
+              autorizacao ou entre em contato.
+            </p>
+          </div>
+        </div>
+
+        {/* Botao cancelar */}
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={handleCancelJourney}
+        >
+          <XCircle className="h-4 w-4" />
+          Cancelar e Voltar
+        </Button>
+      </div>
+    );
+  }
+
+  // ============================================
+  // RENDER: BLOCKED STATE (Admin blocked the journey)
+  // ============================================
+  if (journey.status === "blocked") {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
+        <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-red-100">
+          <XCircle className="h-12 w-12 text-red-600" />
+        </div>
+
+        <h2 className="mb-2 text-2xl font-bold text-foreground">
+          Jornada Bloqueada
+        </h2>
+        <p className="mb-6 max-w-sm text-muted-foreground">
+          A central bloqueou esta viagem. O veiculo foi encaminhado para
+          manutencao.
+        </p>
+
+        {/* Motivo do bloqueio */}
+        {journey.blockReason && (
+          <div className="mb-6 flex max-w-sm items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-left">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+            <div className="text-sm">
+              <p className="font-medium text-red-800">Motivo do bloqueio</p>
+              <p className="mt-1 text-red-700">{journey.blockReason}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Botao voltar */}
+        <Button
+          variant="default"
+          className="gap-2"
+          onClick={handleCancelJourney}
+        >
+          <Home className="h-4 w-4" />
+          Voltar ao Inicio
+        </Button>
+      </div>
+    );
+  }
+
+  // ============================================
   // RENDER: INACTIVE STATE (Start + History)
   // ============================================
   if (!journey.isActive || journey.status === "inactive") {

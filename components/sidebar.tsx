@@ -17,6 +17,7 @@ import {
   AlertOctagon,
   Gauge,
   ClipboardList,
+  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMobile } from "@/hooks/use-mobile";
@@ -28,6 +29,7 @@ interface SidebarProps {
 
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "monitoring", label: "Monitoramento", icon: Radio },
   { id: "fleet", label: "Frota", icon: Car },
   { id: "financials", label: "Financeiro & TCO", icon: DollarSign },
   { id: "tires", label: "Gestão de Pneus", icon: CircleDot },
@@ -77,7 +79,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
             <ChevronLeft
               className={cn(
                 "h-5 w-5 transition-transform",
-                isCollapsed && "rotate-180"
+                isCollapsed && "rotate-180",
               )}
             />
           </Button>
@@ -104,7 +106,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
               "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
               activeView === item.id
                 ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             )}
           >
             <item.icon className="h-5 w-5 shrink-0" />
@@ -154,7 +156,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     <aside
       className={cn(
         "sticky top-0 hidden h-screen border-r border-sidebar-border transition-all lg:block",
-        isCollapsed ? "w-16" : "w-64"
+        isCollapsed ? "w-16" : "w-64",
       )}
     >
       {sidebarContent}
