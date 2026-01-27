@@ -270,16 +270,23 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 
       // TRANSFORMAÇÃO DE DADOS (CRUCIAL):
       // Converte o Array da UI para o Objeto JSON que o Backend espera
+      // CORREÇÃO: Agora inclui TODOS os itens, mesmo os com checked = null (não interagidos)
+      // Isso garante que o backend receba o estado completo do checklist
       const checklistItemsPayload = journey.inspectionItems.reduce<
         Record<string, boolean>
       >((acc, item) => {
-        if (item.checked !== null && item.checked !== undefined) {
+        // Inclui o item se o valor for explicitamente true ou false
+        // Itens null (não preenchidos) são tratados como true (aprovado por padrão)
+        if (item.checked === true || item.checked === false) {
           acc[item.id] = item.checked;
+        } else if (item.checked === null) {
+          // Se o item não foi interagido, considera como aprovado
+          acc[item.id] = true;
         }
         return acc;
       }, {});
 
-      // Monta as notas de problemas
+      // Monta as notas de problemas (apenas itens explicitamente reprovados)
       const problemsNote = journey.inspectionItems
         .filter((i) => i.checked === false && i.problem)
         .map((i) => `${i.id}: ${i.problem}`)
@@ -303,11 +310,17 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           startOdometer: Number(startKm),
           checklist: {
             items: checklistItemsPayload,
-            notes: problemsNote,
+            notes: problemsNote || "",
           },
         };
 
-        console.log("PAYLOAD JSON INDO PRA API:", JSON.stringify(payload));
+        // DEBUG: Log detalhado para rastrear o fluxo de dados
+        console.log("[v0] === INICIO DEBUG CHECKLIST ===");
+        console.log("[v0] inspectionItems (estado bruto):", JSON.stringify(journey.inspectionItems, null, 2));
+        console.log("[v0] checklistItemsPayload (após reduce):", JSON.stringify(checklistItemsPayload, null, 2));
+        console.log("[v0] hasRejectedItems:", hasRejectedItems);
+        console.log("[v0] PAYLOAD FINAL PARA API:", JSON.stringify(payload, null, 2));
+        console.log("[v0] === FIM DEBUG CHECKLIST ===");
 
         const data = await iniciarJornadaAPI(payload);
 
