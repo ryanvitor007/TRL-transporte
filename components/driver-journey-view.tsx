@@ -9,7 +9,8 @@ import {
   type JourneyStatus,
   type VehicleData,
 } from "@/contexts/journey-context";
-import { buscarFrotaAPI } from "@/lib/api-service";
+import { buscarFrotaAPI, salvarManutencaoAPI } from "@/lib/api-service";
+import { useApp } from "@/contexts/app-context";
 import {
   Card,
   CardContent,
@@ -242,6 +243,7 @@ function JourneyStepper({ currentStep }: { currentStep: number }) {
 
 export function DriverJourneyView() {
   const { user } = useAuth();
+  const { setActiveView } = useApp();
   const {
     journey,
     selectVehicle,
@@ -322,6 +324,8 @@ export function DriverJourneyView() {
     },
   ]);
   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
+  const [showUrgentApprovalOption, setShowUrgentApprovalOption] = useState(false);
+  const [isSubmittingMaintenance, setIsSubmittingMaintenance] = useState(false);
   const [currentProblemItem, setCurrentProblemItem] = useState<string | null>(
     null,
   );
@@ -593,6 +597,77 @@ export function DriverJourneyView() {
     );
     setStartKm("");
     cancelJourney();
+  };
+
+  // TAREFA 2: Handler para reportar manutencao via API
+  const handleReportMaintenance = async () => {
+    if (!journey.selectedVehicle || !user?.id) return;
+
+    setIsSubmittingMaintenance(true);
+
+    try {
+      // Monta a lista de itens reprovados
+      const itensReprovados = inspectionItems
+        .filter((item) => item.checked === false)
+        .map((item) => `${item.label}${item.problem ? ` (${item.problem})` : ""}`);
+
+      // Monta o objeto de checklist para o banco
+      const checklistItems = inspectionItems.reduce<Record<string, boolean>>(
+        (acc, item) => {
+          if (item.checked !== null) {
+            acc[item.id] = item.checked;
+          }
+          return acc;
+        },
+        {},
+      );
+
+      // Monta as notas com os problemas descritos
+      const checklistNotes = inspectionItems
+        .filter((item) => item.checked === false && item.problem)
+        .map((item) => `${item.id}: ${item.problem}`)
+        .join("; ");
+
+      const maintenancePayload = {
+        vehicle_id: journey.selectedVehicle.id,
+        driver_id: Number(user.id),
+        type: "Corretiva - Vistoria Inicial",
+        description: `Vistoria Reprovada. Itens: ${itensReprovados.join(", ")}`,
+        priority: "Alta",
+        status: "Pendente",
+        checklist_data: {
+          items: checklistItems,
+          notes: checklistNotes,
+        },
+      };
+
+      await salvarManutencaoAPI(maintenancePayload);
+
+      // Fecha o modal e reseta estados
+      setShowMaintenanceDialog(false);
+      setShowUrgentApprovalOption(false);
+
+      // Reseta a vistoria
+      setInspectionItems((prev) =>
+        prev.map((item) => ({ ...item, checked: null, problem: undefined })),
+      );
+      cancelJourney();
+
+      // Navega para a aba de manutencoes
+      setActiveView("maintenance");
+    } catch (error) {
+      console.error("Erro ao criar manutencao:", error);
+      alert("Erro ao solicitar manutencao. Tente novamente.");
+    } finally {
+      setIsSubmittingMaintenance(false);
+    }
+  };
+
+  // Handler para solicitar aprovacao urgente (fluxo antigo)
+  const handleRequestUrgentApproval = () => {
+    setShowMaintenanceDialog(false);
+    setShowUrgentApprovalOption(false);
+    completeInspection(true); // Marca que tem problemas e continua
   };
 
   const calculateDistance = () => {
@@ -1399,61 +1474,126 @@ export function DriverJourneyView() {
           </DialogContent>
         </Dialog>
 
-        {/* Maintenance Problems Dialog */}
+        {/* TAREFA 1: Modal Redesenhado - Problemas na Vistoria */}
         <Dialog
           open={showMaintenanceDialog}
-          onOpenChange={setShowMaintenanceDialog}
+          onOpenChange={(open) => {
+            setShowMaintenanceDialog(open);
+            if (!open) setShowUrgentApprovalOption(false);
+          }}
         >
           <DialogContent className="max-w-md max-h-[85dvh] p-0 flex flex-col overflow-hidden">
-            <DialogHeader className="shrink-0 p-6 pb-4">
-              <DialogTitle className="flex items-center gap-2 text-amber-600">
-                <AlertTriangle className="h-5 w-5" />
-                Problemas Detectados
+            <DialogHeader className="shrink-0 p-6 pb-4 bg-red-50 border-b border-red-200">
+              <DialogTitle className="flex items-center gap-2 text-red-700">
+                <AlertTriangle className="h-6 w-6" />
+                Vistoria Reprovada
               </DialogTitle>
-              <DialogDescription>
-                Foram encontrados problemas na vistoria. Recomendamos reportar a
-                manutencao.
+              <DialogDescription className="text-red-600">
+                {inspectionItems.filter((i) => i.checked === false).length} item(ns) com problema(s) detectado(s)
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-4">
+            
+            {/* Lista de problemas */}
+            <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+              <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-medium">
+                Itens Reprovados
+              </p>
               <div className="space-y-3">
                 {inspectionItems
                   .filter((i) => i.checked === false)
                   .map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-xl border border-red-200 bg-red-50 p-4"
+                      className="rounded-xl border-2 border-red-200 bg-white p-4"
                     >
-                      <p className="font-medium text-red-700 mb-1">
-                        {item.label}
-                      </p>
-                      <p className="text-sm text-red-600">{item.problem}</p>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100">
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-red-800">
+                            {item.label}
+                          </p>
+                          {item.problem && (
+                            <p className="text-sm text-red-600 mt-1">
+                              {item.problem}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))}
               </div>
+              
+              {/* Info box */}
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs text-amber-800">
+                  <strong>Recomendacao:</strong> Solicite manutencao para garantir a seguranca da viagem.
+                  A equipe de manutencao sera notificada imediatamente.
+                </p>
+              </div>
             </div>
-            <DialogFooter className="shrink-0 gap-2 p-6 pt-4 border-t flex-col sm:flex-row">
+
+            {/* Footer com acoes */}
+            <div className="shrink-0 p-6 pt-4 border-t bg-muted/30 space-y-3">
+              {/* Botao Principal - Solicitar Manutencao */}
               <Button
-                variant="outline"
-                className="w-full sm:w-auto bg-transparent"
-                onClick={() => {
-                  setShowMaintenanceDialog(false);
-                  completeInspection(true);
-                }}
+                className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-semibold"
+                onClick={handleReportMaintenance}
+                disabled={isSubmittingMaintenance}
               >
-                Continuar Mesmo Assim
+                {isSubmittingMaintenance ? (
+                  <span className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Solicitando...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Solicitar Manutencao e Encerrar
+                  </span>
+                )}
               </Button>
-              <Button
-                className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600"
-                onClick={() => {
-                  setShowMaintenanceDialog(false);
-                  handleCancelJourney();
-                }}
-              >
-                <Wrench className="mr-2 h-4 w-4" />
-                Reportar Manutencao
-              </Button>
-            </DialogFooter>
+
+              {/* Link sutil para opcao de urgencia */}
+              {!showUrgentApprovalOption ? (
+                <button
+                  type="button"
+                  className="w-full text-center text-xs text-muted-foreground hover:text-amber-600 underline py-2 transition-colors"
+                  onClick={() => setShowUrgentApprovalOption(true)}
+                >
+                  Preciso realizar a viagem com urgencia (Solicitar Aprovacao)
+                </button>
+              ) : (
+                <div className="space-y-3 pt-2 border-t border-dashed">
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-800">
+                        <p className="font-semibold">Atencao:</p>
+                        <p>Sua solicitacao sera enviada para a central. Voce devera aguardar a aprovacao antes de iniciar a viagem.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full border-amber-300 text-amber-700 hover:bg-amber-50"
+                    onClick={handleRequestUrgentApproval}
+                    disabled={isSubmittingMaintenance}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    Solicitar Aprovacao da Central
+                  </Button>
+                  <button
+                    type="button"
+                    className="w-full text-center text-xs text-muted-foreground hover:text-foreground py-1"
+                    onClick={() => setShowUrgentApprovalOption(false)}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </div>
           </DialogContent>
         </Dialog>
       </div>
