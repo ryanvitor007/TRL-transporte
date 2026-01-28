@@ -168,7 +168,7 @@ export function MonitoringView() {
   }, [loadData]);
 
   // Handlers
-  const handleOpenDetails = (journey: JornadaMonitoramento) => {
+  const handleOpenDetails = useCallback((journey: JornadaMonitoramento) => {
     if (journey.status === "pending_approval") {
       setEmergencyJourney(journey);
       setIsEmergencyOpen(true);
@@ -176,21 +176,29 @@ export function MonitoringView() {
       setSelectedJourney(journey);
       setIsDetailsOpen(true);
     }
-  };
+  }, []);
 
-  const handleEmergencyClose = () => {
-    setIsEmergencyOpen(false);
-    setEmergencyJourney(null);
-  };
+  const handleEmergencyClose = useCallback((open: boolean) => {
+    if (!open) {
+      setIsEmergencyOpen(false);
+      // Delay para garantir que o modal fechou antes de limpar o estado
+      setTimeout(() => {
+        setEmergencyJourney(null);
+      }, 150);
+    }
+  }, []);
 
-  const handleActionComplete = () => {
-    loadData();
-  };
-
-  const handleRefresh = () => {
+  // Handler chamado APOS a acao do modal (autorizar/bloquear)
+  const handleActionComplete = useCallback(() => {
+    // Forca o reload dos dados do Kanban
     setIsLoading(true);
     loadData();
-  };
+  }, [loadData]);
+
+  const handleRefresh = useCallback(() => {
+    setIsLoading(true);
+    loadData();
+  }, [loadData]);
 
   // Agrupa jornadas
   const grouped = groupJourneysByStatus(journeys);

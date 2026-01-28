@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,15 +14,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   AlertTriangle,
   ShieldAlert,
+  ShieldCheck,
   CheckCircle2,
   XCircle,
   Truck,
   User,
   Wrench,
   FileWarning,
+  Loader2,
+  Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JornadaMonitoramento } from "@/lib/api-service";
@@ -38,13 +42,16 @@ interface AdminEmergencyModalProps {
   onActionComplete?: () => void;
 }
 
-// Mapeia IDs de checklist para labels legiveis
-const checklistLabels: Record<string, string> = {
-  tires: "Pneus (Calibragem e Estado)",
-  fluids: "Niveis (Agua e Oleo)",
-  brakes: "Freios (Teste visual/pedal)",
-  lights: "Iluminacao (Farois, Setas e Freio)",
-  panel: "Painel e Instrumentos",
+// Mapeia IDs de checklist para labels legiveis com icones
+const checklistLabels: Record<
+  string,
+  { label: string; severity: "high" | "medium" }
+> = {
+  tires: { label: "Pneu Careca / Calibragem", severity: "high" },
+  fluids: { label: "Niveis de Fluidos (Agua/Oleo)", severity: "medium" },
+  brakes: { label: "Sistema de Freios", severity: "high" },
+  lights: { label: "Iluminacao e Sinalizacao", severity: "medium" },
+  panel: { label: "Painel de Instrumentos", severity: "medium" },
 };
 
 export function AdminEmergencyModal({
@@ -64,57 +71,83 @@ export function AdminEmergencyModal({
   const rejectedItems = journey.rejectedItems || [];
   const hasRejectedItems = rejectedItems.length > 0;
 
-  const handleAuthorize = async () => {
+  // Reset de estados ao fechar
+  const resetStates = useCallback(() => {
+    setAdminNotes("");
+    setShowConfirmAuthorize(false);
+    setShowConfirmBlock(false);
+    setIsAuthorizing(false);
+    setIsBlocking(false);
+  }, []);
+
+  const handleAuthorize = useCallback(async () => {
     if (!showConfirmAuthorize) {
       setShowConfirmAuthorize(true);
+      setShowConfirmBlock(false);
       return;
     }
 
     setIsAuthorizing(true);
     try {
       await autorizarJornadaComRiscoAPI(journey.id, adminNotes);
+      // Fecha modal PRIMEIRO
       onOpenChange(false);
-      onActionComplete?.();
-      // Reset states
-      setAdminNotes("");
-      setShowConfirmAuthorize(false);
+      resetStates();
+      // DEPOIS faz o refresh dos dados
+      setTimeout(() => {
+        onActionComplete?.();
+      }, 100);
     } catch (error) {
       console.error("Erro ao autorizar jornada:", error);
-      alert("Erro ao autorizar. Tente novamente.");
-    } finally {
       setIsAuthorizing(false);
     }
-  };
+  }, [
+    journey.id,
+    adminNotes,
+    showConfirmAuthorize,
+    onOpenChange,
+    onActionComplete,
+    resetStates,
+  ]);
 
-  const handleBlock = async () => {
+  const handleBlock = useCallback(async () => {
     if (!showConfirmBlock) {
       setShowConfirmBlock(true);
+      setShowConfirmAuthorize(false);
       return;
     }
 
     setIsBlocking(true);
     try {
-      const reason = adminNotes || "Checklist reprovado - itens criticos";
+      const reason =
+        adminNotes ||
+        "Checklist reprovado - itens criticos identificados na vistoria";
       await bloquearJornadaAPI(journey.id, reason);
+      // Fecha modal PRIMEIRO
       onOpenChange(false);
-      onActionComplete?.();
-      // Reset states
-      setAdminNotes("");
-      setShowConfirmBlock(false);
+      resetStates();
+      // DEPOIS faz o refresh dos dados
+      setTimeout(() => {
+        onActionComplete?.();
+      }, 100);
     } catch (error) {
       console.error("Erro ao bloquear jornada:", error);
-      alert("Erro ao bloquear. Tente novamente.");
-    } finally {
       setIsBlocking(false);
     }
-  };
+  }, [
+    journey.id,
+    adminNotes,
+    showConfirmBlock,
+    onOpenChange,
+    onActionComplete,
+    resetStates,
+  ]);
 
-  const handleClose = () => {
-    setShowConfirmAuthorize(false);
-    setShowConfirmBlock(false);
-    setAdminNotes("");
+  const handleClose = useCallback(() => {
+    if (isAuthorizing || isBlocking) return; // Previne fechar durante acao
+    resetStates();
     onOpenChange(false);
-  };
+  }, [isAuthorizing, isBlocking, resetStates, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -174,38 +207,117 @@ export function AdminEmergencyModal({
               </div>
             </div>
 
-            {/* Lista de Itens Reprovados */}
-            {hasRejectedItems && (
-              <div className="rounded-lg border border-red-200 bg-white p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-red-700">
-                  <FileWarning className="h-4 w-4" />
-                  Itens Reprovados no Checklist ({rejectedItems.length})
-                </div>
-                <div className="space-y-2">
-                  {rejectedItems.map((itemId) => (
-                    <div
-                      key={itemId}
-                      className="flex items-center gap-2 rounded-md bg-red-50 p-2 text-sm text-red-700"
-                    >
-                      <XCircle className="h-4 w-4 shrink-0" />
-                      <span>{checklistLabels[itemId] || itemId}</span>
-                    </div>
-                  ))}
-                </div>
+            {/* Lista de Itens Reprovados - MINI CHECKLIST */}
+            <div className="rounded-lg border-2 border-red-300 bg-white overflow-hidden">
+              <div className="flex items-center gap-2 bg-red-100 px-4 py-3">
+                <FileWarning className="h-5 w-5 text-red-600" />
+                <span className="font-bold text-red-800">
+                  Itens Criticos Reprovados
+                </span>
+                <Badge className="ml-auto bg-red-600 text-white">
+                  {rejectedItems.length} item(ns)
+                </Badge>
+              </div>
 
-                {/* Notas do motorista */}
-                {journey.checklistNotes && (
-                  <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm">
-                    <p className="font-medium text-amber-800">
-                      Observacao do motorista:
-                    </p>
-                    <p className="mt-1 text-amber-700">
-                      {journey.checklistNotes}
+              <div className="p-3 space-y-2">
+                {hasRejectedItems ? (
+                  rejectedItems.map((itemId) => {
+                    const itemInfo = checklistLabels[itemId] || {
+                      label: itemId,
+                      severity: "medium",
+                    };
+                    const isHighSeverity =
+                      typeof itemInfo === "object" &&
+                      itemInfo.severity === "high";
+                    const label =
+                      typeof itemInfo === "object" ? itemInfo.label : itemId;
+
+                    return (
+                      <div
+                        key={itemId}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg p-3 text-sm",
+                          isHighSeverity
+                            ? "bg-red-100 border border-red-300"
+                            : "bg-amber-50 border border-amber-200",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                            isHighSeverity ? "bg-red-200" : "bg-amber-200",
+                          )}
+                        >
+                          <XCircle
+                            className={cn(
+                              "h-5 w-5",
+                              isHighSeverity
+                                ? "text-red-600"
+                                : "text-amber-600",
+                            )}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <span
+                            className={cn(
+                              "font-semibold",
+                              isHighSeverity
+                                ? "text-red-800"
+                                : "text-amber-800",
+                            )}
+                          >
+                            {label}
+                          </span>
+                          {isHighSeverity && (
+                            <Badge className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0">
+                              CRITICO
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs",
+                            isHighSeverity
+                              ? "border-red-400 text-red-700"
+                              : "border-amber-400 text-amber-700",
+                          )}
+                        >
+                          Reprovado
+                        </Badge>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-400" />
+                    <p className="text-sm">
+                      Checklist reprovado sem itens especificos
                     </p>
                   </div>
                 )}
               </div>
-            )}
+
+              {/* Notas do motorista */}
+              {journey.checklistNotes && (
+                <>
+                  <Separator />
+                  <div className="p-3 bg-amber-50">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-amber-800 text-sm">
+                          Observacao do Motorista:
+                        </p>
+                        <p className="mt-1 text-amber-700 text-sm">
+                          {journey.checklistNotes}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Campo de Notas do Admin */}
             <div className="space-y-2">
@@ -259,45 +371,64 @@ export function AdminEmergencyModal({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="flex-col gap-2 sm:flex-row">
+        <DialogFooter className="flex-col gap-3 sm:flex-row pt-2">
           {/* Botao Bloquear */}
           <Button
             variant="destructive"
-            className="flex-1 gap-2"
+            size="lg"
+            className={cn(
+              "flex-1 gap-2 font-semibold",
+              showConfirmBlock && "bg-red-700 hover:bg-red-800",
+            )}
             onClick={handleBlock}
             disabled={isAuthorizing || isBlocking}
           >
             {isBlocking ? (
-              <span className="animate-pulse">Bloqueando...</span>
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Bloqueando...
+              </>
             ) : (
               <>
-                <Wrench className="h-4 w-4" />
+                {showConfirmBlock ? (
+                  <Ban className="h-4 w-4" />
+                ) : (
+                  <Wrench className="h-4 w-4" />
+                )}
                 {showConfirmBlock
-                  ? "Confirmar Bloqueio"
-                  : "Bloquear e Solicitar Manutencao"}
+                  ? "CONFIRMAR BLOQUEIO"
+                  : "Bloquear + Manutencao"}
               </>
             )}
           </Button>
 
           {/* Botao Autorizar */}
           <Button
-            variant="outline"
+            size="lg"
             className={cn(
-              "flex-1 gap-2 border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800",
-              showConfirmAuthorize &&
-                "border-green-300 bg-green-50 text-green-700 hover:bg-green-100",
+              "flex-1 gap-2 font-semibold transition-colors",
+              showConfirmAuthorize
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-amber-500 hover:bg-amber-600 text-white",
             )}
             onClick={handleAuthorize}
             disabled={isAuthorizing || isBlocking}
           >
             {isAuthorizing ? (
-              <span className="animate-pulse">Autorizando...</span>
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Autorizando...
+              </>
             ) : (
               <>
-                <CheckCircle2 className="h-4 w-4" />
+                {showConfirmAuthorize ? (
+                  <ShieldCheck className="h-4 w-4" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
                 {showConfirmAuthorize
-                  ? "Confirmar Autorizacao"
-                  : "Autorizar Viagem com Risco"}
+                  ? "CONFIRMAR LIBERACAO"
+                  : "Autorizar com Risco"}
               </>
             )}
           </Button>

@@ -145,14 +145,30 @@ export function JourneyKanbanCard({
 
   const isCritical =
     variant === "critical" || journey.status === "pending_approval";
+  const isResting = journey.status === "resting";
+  const isMeal = journey.status === "meal";
+  const isPaused = isResting || isMeal;
   const hasProblems = journey.rejectedItems && journey.rejectedItems.length > 0;
+
+  // Determina as cores do card baseado no status
+  const getCardClasses = () => {
+    if (isCritical) {
+      return "border-red-300 bg-red-50/50 shadow-red-100";
+    }
+    if (isResting) {
+      return "border-amber-300 bg-amber-50/50 shadow-amber-100";
+    }
+    if (isMeal) {
+      return "border-orange-300 bg-orange-50/50 shadow-orange-100";
+    }
+    return statusConfig.borderColor;
+  };
 
   return (
     <Card
       className={cn(
         "cursor-pointer transition-all duration-200 hover:shadow-md active:scale-[0.98]",
-        isCritical && "border-red-300 bg-red-50/50 shadow-red-100",
-        !isCritical && statusConfig.borderColor,
+        getCardClasses(),
       )}
       onClick={() => onOpenDetails?.(journey)}
     >
@@ -163,7 +179,10 @@ export function JourneyKanbanCard({
           <div
             className={cn(
               "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-              isCritical ? "bg-red-100" : "bg-muted",
+              isCritical && "bg-red-100",
+              isResting && "bg-amber-100",
+              isMeal && "bg-orange-100",
+              !isCritical && !isPaused && "bg-muted",
             )}
           >
             {journey.driverPhoto ? (
@@ -171,6 +190,14 @@ export function JourneyKanbanCard({
                 src={journey.driverPhoto}
                 alt={journey.driverName}
                 className="h-12 w-12 rounded-full object-cover"
+              />
+            ) : isPaused ? (
+              <StatusIcon
+                className={cn(
+                  "h-6 w-6",
+                  isResting && "text-amber-600",
+                  isMeal && "text-orange-600",
+                )}
               />
             ) : (
               <User
@@ -197,6 +224,8 @@ export function JourneyKanbanCard({
               className={cn(
                 "mt-1 font-mono text-xs",
                 isCritical && "border-red-300 bg-red-100 text-red-700",
+                isResting && "border-amber-300 bg-amber-100 text-amber-700",
+                isMeal && "border-orange-300 bg-orange-100 text-orange-700",
               )}
             >
               <Truck className="mr-1 h-3 w-3" />
@@ -217,13 +246,19 @@ export function JourneyKanbanCard({
             <Clock
               className={cn(
                 "h-4 w-4",
-                isCritical ? "text-red-500" : "text-muted-foreground",
+                isCritical && "text-red-500",
+                isResting && "text-amber-500",
+                isMeal && "text-orange-500",
+                !isCritical && !isPaused && "text-muted-foreground",
               )}
             />
             <span
               className={cn(
                 "font-mono font-medium",
-                isCritical ? "text-red-600" : "text-foreground",
+                isCritical && "text-red-600",
+                isResting && "text-amber-600",
+                isMeal && "text-orange-600",
+                !isCritical && !isPaused && "text-foreground",
               )}
             >
               {formatElapsedTime(elapsedSeconds)}
@@ -231,9 +266,7 @@ export function JourneyKanbanCard({
           </div>
 
           {/* Status Badge */}
-          <Badge
-            className={cn("gap-1 text-xs", statusConfig.color, "text-white")}
-          >
+          <Badge className={cn("gap-1 text-xs text-white", statusConfig.color)}>
             <StatusIcon className="h-3 w-3" />
             {statusConfig.label}
           </Badge>
