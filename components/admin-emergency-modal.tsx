@@ -57,16 +57,15 @@ export function AdminEmergencyModal({
   onOpenChange,
   onActionComplete,
 }: AdminEmergencyModalProps) {
+  // ========================================
+  // TODOS OS HOOKS DEVEM VIR PRIMEIRO
+  // Nunca coloque hooks depois de um return condicional
+  // ========================================
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
   const [showConfirmAuthorize, setShowConfirmAuthorize] = useState(false);
   const [showConfirmBlock, setShowConfirmBlock] = useState(false);
-
-  if (!journey) return null;
-
-  const rejectedItems = journey.rejectedItems || [];
-  const hasRejectedItems = rejectedItems.length > 0;
 
   // Reset de estados ao fechar
   const resetStates = useCallback(() => {
@@ -78,6 +77,8 @@ export function AdminEmergencyModal({
   }, []);
 
   const handleAuthorize = useCallback(async () => {
+    if (!journey) return;
+    
     if (!showConfirmAuthorize) {
       setShowConfirmAuthorize(true);
       setShowConfirmBlock(false);
@@ -87,10 +88,8 @@ export function AdminEmergencyModal({
     setIsAuthorizing(true);
     try {
       await autorizarJornadaComRiscoAPI(journey.id, adminNotes);
-      // Fecha modal PRIMEIRO
       onOpenChange(false);
       resetStates();
-      // DEPOIS faz o refresh dos dados
       setTimeout(() => {
         onActionComplete?.();
       }, 100);
@@ -98,9 +97,11 @@ export function AdminEmergencyModal({
       console.error("Erro ao autorizar jornada:", error);
       setIsAuthorizing(false);
     }
-  }, [journey.id, adminNotes, showConfirmAuthorize, onOpenChange, onActionComplete, resetStates]);
+  }, [journey, adminNotes, showConfirmAuthorize, onOpenChange, onActionComplete, resetStates]);
 
   const handleBlock = useCallback(async () => {
+    if (!journey) return;
+    
     if (!showConfirmBlock) {
       setShowConfirmBlock(true);
       setShowConfirmAuthorize(false);
@@ -111,10 +112,8 @@ export function AdminEmergencyModal({
     try {
       const reason = adminNotes || "Checklist reprovado - itens criticos identificados na vistoria";
       await bloquearJornadaAPI(journey.id, reason);
-      // Fecha modal PRIMEIRO
       onOpenChange(false);
       resetStates();
-      // DEPOIS faz o refresh dos dados
       setTimeout(() => {
         onActionComplete?.();
       }, 100);
@@ -122,13 +121,26 @@ export function AdminEmergencyModal({
       console.error("Erro ao bloquear jornada:", error);
       setIsBlocking(false);
     }
-  }, [journey.id, adminNotes, showConfirmBlock, onOpenChange, onActionComplete, resetStates]);
+  }, [journey, adminNotes, showConfirmBlock, onOpenChange, onActionComplete, resetStates]);
 
-  const handleClose = useCallback(() => {
-    if (isAuthorizing || isBlocking) return; // Previne fechar durante acao
-    resetStates();
-    onOpenChange(false);
+  const handleClose = useCallback((newOpen: boolean) => {
+    if (!newOpen) {
+      if (isAuthorizing || isBlocking) return;
+      resetStates();
+      onOpenChange(false);
+    }
   }, [isAuthorizing, isBlocking, resetStates, onOpenChange]);
+
+  // ========================================
+  // AGORA SIM PODEMOS FAZER EARLY RETURN
+  // Depois que todos os hooks foram chamados
+  // ========================================
+  if (!journey) {
+    return null;
+  }
+
+  const rejectedItems = journey.rejectedItems || [];
+  const hasRejectedItems = rejectedItems.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -154,7 +166,6 @@ export function AdminEmergencyModal({
             {/* Info do Motorista/Veiculo */}
             <div className="rounded-lg border border-red-200 bg-white p-4">
               <div className="flex items-start gap-4">
-                {/* Avatar */}
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-red-100">
                   {journey.driverPhoto ? (
                     <img
@@ -167,7 +178,6 @@ export function AdminEmergencyModal({
                   )}
                 </div>
 
-                {/* Info */}
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-foreground">
                     {journey.driverName}
@@ -188,7 +198,7 @@ export function AdminEmergencyModal({
               </div>
             </div>
 
-            {/* Lista de Itens Reprovados - MINI CHECKLIST */}
+            {/* Lista de Itens Reprovados */}
             <div className="rounded-lg border-2 border-red-300 bg-white overflow-hidden">
               <div className="flex items-center gap-2 bg-red-100 px-4 py-3">
                 <FileWarning className="h-5 w-5 text-red-600" />
@@ -204,8 +214,8 @@ export function AdminEmergencyModal({
                 {hasRejectedItems ? (
                   rejectedItems.map((itemId) => {
                     const itemInfo = checklistLabels[itemId] || { label: itemId, severity: "medium" };
-                    const isHighSeverity = typeof itemInfo === "object" && itemInfo.severity === "high";
-                    const label = typeof itemInfo === "object" ? itemInfo.label : itemId;
+                    const isHighSeverity = itemInfo.severity === "high";
+                    const label = itemInfo.label;
                     
                     return (
                       <div
@@ -261,7 +271,6 @@ export function AdminEmergencyModal({
                 )}
               </div>
 
-              {/* Notas do motorista */}
               {journey.checklistNotes && (
                 <>
                   <Separator />
@@ -335,7 +344,6 @@ export function AdminEmergencyModal({
         </ScrollArea>
 
         <DialogFooter className="flex-col gap-3 sm:flex-row pt-2">
-          {/* Botao Bloquear */}
           <Button
             variant="destructive"
             size="lg"
@@ -359,7 +367,6 @@ export function AdminEmergencyModal({
             )}
           </Button>
 
-          {/* Botao Autorizar */}
           <Button
             size="lg"
             className={cn(
