@@ -39,6 +39,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Wrench,
   Clock,
   AlertCircle,
@@ -48,6 +53,7 @@ import {
   X,
   Camera,
   ChevronRight,
+  ChevronDown,
   FileText,
   DollarSign,
   Gauge,
@@ -62,6 +68,8 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCw,
+  AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
 import { format, subDays, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -325,6 +333,9 @@ export function DriverMaintenanceView() {
     type: "all",
   });
 
+  // --- COLLAPSIBLE STATE (Alertas de Vistoria) ---
+  const [isInspectionAlertsOpen, setIsInspectionAlertsOpen] = useState(true);
+
   // --- LOAD DATA ---
   const loadData = async () => {
     setIsLoading(true);
@@ -403,6 +414,24 @@ export function DriverMaintenanceView() {
       return true;
     });
   }, [maintenances, filters]);
+
+  // TAREFA 3: Filtra manutencoes de vistoria (Corretiva - Vistoria Inicial)
+  const inspectionMaintenances = useMemo(() => {
+    return filteredMaintenances.filter(
+      (m) =>
+        m.type === "Corretiva - Vistoria Inicial" ||
+        m.type === "Corretiva - Checklist",
+    );
+  }, [filteredMaintenances]);
+
+  // Manutencoes comuns (excluindo as de vistoria)
+  const regularMaintenances = useMemo(() => {
+    return filteredMaintenances.filter(
+      (m) =>
+        m.type !== "Corretiva - Vistoria Inicial" &&
+        m.type !== "Corretiva - Checklist",
+    );
+  }, [filteredMaintenances]);
 
   const clearFilters = () => {
     setFilters({ vehicleId: "all", status: "all", type: "all" });
@@ -803,6 +832,118 @@ export function DriverMaintenanceView() {
         </div>
       )}
 
+      {/* TAREFA 3: ALERTAS DE VISTORIA - SECAO COLAPSAVEL */}
+      {inspectionMaintenances.length > 0 && (
+        <Collapsible
+          open={isInspectionAlertsOpen}
+          onOpenChange={setIsInspectionAlertsOpen}
+          className="rounded-xl border-2 border-red-200 bg-red-50/50 overflow-hidden"
+        >
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between p-4 hover:bg-red-100/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold text-red-800">
+                    Alertas de Vistoria
+                  </h3>
+                  <p className="text-xs text-red-600">
+                    {inspectionMaintenances.length} solicitacao(oes) pendente(s)
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-red-600 text-white">
+                  {
+                    inspectionMaintenances.filter(
+                      (m) => m.status !== "Concluida",
+                    ).length
+                  }
+                </Badge>
+                <ChevronDown
+                  className={cn(
+                    "h-5 w-5 text-red-600 transition-transform duration-200",
+                    isInspectionAlertsOpen && "rotate-180",
+                  )}
+                />
+              </div>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="border-t border-red-200 bg-white p-4 space-y-3">
+              {inspectionMaintenances.map((maintenance) => {
+                const config =
+                  statusConfig[maintenance.status] || statusConfig.Agendada;
+                const StatusIcon = config.icon;
+                const vehiclePlate =
+                  maintenance.vehicle?.placa ||
+                  maintenance.vehicle_plate ||
+                  "N/A";
+
+                return (
+                  <div
+                    key={maintenance.id}
+                    className="flex items-start gap-3 p-3 rounded-lg border border-red-200 bg-red-50/50 cursor-pointer hover:bg-red-100/50 transition-colors"
+                    onClick={() => openDetails(maintenance)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && openDetails(maintenance)
+                    }
+                  >
+                    <div
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                        config.bgColor,
+                      )}
+                    >
+                      <ClipboardList className={cn("h-4 w-4", config.color)} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-mono border-red-300 text-red-700"
+                        >
+                          {vehiclePlate}
+                        </Badge>
+                        <Badge
+                          className={cn(
+                            "text-xs",
+                            config.bgColor,
+                            config.color,
+                          )}
+                        >
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {config.label}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-foreground line-clamp-2">
+                        {maintenance.description}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Solicitado em{" "}
+                        {format(
+                          new Date(maintenance.created_at),
+                          "dd/MM/yyyy",
+                          { locale: ptBR },
+                        )}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {/* LISTA DE MANUTENCOES - FEED STYLE */}
       <Card className="overflow-hidden">
         <CardHeader className="py-3 px-4 md:p-6">
@@ -810,7 +951,7 @@ export function DriverMaintenanceView() {
             Minhas Solicitacoes
           </CardTitle>
           <CardDescription className="text-xs md:text-sm">
-            {filteredMaintenances.length} manutencao(oes) encontrada(s)
+            {regularMaintenances.length} manutencao(oes) encontrada(s)
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -823,12 +964,12 @@ export function DriverMaintenanceView() {
             </div>
           ) : hasError ? (
             <ErrorState onRetry={loadData} />
-          ) : filteredMaintenances.length === 0 ? (
+          ) : regularMaintenances.length === 0 ? (
             <EmptyState />
           ) : (
             <ScrollArea className="h-[400px] md:h-[450px]">
               <div className="px-4 pb-4 md:px-6 md:pb-6">
-                {filteredMaintenances.map((maintenance) => {
+                {regularMaintenances.map((maintenance) => {
                   const config =
                     statusConfig[maintenance.status] ||
                     statusConfig["Agendada"];
