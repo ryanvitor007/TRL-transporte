@@ -628,10 +628,19 @@ export function DriverJourneyView() {
         .map((item) => `${item.id}: ${item.problem}`)
         .join("; ");
 
+      // Garante que temos os dados do veiculo
+      const selectedVehicle = journey.selectedVehicle;
+      if (!selectedVehicle.plate || !selectedVehicle.model) {
+        console.error("[v0] Dados do veiculo incompletos:", selectedVehicle);
+        alert("Erro: Dados do veiculo incompletos. Tente selecionar novamente.");
+        setIsSubmittingMaintenance(false);
+        return;
+      }
+
       const maintenancePayload = {
-        vehicle_id: journey.selectedVehicle.id,
-        vehicle_plate: journey.selectedVehicle.plate,
-        vehicle_model: journey.selectedVehicle.model,
+        vehicle_id: selectedVehicle.id,
+        vehicle_plate: selectedVehicle.plate,
+        vehicle_model: selectedVehicle.model,
         driver_id: Number(user.id),
         type: "Corretiva - Vistoria Inicial",
         description: `Vistoria Reprovada. Itens: ${itensReprovados.join(", ")}`,
@@ -642,6 +651,8 @@ export function DriverJourneyView() {
           notes: checklistNotes,
         },
       };
+
+      console.log("[v0] Maintenance Payload:", JSON.stringify(maintenancePayload, null, 2));
 
       await salvarManutencaoAPI(maintenancePayload);
 
