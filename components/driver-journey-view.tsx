@@ -10,7 +10,6 @@ import {
   type VehicleData,
 } from "@/contexts/journey-context";
 import { buscarFrotaAPI, salvarManutencaoAPI } from "@/lib/api-service";
-import { useApp } from "@/contexts/app-context";
 import {
   Card,
   CardContent,
@@ -243,7 +242,6 @@ function JourneyStepper({ currentStep }: { currentStep: number }) {
 
 export function DriverJourneyView() {
   const { user } = useAuth();
-  const { setActiveView } = useApp();
   const {
     journey,
     selectVehicle,
@@ -666,8 +664,8 @@ export function DriverJourneyView() {
       );
       cancelJourney();
 
-      // Navega para a aba de manutencoes
-      setActiveView("maintenance");
+      // Mostra mensagem de sucesso
+      alert("Solicitacao de manutencao enviada com sucesso!");
     } catch (error) {
       console.error("Erro ao criar manutencao:", error);
       alert("Erro ao solicitar manutencao. Tente novamente.");
