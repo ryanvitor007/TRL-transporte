@@ -240,11 +240,7 @@ function JourneyStepper({ currentStep }: { currentStep: number }) {
   );
 }
 
-type DriverJourneyViewProps = {
-  onViewChange?: (view: string) => void;
-};
-
-export function DriverJourneyView({ onViewChange }: DriverJourneyViewProps) {
+export function DriverJourneyView() {
   const { user } = useAuth();
   const {
     journey,
@@ -633,8 +629,21 @@ export function DriverJourneyView({ onViewChange }: DriverJourneyViewProps) {
         .map((item) => `${item.id}: ${item.problem}`)
         .join("; ");
 
+      // Garante que temos os dados do veiculo
+      const selectedVehicle = journey.selectedVehicle;
+      if (!selectedVehicle.plate || !selectedVehicle.model) {
+        console.error("[v0] Dados do veiculo incompletos:", selectedVehicle);
+        alert(
+          "Erro: Dados do veiculo incompletos. Tente selecionar novamente.",
+        );
+        setIsSubmittingMaintenance(false);
+        return;
+      }
+
       const maintenancePayload = {
-        vehicle_id: journey.selectedVehicle.id,
+        vehicle_id: selectedVehicle.id,
+        vehicle_plate: selectedVehicle.plate,
+        vehicle_model: selectedVehicle.model,
         driver_id: Number(user.id),
         type: "Corretiva - Vistoria Inicial",
         description: `Vistoria Reprovada. Itens: ${itensReprovados.join(", ")}`,
@@ -645,6 +654,11 @@ export function DriverJourneyView({ onViewChange }: DriverJourneyViewProps) {
           notes: checklistNotes,
         },
       };
+
+      console.log(
+        "[v0] Maintenance Payload:",
+        JSON.stringify(maintenancePayload, null, 2),
+      );
 
       await salvarManutencaoAPI(maintenancePayload);
 
@@ -658,8 +672,8 @@ export function DriverJourneyView({ onViewChange }: DriverJourneyViewProps) {
       );
       cancelJourney();
 
-      // Navega para a aba de manutencoes
-      onViewChange?.("maintenance");
+      // Mostra mensagem de sucesso
+      alert("Solicitacao de manutencao enviada com sucesso!");
     } catch (error) {
       console.error("Erro ao criar manutencao:", error);
       alert("Erro ao solicitar manutencao. Tente novamente.");
