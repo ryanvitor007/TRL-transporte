@@ -630,6 +630,8 @@ export function DriverJourneyView() {
 
       const maintenancePayload = {
         vehicle_id: journey.selectedVehicle.id,
+        vehicle_plate: journey.selectedVehicle.plate,
+        vehicle_model: journey.selectedVehicle.model,
         driver_id: Number(user.id),
         type: "Corretiva - Vistoria Inicial",
         description: `Vistoria Reprovada. Itens: ${itensReprovados.join(", ")}`,
