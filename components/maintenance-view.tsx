@@ -37,6 +37,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Separator } from "@/components/ui/separator";
+import {
   Wrench,
   Clock,
   DollarSign,
@@ -51,6 +58,10 @@ import {
   Filter,
   X,
   FileX,
+  ClipboardList,
+  User,
+  XCircle,
+  Link as LinkIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -61,7 +72,24 @@ import {
   buscarManutencoesAPI,
   salvarManutencaoAPI,
   concluirManutencaoAPI,
+  atualizarManutencaoAPI,
 } from "@/lib/api-service";
+
+// --- MAPEAMENTO DE TRADUCAO DOS ITENS DO CHECKLIST ---
+const CHECKLIST_LABELS: Record<string, string> = {
+  tires: "Pneus",
+  fluids: "Fluidos",
+  brakes: "Freios",
+  lights: "Luzes",
+  panel: "Painel",
+  windows: "Vidros",
+  security: "Segurança",
+  body: "Lataria",
+};
+
+function translateChecklistItem(key: string): string {
+  return CHECKLIST_LABELS[key?.toLowerCase()] || key || "Item";
+}
 
 // --- INTERFACES ---
 interface ExtendedMaintenance {
@@ -78,6 +106,59 @@ interface ExtendedMaintenance {
   provider: string;
   km_at_maintenance: number;
   invoice_url?: string;
+  checklist_data?: any;
+  driver_name?: string;
+  vehicle?: {
+    placa?: string;
+    modelo?: string;
+  };
+}
+
+// Helper para extrair itens reprovados do checklist_data
+function getFailedChecklistItems(
+  checklistData: any,
+): { name: string; note?: string }[] {
+  if (!checklistData) return [];
+
+  // Tenta parsear se for string JSON
+  let data = checklistData;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return [];
+    }
+  }
+
+  // Formato: { items: { tires: false, lights: true, ... }, notes: { tires: "pneu furado" } }
+  if (data?.items && typeof data.items === "object") {
+    const failedItems: { name: string; note?: string }[] = [];
+    for (const [key, value] of Object.entries(data.items)) {
+      if (value === false) {
+        failedItems.push({
+          name: key,
+          note: data.notes?.[key] || undefined,
+        });
+      }
+    }
+    return failedItems;
+  }
+
+  // Formato simples: { tires: false, lights: true, ... }
+  if (typeof data === "object" && !Array.isArray(data)) {
+    const failedItems: { name: string; note?: string }[] = [];
+    for (const [key, value] of Object.entries(data)) {
+      if (key !== "notes" && value === false) {
+        failedItems.push({
+          name: key,
+          note: data.notes?.[key] || undefined,
+        });
+      }
+    }
+    return failedItems;
+  }
+
+  return [];
 }
 
 // --- CONFIGURAÇÃO DE STATUS ---
@@ -144,6 +225,19 @@ export function MaintenanceView() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompletingService, setIsCompletingService] = useState(false);
+
+  // --- ESTADOS DO FORMULÁRIO IN-PLACE (Accordion de Vistoria) ---
+  const [accordionFormData, setAccordionFormData] = useState<
+    Record<
+      number,
+      {
+        cost: string;
+        provider: string;
+        invoiceUrl: string;
+      }
+    >
+  >({});
+  const [finalizingId, setFinalizingId] = useState<number | null>(null);
 
   // --- ESTADO DOS FILTROS ---
   const [filters, setFilters] = useState({
@@ -252,13 +346,30 @@ export function MaintenanceView() {
     });
   };
 
+  // --- SEPARAR VISTORIAS DAS DEMAIS MANUTENCOES ---
+  const vistoriaMaintenances = useMemo(() => {
+    return filteredMaintenances.filter(
+      (m) =>
+        m.type?.includes("Vistoria") ||
+        m.type?.includes("Corretiva - Vistoria"),
+    );
+  }, [filteredMaintenances]);
+
+  const otherMaintenances = useMemo(() => {
+    return filteredMaintenances.filter(
+      (m) =>
+        !m.type?.includes("Vistoria") &&
+        !m.type?.includes("Corretiva - Vistoria"),
+    );
+  }, [filteredMaintenances]);
+
   // --- KPIs ---
   const totalCostMonth = filteredMaintenances.reduce(
     (sum, m) => sum + Number(m.cost || 0),
     0,
   );
   const scheduledCount = filteredMaintenances.filter((m) =>
-    m.status.includes("Agendad"),
+    m.status?.includes("Agendad"),
   ).length;
   const inProgressCount = filteredMaintenances.filter(
     (m) => m.status === "Em Andamento",
@@ -266,6 +377,77 @@ export function MaintenanceView() {
   const completedCount = filteredMaintenances.filter(
     (m) => m.status === "Concluída" || m.status === "Concluído",
   ).length;
+  const vistoriaPendingCount = vistoriaMaintenances.filter(
+    (m) => m.status !== "Concluída" && m.status !== "Concluído",
+  ).length;
+
+  // --- HANDLER: Finalizar Vistoria via Accordion ---
+  const handleFinalizeVistoria = async (maintenanceId: number) => {
+    const formData = accordionFormData[maintenanceId];
+    if (!formData) {
+      toast.error("Atenção", "Preencha os dados antes de finalizar.");
+      return;
+    }
+
+    setFinalizingId(maintenanceId);
+
+    try {
+      // Limpa formatacao do custo
+      const rawCost = formData.cost
+        ? Number(formData.cost.replace(/[^\d,]/g, "").replace(",", "."))
+        : 0;
+
+      await atualizarManutencaoAPI(maintenanceId, {
+        status: "Concluída",
+        cost: rawCost,
+        provider: formData.provider || "Interno",
+        invoice_url: formData.invoiceUrl || undefined,
+        completed_date: new Date().toISOString(),
+      });
+
+      toast.success("Concluído", "Vistoria finalizada com sucesso!");
+
+      // Limpa o form do accordion
+      setAccordionFormData((prev) => {
+        const newData = { ...prev };
+        delete newData[maintenanceId];
+        return newData;
+      });
+
+      carregarTudo();
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro", "Falha ao finalizar vistoria.");
+    } finally {
+      setFinalizingId(null);
+    }
+  };
+
+  // Helper para atualizar form do accordion
+  const updateAccordionForm = (id: number, field: string, value: string) => {
+    setAccordionFormData((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value,
+      },
+    }));
+  };
+
+  // Formata custo no accordion
+  const handleAccordionCostChange = (id: number, rawValue: string) => {
+    const value = rawValue.replace(/\D/g, "");
+    if (value === "") {
+      updateAccordionForm(id, "cost", "");
+      return;
+    }
+    const amount = Number(value) / 100;
+    const formatted = amount.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+    updateAccordionForm(id, "cost", formatted);
+  };
 
   // --- FORMATADORES DE INPUT (MÁSCARAS) ---
 
@@ -677,9 +859,247 @@ export function MaintenanceView() {
         </Card>
       </div>
 
-      {/* TABELA */}
+      {/* --- SECAO 1: SOLICITACOES DE VISTORIA (ACCORDION) --- */}
+      {vistoriaMaintenances.length > 0 && (
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
+                <ClipboardList className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">
+                  Solicitações de Vistoria (Checklist)
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {vistoriaPendingCount} pendente
+                  {vistoriaPendingCount !== 1 ? "s" : ""} de aprovação
+                </p>
+              </div>
+            </div>
+
+            <Accordion type="single" collapsible className="w-full space-y-2">
+              {vistoriaMaintenances.map((maintenance) => {
+                const failedItems = getFailedChecklistItems(
+                  maintenance.checklist_data,
+                );
+                const isCompleted =
+                  maintenance.status === "Concluída" ||
+                  maintenance.status === "Concluído";
+                const formData = accordionFormData[maintenance.id] || {
+                  cost: "",
+                  provider: "",
+                  invoiceUrl: "",
+                };
+
+                return (
+                  <AccordionItem
+                    key={maintenance.id}
+                    value={String(maintenance.id)}
+                    className="border rounded-lg px-4 data-[state=open]:bg-muted/30"
+                  >
+                    <AccordionTrigger className="hover:no-underline py-4">
+                      <div className="flex flex-1 flex-wrap items-center gap-3 text-left">
+                        {/* Placa e Modelo */}
+                        <div className="flex items-center gap-2 min-w-[120px]">
+                          <Car className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-semibold">
+                            {maintenance.vehicle_plate ||
+                              maintenance.vehicle?.placa ||
+                              "N/A"}
+                          </span>
+                          <span className="text-sm text-muted-foreground hidden sm:inline">
+                            {maintenance.vehicle_model ||
+                              maintenance.vehicle?.modelo ||
+                              ""}
+                          </span>
+                        </div>
+
+                        {/* Motorista */}
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <User className="h-3.5 w-3.5" />
+                          <span>{maintenance.driver_name || "Motorista"}</span>
+                        </div>
+
+                        {/* Data */}
+                        <span className="text-sm text-muted-foreground">
+                          {maintenance.scheduled_date
+                            ? new Date(
+                                maintenance.scheduled_date,
+                              ).toLocaleDateString("pt-BR")
+                            : "-"}
+                        </span>
+
+                        {/* Badges */}
+                        <div className="flex items-center gap-2 ml-auto mr-4">
+                          {failedItems.length > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              {failedItems.length} problema
+                              {failedItems.length > 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                          <Badge
+                            className={cn(
+                              isCompleted
+                                ? "bg-green-100 text-green-800"
+                                : "bg-orange-100 text-orange-800",
+                            )}
+                          >
+                            {isCompleted
+                              ? "Concluída"
+                              : maintenance.status || "Pendente"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+
+                    <AccordionContent className="pb-4">
+                      <Separator className="mb-4" />
+                      <div className="grid gap-6 md:grid-cols-2">
+                        {/* COLUNA 1: Itens Reprovados */}
+                        <div className="space-y-3">
+                          <h4 className="font-medium text-sm flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-red-500" />
+                            Itens Reprovados na Vistoria
+                          </h4>
+
+                          {failedItems.length === 0 ? (
+                            <p className="text-sm text-muted-foreground italic">
+                              Nenhum item reprovado encontrado.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {failedItems.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-start gap-2 p-2 rounded-lg bg-red-50 border border-red-100"
+                                >
+                                  <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                                  <div>
+                                    <p className="text-sm font-medium text-red-900">
+                                      {translateChecklistItem(item.name)}
+                                    </p>
+                                    {item.note && (
+                                      <p className="text-xs text-red-700 mt-0.5">
+                                        {item.note}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* COLUNA 2: Formulario de Acao (Admin) */}
+                        <div className="space-y-3">
+                          <h4 className="font-medium text-sm flex items-center gap-2">
+                            <Wrench className="h-4 w-4 text-primary" />
+                            Ação do Administrador
+                          </h4>
+
+                          {isCompleted ? (
+                            <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-center">
+                              <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                              <p className="text-sm font-medium text-green-800">
+                                Manutenção Finalizada
+                              </p>
+                              <p className="text-xs text-green-700 mt-1">
+                                Custo: R${" "}
+                                {Number(maintenance.cost || 0).toLocaleString(
+                                  "pt-BR",
+                                  { minimumFractionDigits: 2 },
+                                )}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3 p-3 rounded-lg border bg-background">
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">Custo (R$)</Label>
+                                <Input
+                                  placeholder="R$ 0,00"
+                                  value={formData.cost}
+                                  onChange={(e) =>
+                                    handleAccordionCostChange(
+                                      maintenance.id,
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">
+                                  Fornecedor / Oficina
+                                </Label>
+                                <Input
+                                  placeholder="Nome da oficina..."
+                                  value={formData.provider}
+                                  onChange={(e) =>
+                                    updateAccordionForm(
+                                      maintenance.id,
+                                      "provider",
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <Label className="text-xs flex items-center gap-1.5">
+                                  <LinkIcon className="h-3 w-3" />
+                                  Link da Nota Fiscal (Opcional)
+                                </Label>
+                                <Input
+                                  placeholder="https://..."
+                                  value={formData.invoiceUrl}
+                                  onChange={(e) =>
+                                    updateAccordionForm(
+                                      maintenance.id,
+                                      "invoiceUrl",
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+
+                              <Button
+                                className="w-full bg-green-600 hover:bg-green-700 mt-2"
+                                onClick={() =>
+                                  handleFinalizeVistoria(maintenance.id)
+                                }
+                                disabled={finalizingId === maintenance.id}
+                              >
+                                {finalizingId === maintenance.id ? (
+                                  <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                                ) : (
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                )}
+                                Aprovar e Finalizar Manutenção
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* --- SECAO 2: HISTORICO GERAL (TABELA) --- */}
       <Card>
         <CardContent className="p-0">
+          <div className="p-4 border-b">
+            <h2 className="font-semibold">Histórico Geral de Manutenções</h2>
+            <p className="text-sm text-muted-foreground">
+              {otherMaintenances.length} registro
+              {otherMaintenances.length !== 1 ? "s" : ""}
+            </p>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -699,21 +1119,21 @@ export function MaintenanceView() {
                     Carregando dados...
                   </TableCell>
                 </TableRow>
-              ) : filteredMaintenances.length === 0 ? (
+              ) : otherMaintenances.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
                     Nenhuma manutenção encontrada com os filtros atuais.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredMaintenances.map((maintenance) => {
+                otherMaintenances.map((maintenance) => {
                   const statusKey =
                     maintenance.status === "Agendado"
                       ? "Agendada"
                       : maintenance.status;
                   const config =
                     statusConfig[statusKey] || statusConfig.Agendada;
-                  const StatusIcon = config.icon;
+                  const StatusIcon = config?.icon || Clock;
 
                   return (
                     <TableRow
@@ -725,32 +1145,44 @@ export function MaintenanceView() {
                       }}
                     >
                       <TableCell>
-                        {new Date(
-                          maintenance.scheduled_date,
-                        ).toLocaleDateString("pt-BR")}
+                        {maintenance.scheduled_date
+                          ? new Date(
+                              maintenance.scheduled_date,
+                            ).toLocaleDateString("pt-BR")
+                          : "-"}
                       </TableCell>
                       <TableCell>
                         <div>
                           <p className="font-medium">
-                            {maintenance.vehicle_plate}
+                            {maintenance.vehicle_plate ||
+                              maintenance.vehicle?.placa ||
+                              "N/A"}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {maintenance.vehicle_model}
+                            {maintenance.vehicle_model ||
+                              maintenance.vehicle?.modelo ||
+                              ""}
                           </p>
                         </div>
                       </TableCell>
-                      <TableCell>{maintenance.type}</TableCell>
+                      <TableCell>{maintenance.type || "-"}</TableCell>
                       <TableCell>{maintenance.provider || "-"}</TableCell>
                       <TableCell>
                         R${" "}
-                        {Number(maintenance.cost).toLocaleString("pt-BR", {
+                        {Number(maintenance.cost || 0).toLocaleString("pt-BR", {
                           minimumFractionDigits: 2,
                         })}
                       </TableCell>
                       <TableCell>
-                        <Badge className={config.color}>
-                          <StatusIcon className="mr-1 h-3 w-3" />
-                          {maintenance.status}
+                        <Badge
+                          className={
+                            config?.color || "bg-gray-100 text-gray-800"
+                          }
+                        >
+                          {StatusIcon && (
+                            <StatusIcon className="mr-1 h-3 w-3" />
+                          )}
+                          {maintenance.status || "Pendente"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

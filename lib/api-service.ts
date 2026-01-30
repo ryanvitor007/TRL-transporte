@@ -171,6 +171,22 @@ export async function concluirManutencaoAPI(id: number) {
   return handleResponse(response);
 }
 
+// Atualiza uma manutencao existente (usado para finalizar vistorias com custo/fornecedor)
+export async function atualizarManutencaoAPI(id: number, dados: {
+  status?: string;
+  cost?: number;
+  provider?: string;
+  invoice_url?: string;
+  completed_date?: string;
+}) {
+  const response = await fetch(`${API_BASE_URL}/maintenances/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  return handleResponse(response);
+}
+
 // --- MÓDULO: RELATÓRIOS (INTEGRAÇÃO REAL) ---
 
 export interface ReportFilter {
