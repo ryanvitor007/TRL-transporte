@@ -95,6 +95,11 @@ export function ChecklistMaintenanceModal({
   // --- NOVA PROTEÇÃO CONTRA DADOS VAZIOS ---
   // Se não tiver dados de checklist (ex: manutenção comum), não renderiza nada ou renderiza vazio
   if (!maintenance.checklistData || !maintenance.checklistData.items || !Array.isArray(maintenance.checklistData.items)) {
+  if (
+    !maintenance.checklistData ||
+    !maintenance.checklistData.items ||
+    !Array.isArray(maintenance.checklistData.items)
+  ) {
     return null;
   }
 
