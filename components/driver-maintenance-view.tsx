@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { buscarManutencoesAPI } from "@/lib/api-service";
-import { ChecklistMaintenanceModal } from "@/components/checklist-maintenance-modal";
+import { ChecklistDetailsModal } from "@/components/checklist-details-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1367,39 +1367,11 @@ export function DriverMaintenanceView() {
         </DialogContent>
       </Dialog>
       {/* --- MODAL ESPECÍFICO: DETALHES DO CHECKLIST --- */}
-      {/* CORREÇÃO: Adicionamos '&& showChecklistModal' para só renderizar se tiver aberto */}
-      {/* MODAL DE CHECKLIST */}
-      {/* MODAL DE CHECKLIST */}
-      {selectedMaintenance && showChecklistModal && (
-        <ChecklistMaintenanceModal
-          open={showChecklistModal}
-          onOpenChange={setShowChecklistModal}
-          maintenance={{
-            ...selectedMaintenance,
-            // Garante que o modal receba o JSON correto
-            checklistData:
-              selectedMaintenance.checklist_data ||
-              selectedMaintenance.checklistData,
-
-            // Tratamento de campos obrigatórios para evitar crash
-            id: selectedMaintenance.id,
-            vehicle_id: selectedMaintenance.vehicle_id,
-            // Acessa o veículo com segurança usando ?. (optional chaining)
-            vehicle_plate: selectedMaintenance.vehicle?.placa || "N/A",
-            vehicle_model:
-              selectedMaintenance.vehicle?.modelo || "Modelo não inf.",
-
-            type: selectedMaintenance.type,
-            description: selectedMaintenance.description,
-            scheduled_date:
-              selectedMaintenance.scheduled_date || new Date().toISOString(),
-            cost: selectedMaintenance.cost || 0,
-            status: selectedMaintenance.status,
-            provider: selectedMaintenance.provider || "Interno",
-            km_at_maintenance: selectedMaintenance.km_at_maintenance || 0,
-          }}
-        />
-      )}
+      <ChecklistDetailsModal
+        isOpen={showChecklistModal}
+        onClose={() => setShowChecklistModal(false)}
+        maintenance={selectedMaintenance}
+      />
 
       {/* DIALOG: DETALHES - MOBILE OPTIMIZED */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
