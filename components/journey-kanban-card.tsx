@@ -28,6 +28,22 @@ import {
 import { cn } from "@/lib/utils";
 import type { JornadaMonitoramento } from "@/lib/api-service";
 
+// --- MAPEAMENTO DE TRADUCAO DOS ITENS DO CHECKLIST ---
+const CHECKLIST_LABELS: Record<string, string> = {
+  tires: "Pneus",
+  fluids: "Fluidos",
+  brakes: "Freios",
+  lights: "Luzes",
+  panel: "Painel",
+  windows: "Vidros",
+  security: "Seguranca",
+  body: "Lataria",
+};
+
+function translateChecklistItem(key: string): string {
+  return CHECKLIST_LABELS[key?.toLowerCase()] || key || "Item";
+}
+
 interface JourneyKanbanCardProps {
   journey: JornadaMonitoramento;
   onOpenDetails?: (journey: JornadaMonitoramento) => void;
@@ -272,13 +288,34 @@ export function JourneyKanbanCard({
           </Badge>
         </div>
 
-        {/* Alerta de Problemas */}
+        {/* Alerta de Problemas no Checklist */}
         {hasProblems && (
-          <div className="mt-3 flex items-center gap-2 rounded-md bg-red-100 p-2 text-xs text-red-700">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span className="font-medium">
-              {journey.rejectedItems?.length} item(ns) reprovado(s) no checklist
-            </span>
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-red-700 mb-1.5">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>
+                {journey.rejectedItems?.length} problema
+                {(journey.rejectedItems?.length || 0) > 1 ? "s" : ""} no
+                checklist
+              </span>
+            </div>
+            {/* Lista dos itens reprovados */}
+            <div className="flex flex-wrap gap-1">
+              {journey.rejectedItems?.slice(0, 3).map((item) => (
+                <span
+                  key={item}
+                  className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-800"
+                >
+                  <XCircle className="h-2.5 w-2.5" />
+                  {translateChecklistItem(item)}
+                </span>
+              ))}
+              {(journey.rejectedItems?.length || 0) > 3 && (
+                <span className="inline-flex items-center rounded-full bg-red-200 px-2 py-0.5 text-[10px] font-medium text-red-800">
+                  +{(journey.rejectedItems?.length || 0) - 3}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -318,6 +355,22 @@ export function JourneyDetailsModal({
     brakes: "Freios (Teste visual/pedal)",
     lights: "Iluminacao (Farois, Setas e Freio)",
     panel: "Painel e Instrumentos",
+    windows: "Vidros e Espelhos",
+    security: "Itens de Seguranca",
+    body: "Lataria e Pintura",
+  };
+
+  // Verifica se tem problemas no checklist
+  const hasChecklistProblems =
+    journey.rejectedItems && journey.rejectedItems.length > 0;
+
+  // Extrai notas especificas por item (se existirem)
+  const getItemNote = (key: string): string | null => {
+    const notes = journey.checklistRaw?.notes;
+    if (typeof notes === "object" && notes !== null) {
+      return notes[key] || null;
+    }
+    return null;
   };
 
   return (
@@ -383,45 +436,94 @@ export function JourneyDetailsModal({
               </p>
             </div>
 
-            {/* Checklist */}
+            {/* Alerta de Problemas (Destaque) */}
+            {hasChecklistProblems && (
+              <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-red-700 mb-3">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span>
+                    Veiculo rodando com {journey.rejectedItems?.length} problema
+                    {(journey.rejectedItems?.length || 0) > 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                {/* Lista de itens reprovados */}
+                <div className="space-y-2">
+                  {journey.rejectedItems?.map((item) => {
+                    const itemNote = getItemNote(item);
+                    return (
+                      <div
+                        key={item}
+                        className="flex items-start gap-3 rounded-lg bg-white/70 border border-red-200 p-3"
+                      >
+                        <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-red-800">
+                            {checklistLabels[item] || item}
+                          </p>
+                          {itemNote && (
+                            <p className="text-xs text-red-600 mt-0.5">
+                              {itemNote}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Nota geral do motorista */}
+                {journey.checklistNotes &&
+                  typeof journey.checklistNotes === "string" &&
+                  !journey.checklistNotes.includes(":") && (
+                    <div className="mt-3 pt-3 border-t border-red-200">
+                      <p className="text-xs font-medium text-red-700 mb-1">
+                        Observacao do Motorista:
+                      </p>
+                      <p className="text-sm text-red-800 italic">
+                        "{journey.checklistNotes}"
+                      </p>
+                    </div>
+                  )}
+              </div>
+            )}
+
+            {/* Checklist Completo */}
             {journey.checklistItems && (
               <div className="rounded-lg border bg-muted/30 p-3">
                 <div className="flex items-center gap-2 text-sm font-medium mb-3">
                   <CheckCircle2 className="h-4 w-4 text-primary" />
                   Checklist de Vistoria
                 </div>
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   {Object.entries(journey.checklistItems).map(
                     ([key, value]) => (
                       <div
                         key={key}
                         className={cn(
-                          "flex items-center justify-between rounded-md p-2 text-sm",
-                          value ? "bg-green-50" : "bg-red-50",
+                          "flex items-center gap-2 rounded-lg p-2 text-xs",
+                          value
+                            ? "bg-green-50 border border-green-200"
+                            : "bg-red-50 border border-red-200",
                         )}
                       >
+                        {value ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                        )}
                         <span
-                          className={value ? "text-green-700" : "text-red-700"}
+                          className={cn(
+                            "truncate",
+                            value ? "text-green-700" : "text-red-700",
+                          )}
                         >
                           {checklistLabels[key] || key}
                         </span>
-                        {value ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-red-600" />
-                        )}
                       </div>
                     ),
                   )}
                 </div>
-
-                {/* Notas de problemas */}
-                {journey.checklistNotes && (
-                  <div className="mt-3 rounded-md bg-red-100 p-2 text-xs text-red-700">
-                    <p className="font-medium">Observacoes:</p>
-                    <p>{journey.checklistNotes}</p>
-                  </div>
-                )}
               </div>
             )}
           </div>

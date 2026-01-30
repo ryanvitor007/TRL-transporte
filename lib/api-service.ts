@@ -716,6 +716,7 @@ export interface JornadaMonitoramento {
   startTime: string;
   startLocation: string;
   currentLocation?: string;
+  checklistRaw?: any;
   checklistItems?: Record<string, boolean>;
   checklistNotes?: string;
   rejectedItems?: string[];
@@ -745,6 +746,7 @@ function adapterJornadaMonitoramento(data: any): JornadaMonitoramento {
     startTime: data.start_time || data.startTime || data.created_at,
     startLocation: data.start_location || data.startLocation || "N/A",
     currentLocation: data.current_location || data.currentLocation,
+    checklistRaw: data.checklist || data.checklistRaw,
     checklistItems: data.checklist?.items,
     checklistNotes: data.checklist?.notes,
     rejectedItems,

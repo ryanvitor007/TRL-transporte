@@ -62,6 +62,8 @@ import {
   User,
   XCircle,
   Link as LinkIcon,
+  CloudUpload,
+  MessageSquareText,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -233,11 +235,17 @@ export function MaintenanceView() {
       {
         cost: string;
         provider: string;
-        invoiceUrl: string;
+        invoiceUrl?: string;
       }
     >
   >({});
+  const [accordionFiles, setAccordionFiles] = useState<
+    Record<number, File | null>
+  >({});
   const [finalizingId, setFinalizingId] = useState<number | null>(null);
+  const accordionFileInputRefs = useRef<
+    Record<number, HTMLInputElement | null>
+  >({});
 
   // --- ESTADO DOS FILTROS ---
   const [filters, setFilters] = useState({
@@ -447,6 +455,76 @@ export function MaintenanceView() {
       currency: "BRL",
     });
     updateAccordionForm(id, "cost", formatted);
+  };
+
+  // --- FILE UPLOAD HANDLERS (ACCORDION) ---
+  const handleAccordionFileSelect = (id: number, file: File | null) => {
+    if (file) {
+      // Valida tipo de arquivo (PDF ou imagem)
+      const validTypes = [
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/webp",
+      ];
+      if (!validTypes.includes(file.type)) {
+        toast.error(
+          "Arquivo inválido",
+          "Selecione um PDF ou imagem (PNG, JPG, WEBP).",
+        );
+        return;
+      }
+      // Valida tamanho (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(
+          "Arquivo muito grande",
+          "O arquivo deve ter no máximo 10MB.",
+        );
+        return;
+      }
+    }
+    setAccordionFiles((prev) => ({ ...prev, [id]: file }));
+  };
+
+  const handleAccordionFileDrop = (
+    id: number,
+    e: React.DragEvent<HTMLDivElement>,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0] || null;
+    handleAccordionFileSelect(id, file);
+  };
+
+  const handleAccordionDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // Helper para extrair notas do motorista do checklist_data
+  const getDriverNotes = (checklistData: any): string | null => {
+    if (!checklistData) return null;
+    let data = checklistData;
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        return null;
+      }
+    }
+    // Tenta diferentes formatos de notas
+    if (typeof data.notes === "string") return data.notes;
+    if (data.observations) return data.observations;
+    if (data.observacoes) return data.observacoes;
+    // Se notes for objeto, concatena todas as notas
+    if (typeof data.notes === "object" && data.notes !== null) {
+      const noteEntries = Object.entries(data.notes)
+        .filter(([_, v]) => v)
+        .map(([k, v]) => `${translateChecklistItem(k)}: ${v}`);
+      return noteEntries.length > 0 ? noteEntries.join("\n") : null;
+    }
+    return null;
   };
 
   // --- FORMATADORES DE INPUT (MÁSCARAS) ---
@@ -956,13 +1034,14 @@ export function MaintenanceView() {
                     <AccordionContent className="pb-4">
                       <Separator className="mb-4" />
                       <div className="grid gap-6 md:grid-cols-2">
-                        {/* COLUNA 1: Itens Reprovados */}
-                        <div className="space-y-3">
-                          <h4 className="font-medium text-sm flex items-center gap-2">
+                        {/* COLUNA 1: Detalhes da Reprovacao */}
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-sm flex items-center gap-2">
                             <AlertCircle className="h-4 w-4 text-red-500" />
-                            Itens Reprovados na Vistoria
+                            Detalhes da Reprovacao
                           </h4>
 
+                          {/* Lista de Itens Reprovados */}
                           {failedItems.length === 0 ? (
                             <p className="text-sm text-muted-foreground italic">
                               Nenhum item reprovado encontrado.
@@ -972,7 +1051,7 @@ export function MaintenanceView() {
                               {failedItems.map((item, idx) => (
                                 <div
                                   key={idx}
-                                  className="flex items-start gap-2 p-2 rounded-lg bg-red-50 border border-red-100"
+                                  className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-100"
                                 >
                                   <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                                   <div>
@@ -980,7 +1059,7 @@ export function MaintenanceView() {
                                       {translateChecklistItem(item.name)}
                                     </p>
                                     {item.note && (
-                                      <p className="text-xs text-red-700 mt-0.5">
+                                      <p className="text-xs text-red-700 mt-1">
                                         {item.note}
                                       </p>
                                     )}
@@ -989,20 +1068,41 @@ export function MaintenanceView() {
                               ))}
                             </div>
                           )}
+
+                          {/* Notas do Motorista (Secao de Destaque) */}
+                          {(() => {
+                            const driverNotes = getDriverNotes(
+                              maintenance.checklist_data,
+                            );
+                            return (
+                              <div className="mt-4">
+                                <h5 className="font-medium text-sm flex items-center gap-2 mb-2">
+                                  <MessageSquareText className="h-4 w-4 text-amber-600" />
+                                  Observacoes do Motorista
+                                </h5>
+                                <div className="relative pl-4 py-3 pr-3 rounded-lg bg-amber-50 border-l-4 border-amber-400">
+                                  <p className="text-sm text-amber-900 whitespace-pre-wrap">
+                                    {driverNotes ||
+                                      "Sem observacoes adicionais."}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* COLUNA 2: Formulario de Acao (Admin) */}
-                        <div className="space-y-3">
-                          <h4 className="font-medium text-sm flex items-center gap-2">
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-sm flex items-center gap-2">
                             <Wrench className="h-4 w-4 text-primary" />
-                            Ação do Administrador
+                            Acao do Administrador
                           </h4>
 
                           {isCompleted ? (
-                            <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-center">
-                              <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                              <p className="text-sm font-medium text-green-800">
-                                Manutenção Finalizada
+                            <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-center">
+                              <CheckCircle className="h-10 w-10 text-green-600 mx-auto mb-2" />
+                              <p className="text-sm font-semibold text-green-800">
+                                Manutencao Finalizada
                               </p>
                               <p className="text-xs text-green-700 mt-1">
                                 Custo: R${" "}
@@ -1011,11 +1111,19 @@ export function MaintenanceView() {
                                   { minimumFractionDigits: 2 },
                                 )}
                               </p>
+                              {maintenance.provider && (
+                                <p className="text-xs text-green-700">
+                                  Oficina: {maintenance.provider}
+                                </p>
+                              )}
                             </div>
                           ) : (
-                            <div className="space-y-3 p-3 rounded-lg border bg-background">
+                            <div className="space-y-4 p-4 rounded-xl border bg-background">
+                              {/* Campo Custo */}
                               <div className="space-y-1.5">
-                                <Label className="text-xs">Custo (R$)</Label>
+                                <Label className="text-xs font-medium">
+                                  Custo (R$)
+                                </Label>
                                 <Input
                                   placeholder="R$ 0,00"
                                   value={formData.cost}
@@ -1028,8 +1136,9 @@ export function MaintenanceView() {
                                 />
                               </div>
 
+                              {/* Campo Fornecedor */}
                               <div className="space-y-1.5">
-                                <Label className="text-xs">
+                                <Label className="text-xs font-medium">
                                   Fornecedor / Oficina
                                 </Label>
                                 <Input
@@ -1045,24 +1154,90 @@ export function MaintenanceView() {
                                 />
                               </div>
 
+                              {/* Drag-and-Drop Upload Area */}
                               <div className="space-y-1.5">
-                                <Label className="text-xs flex items-center gap-1.5">
-                                  <LinkIcon className="h-3 w-3" />
-                                  Link da Nota Fiscal (Opcional)
+                                <Label className="text-xs font-medium">
+                                  Nota Fiscal (Opcional)
                                 </Label>
-                                <Input
-                                  placeholder="https://..."
-                                  value={formData.invoiceUrl}
+
+                                {/* Input file hidden */}
+                                <input
+                                  type="file"
+                                  accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
+                                  className="hidden"
+                                  ref={(el) => {
+                                    accordionFileInputRefs.current[
+                                      maintenance.id
+                                    ] = el;
+                                  }}
                                   onChange={(e) =>
-                                    updateAccordionForm(
+                                    handleAccordionFileSelect(
                                       maintenance.id,
-                                      "invoiceUrl",
-                                      e.target.value,
+                                      e.target.files?.[0] || null,
                                     )
                                   }
                                 />
+
+                                {accordionFiles[maintenance.id] ? (
+                                  /* Estado: Arquivo Selecionado */
+                                  <div className="flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-green-300 bg-green-50">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                                      <FileText className="h-5 w-5 text-green-600" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-green-800 truncate">
+                                        {accordionFiles[maintenance.id]?.name}
+                                      </p>
+                                      <p className="text-xs text-green-600">
+                                        {(
+                                          (accordionFiles[maintenance.id]
+                                            ?.size || 0) / 1024
+                                        ).toFixed(1)}{" "}
+                                        KB
+                                      </p>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      onClick={() =>
+                                        handleAccordionFileSelect(
+                                          maintenance.id,
+                                          null,
+                                        )
+                                      }
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  /* Estado: Aguardando Upload */
+                                  <div
+                                    className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 cursor-pointer transition-colors hover:border-primary hover:bg-accent/50"
+                                    onClick={() =>
+                                      accordionFileInputRefs.current[
+                                        maintenance.id
+                                      ]?.click()
+                                    }
+                                    onDragOver={handleAccordionDragOver}
+                                    onDrop={(e) =>
+                                      handleAccordionFileDrop(maintenance.id, e)
+                                    }
+                                  >
+                                    <CloudUpload className="h-8 w-8 text-muted-foreground" />
+                                    <p className="text-sm font-medium text-muted-foreground text-center">
+                                      Arraste e solte sua Nota Fiscal aqui
+                                    </p>
+                                    <p className="text-xs text-muted-foreground/70 text-center">
+                                      Ou clique para selecionar arquivo (PDF,
+                                      Imagem)
+                                    </p>
+                                  </div>
+                                )}
                               </div>
 
+                              {/* Botao Finalizar */}
                               <Button
                                 className="w-full bg-green-600 hover:bg-green-700 mt-2"
                                 onClick={() =>
@@ -1075,7 +1250,7 @@ export function MaintenanceView() {
                                 ) : (
                                   <CheckCircle className="mr-2 h-4 w-4" />
                                 )}
-                                Aprovar e Finalizar Manutenção
+                                Aprovar e Finalizar Manutencao
                               </Button>
                             </div>
                           )}
