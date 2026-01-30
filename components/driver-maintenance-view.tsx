@@ -551,7 +551,7 @@ export function DriverMaintenanceView() {
     if (selectedMaintenance) {
       setNewMaintenance({
         type: selectedMaintenance.type,
-        problemType: selectedMaintenance.description.split(" - ")[0],
+        problemType: (selectedMaintenance.description ?? "").split(" - ")[0],
         description: selectedMaintenance.description,
         urgency: selectedMaintenance.status === "Urgente" ? "alta" : "media",
         scheduledDate:
@@ -1021,7 +1021,7 @@ export function DriverMaintenanceView() {
 
                           {/* Service Type + Plate */}
                           <p className="text-sm text-foreground line-clamp-1">
-                            {maintenance.description.split(" - ")[0]}
+                            {(maintenance.description ?? "").split(" - ")[0]}
                           </p>
 
                           {/* Footer: Plate + Type + Indicators */}
@@ -1624,7 +1624,7 @@ export function DriverMaintenanceView() {
             {selectedMaintenance && (
               <div className="p-3 rounded-lg bg-muted/50 space-y-1">
                 <p className="font-medium">
-                  {selectedMaintenance.description.split(" - ")[0]}
+                  {(selectedMaintenance.description ?? "").split(" - ")[0]}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {selectedMaintenance.vehicle_plate} - R${" "}
