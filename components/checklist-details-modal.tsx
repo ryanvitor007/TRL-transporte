@@ -23,6 +23,25 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
+// --- MAPEAMENTO DE TRADUCAO ---
+const CHECKLIST_LABELS: Record<string, string> = {
+  tires: "Pneus e Rodas",
+  fluids: "Niveis de Fluidos (Oleo/Agua)",
+  brakes: "Sistema de Freios",
+  lights: "Luzes e Sinalizacao",
+  panel: "Painel e Instrumentos",
+  windows: "Vidros e Espelhos",
+  security: "Itens de Seguranca",
+  body: "Lataria e Pintura",
+  // Adicione mais traducoes conforme necessario
+};
+
+// Helper para traduzir o nome do item
+function translateItemName(name: string): string {
+  const key = name.toLowerCase().trim();
+  return CHECKLIST_LABELS[key] || name;
+}
+
 // --- INTERFACES ---
 interface ChecklistDetailsModalProps {
   isOpen: boolean;
@@ -31,7 +50,9 @@ interface ChecklistDetailsModalProps {
 }
 
 // Helper para parsear e normalizar os dados do checklist
-function parseChecklistItems(checklistData: any): { name: string; passed: boolean; note?: string }[] {
+function parseChecklistItems(
+  checklistData: any,
+): { name: string; passed: boolean; note?: string }[] {
   if (!checklistData) return [];
 
   // Se ja e um array de itens estruturados (formato antigo)
@@ -55,7 +76,14 @@ function parseChecklistItems(checklistData: any): { name: string; passed: boolea
   // Se o proprio checklistData e um objeto simples { "Pneus": false }
   if (typeof checklistData === "object" && !Array.isArray(checklistData)) {
     // Ignorar campos de metadados conhecidos
-    const metadataKeys = ["type", "completedAt", "driverName", "notes", "observacoes", "created_at"];
+    const metadataKeys = [
+      "type",
+      "completedAt",
+      "driverName",
+      "notes",
+      "observacoes",
+      "created_at",
+    ];
     return Object.entries(checklistData)
       .filter(([key]) => !metadataKeys.includes(key))
       .map(([key, value]) => ({
@@ -71,7 +99,12 @@ function parseChecklistItems(checklistData: any): { name: string; passed: boolea
 // Helper para extrair observacoes/notas
 function getChecklistNotes(checklistData: any): string | null {
   if (!checklistData) return null;
-  return checklistData.notes || checklistData.observacoes || checklistData.note || null;
+  return (
+    checklistData.notes ||
+    checklistData.observacoes ||
+    checklistData.note ||
+    null
+  );
 }
 
 export function ChecklistDetailsModal({
@@ -82,7 +115,8 @@ export function ChecklistDetailsModal({
   if (!maintenance) return null;
 
   // Tenta pegar checklist_data ou checklistData
-  const rawChecklistData = maintenance.checklist_data || maintenance.checklistData;
+  const rawChecklistData =
+    maintenance.checklist_data || maintenance.checklistData;
 
   // Parseia os dados do checklist
   const allItems = parseChecklistItems(rawChecklistData);
@@ -90,16 +124,24 @@ export function ChecklistDetailsModal({
   const notes = getChecklistNotes(rawChecklistData);
 
   // Extrai informacoes do veiculo e motorista com fallbacks seguros
-  const vehiclePlate = maintenance.vehicle?.placa || maintenance.vehicle_plate || "N/A";
-  const vehicleModel = maintenance.vehicle?.modelo || maintenance.vehicle_model || "";
-  const driverName = rawChecklistData?.driverName || maintenance.requested_by || maintenance.driver?.name || "Nao informado";
+  const vehiclePlate =
+    maintenance.vehicle?.placa || maintenance.vehicle_plate || "N/A";
+  const vehicleModel =
+    maintenance.vehicle?.modelo || maintenance.vehicle_model || "";
+  const driverName =
+    rawChecklistData?.driverName ||
+    maintenance.requested_by ||
+    maintenance.driver?.name ||
+    "Nao informado";
 
   // Formata a data
   const createdDate = maintenance.created_at || maintenance.scheduled_date;
   let formattedDate = "Data nao informada";
   if (createdDate) {
     try {
-      formattedDate = format(new Date(createdDate), "dd/MM HH:mm", { locale: ptBR });
+      formattedDate = format(new Date(createdDate), "dd/MM HH:mm", {
+        locale: ptBR,
+      });
     } catch {
       formattedDate = String(createdDate);
     }
@@ -121,13 +163,12 @@ export function ChecklistDetailsModal({
               <DialogTitle className="text-lg font-semibold leading-tight">
                 Detalhes da Vistoria
               </DialogTitle>
-              <p className="text-sm text-muted-foreground">
-                #{maintenance.id}
-              </p>
+              <p className="text-sm text-muted-foreground">#{maintenance.id}</p>
             </div>
             {failedItems.length > 0 && (
               <Badge variant="destructive" className="shrink-0">
-                {failedItems.length} {failedItems.length === 1 ? "problema" : "problemas"}
+                {failedItems.length}{" "}
+                {failedItems.length === 1 ? "problema" : "problemas"}
               </Badge>
             )}
           </div>
@@ -146,8 +187,12 @@ export function ChecklistDetailsModal({
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground leading-tight">Data/Hora</p>
-                  <p className="text-sm font-medium truncate">{formattedDate}</p>
+                  <p className="text-xs text-muted-foreground leading-tight">
+                    Data/Hora
+                  </p>
+                  <p className="text-sm font-medium truncate">
+                    {formattedDate}
+                  </p>
                 </div>
               </div>
 
@@ -156,10 +201,14 @@ export function ChecklistDetailsModal({
                   <Car className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground leading-tight">Veiculo</p>
+                  <p className="text-xs text-muted-foreground leading-tight">
+                    Veiculo
+                  </p>
                   <p className="text-sm font-medium truncate">{vehiclePlate}</p>
                   {vehicleModel && (
-                    <p className="text-xs text-muted-foreground truncate">{vehicleModel}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {vehicleModel}
+                    </p>
                   )}
                 </div>
               </div>
@@ -169,7 +218,9 @@ export function ChecklistDetailsModal({
                   <User className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground leading-tight">Motorista</p>
+                  <p className="text-xs text-muted-foreground leading-tight">
+                    Motorista
+                  </p>
                   <p className="text-sm font-medium truncate">{driverName}</p>
                 </div>
               </div>
@@ -184,7 +235,9 @@ export function ChecklistDetailsModal({
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-100">
                     <AlertTriangle className="h-4 w-4 text-red-600" />
                   </div>
-                  <h3 className="font-semibold text-foreground">Itens Reprovados</h3>
+                  <h3 className="font-semibold text-foreground">
+                    Itens Reprovados
+                  </h3>
                 </div>
 
                 {failedItems.length === 0 ? (
@@ -200,7 +253,7 @@ export function ChecklistDetailsModal({
                         key={index}
                         className={cn(
                           "flex items-start gap-3 p-3 rounded-xl",
-                          "bg-red-50 border border-red-200"
+                          "bg-red-50 border border-red-200",
                         )}
                       >
                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-100 shrink-0 mt-0.5">
@@ -208,7 +261,7 @@ export function ChecklistDetailsModal({
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm text-red-900">
-                            {item.name}
+                            {translateItemName(item.name)}
                           </p>
                           {item.note && (
                             <p className="mt-1 text-sm text-red-700/80 italic">
@@ -233,7 +286,7 @@ export function ChecklistDetailsModal({
             )}
 
             {/* Secao de Observacoes */}
-            {notes && (
+            {(notes || rawChecklistData?.notes) && (
               <>
                 <Separator />
                 <div>
@@ -241,12 +294,34 @@ export function ChecklistDetailsModal({
                     <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted">
                       <FileText className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <h3 className="font-semibold text-foreground">Observacoes</h3>
+                    <h3 className="font-semibold text-foreground">
+                      Observacoes
+                    </h3>
                   </div>
-                  <div className="p-3 rounded-xl bg-muted/50 border">
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {notes}
-                    </p>
+                  <div className="p-3 rounded-xl bg-muted/50 border space-y-2">
+                    {/* Exibe notas especificas de cada item reprovado */}
+                    {rawChecklistData?.notes &&
+                      typeof rawChecklistData.notes === "object" &&
+                      Object.entries(rawChecklistData.notes).map(
+                        ([key, value]) =>
+                          value && (
+                            <p
+                              key={key}
+                              className="text-sm text-muted-foreground"
+                            >
+                              <span className="font-medium">
+                                {translateItemName(key)}:
+                              </span>{" "}
+                              {String(value)}
+                            </p>
+                          ),
+                      )}
+                    {/* Exibe notas gerais se for string */}
+                    {typeof notes === "string" && (
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {notes}
+                      </p>
+                    )}
                   </div>
                 </div>
               </>
