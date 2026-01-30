@@ -159,6 +159,16 @@ export function JourneyKanbanCard({
   const statusConfig = getStatusConfig(journey.status);
   const StatusIcon = statusConfig.icon;
 
+  // Debug: verificar dados do checklist
+  console.log(
+    "[v0] JourneyKanbanCard - journey.rejectedItems:",
+    journey.rejectedItems,
+  );
+  console.log(
+    "[v0] JourneyKanbanCard - journey.checklistItems:",
+    journey.checklistItems,
+  );
+
   const isCritical =
     variant === "critical" || journey.status === "pending_approval";
   const isResting = journey.status === "resting";
