@@ -172,13 +172,16 @@ export async function concluirManutencaoAPI(id: number) {
 }
 
 // Atualiza uma manutencao existente (usado para finalizar vistorias com custo/fornecedor)
-export async function atualizarManutencaoAPI(id: number, dados: {
-  status?: string;
-  cost?: number;
-  provider?: string;
-  invoice_url?: string;
-  completed_date?: string;
-}) {
+export async function atualizarManutencaoAPI(
+  id: number,
+  dados: {
+    status?: string;
+    cost?: number;
+    provider?: string;
+    invoice_url?: string;
+    completed_date?: string;
+  },
+) {
   const response = await fetch(`${API_BASE_URL}/maintenances/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -716,20 +719,58 @@ export interface JornadaMonitoramento {
   startTime: string;
   startLocation: string;
   currentLocation?: string;
-  checklistRaw?: any;
   checklistItems?: Record<string, boolean>;
   checklistNotes?: string;
   rejectedItems?: string[];
+  // Dados brutos do checklist para exibicao detalhada
+  checklistRaw?: {
+    items?: Record<string, boolean>;
+    notes?: string | Record<string, string>;
+  };
 }
 
 // Adaptador para converter dados do banco para o frontend
 function adapterJornadaMonitoramento(data: any): JornadaMonitoramento {
-  // Processa itens rejeitados do checklist
+  // Processa checklist - pode vir como array ou objeto
+  let checklistData: {
+    items?: Record<string, boolean>;
+    notes?: string | Record<string, string>;
+  } | null = null;
+
+  // Formato array do Supabase: checklist: [{ items: {...}, notes: "..." }]
+  if (Array.isArray(data.checklist) && data.checklist.length > 0) {
+    checklistData = data.checklist[0];
+  }
+  // Formato objeto direto: checklist: { items: {...}, notes: "..." }
+  else if (
+    data.checklist &&
+    typeof data.checklist === "object" &&
+    !Array.isArray(data.checklist)
+  ) {
+    checklistData = data.checklist;
+  }
+
+  // Extrai itens reprovados (valor false)
   let rejectedItems: string[] = [];
-  if (data.checklist?.items) {
-    rejectedItems = Object.entries(data.checklist.items)
+  if (checklistData?.items) {
+    rejectedItems = Object.entries(checklistData.items)
       .filter(([, value]) => value === false)
       .map(([key]) => key);
+  }
+
+  // Processa notas - pode ser string ou objeto
+  let checklistNotes: string | undefined;
+  if (typeof checklistData?.notes === "string") {
+    checklistNotes = checklistData.notes;
+  } else if (
+    typeof checklistData?.notes === "object" &&
+    checklistData.notes !== null
+  ) {
+    // Se for objeto {lights: "farol queimado", tires: "pneu careca"}, concatena
+    checklistNotes = Object.entries(checklistData.notes)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join("; ");
   }
 
   return {
@@ -746,10 +787,10 @@ function adapterJornadaMonitoramento(data: any): JornadaMonitoramento {
     startTime: data.start_time || data.startTime || data.created_at,
     startLocation: data.start_location || data.startLocation || "N/A",
     currentLocation: data.current_location || data.currentLocation,
-    checklistRaw: data.checklist || data.checklistRaw,
-    checklistItems: data.checklist?.items,
-    checklistNotes: data.checklist?.notes,
+    checklistItems: checklistData?.items,
+    checklistNotes,
     rejectedItems,
+    checklistRaw: checklistData || undefined,
   };
 }
 
