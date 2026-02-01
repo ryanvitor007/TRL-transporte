@@ -701,6 +701,17 @@ export function naoTiver(dado: any, mensagem = "NÃO TIVER") {
 
 // --- MÓDULO: MONITORAMENTO DE JORNADAS (ADMIN) ---
 
+export interface JornadaIncidente {
+  id: number;
+  tipo: string;
+  descricao: string;
+  localizacao: string;
+  dataOcorrencia: string;
+  horaOcorrencia: string;
+  fotos?: string[];
+  status: string;
+}
+
 export interface JornadaMonitoramento {
   id: number;
   driverId: number;
@@ -727,6 +738,8 @@ export interface JornadaMonitoramento {
     items?: Record<string, boolean>;
     notes?: string | Record<string, string>;
   };
+  // Incidentes/Sinistros registrados nesta jornada
+  incidents?: JornadaIncidente[];
 }
 
 // Adaptador para converter dados do banco para o frontend
@@ -773,6 +786,20 @@ function adapterJornadaMonitoramento(data: any): JornadaMonitoramento {
       .join("; ");
   }
 
+  // Processa incidentes/sinistros vinculados a jornada
+  const incidents: JornadaIncidente[] = Array.isArray(data.incidents)
+    ? data.incidents.map((inc: any) => ({
+        id: inc.id,
+        tipo: inc.tipo || "Acidente",
+        descricao: inc.descricao || "",
+        localizacao: inc.localizacao || "",
+        dataOcorrencia: inc.data_ocorrencia || inc.created_at,
+        horaOcorrencia: inc.hora_ocorrencia || "",
+        fotos: inc.fotos || [],
+        status: inc.status || "Aberto",
+      }))
+    : [];
+
   return {
     id: data.id,
     driverId: data.driver_id || data.driverId,
@@ -791,6 +818,7 @@ function adapterJornadaMonitoramento(data: any): JornadaMonitoramento {
     checklistNotes,
     rejectedItems,
     checklistRaw: checklistData || undefined,
+    incidents: incidents.length > 0 ? incidents : undefined,
   };
 }
 
@@ -896,6 +924,21 @@ export async function buscarStatusJornadaAPI(
     console.error("Erro ao buscar status da jornada:", error);
     return null;
   }
+}
+
+// --- MÓDULO: INCIDENTES DE JORNADA (MOTORISTA) ---
+
+// Cria um incidente/sinistro vinculado a uma jornada ativa
+export async function criarIncidenteJornadaAPI(formData: FormData) {
+  const response = await fetch(`${API_BASE_URL}/incidents`, {
+    method: "POST",
+    body: formData, // FormData com journeyId, photos, description, location, etc.
+  });
+
+  if (!response.ok) throw new Error("Erro ao registrar incidente");
+
+  const novoRegistro = await response.json();
+  return adapterIncidente(novoRegistro);
 }
 
 // API Service - Conexão Real com Backend NestJS e Adapters
