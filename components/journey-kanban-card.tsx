@@ -24,6 +24,8 @@ import {
   Utensils,
   Play,
   ChevronRight,
+  TriangleAlert,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JornadaMonitoramento } from "@/lib/api-service";
@@ -159,22 +161,13 @@ export function JourneyKanbanCard({
   const statusConfig = getStatusConfig(journey.status);
   const StatusIcon = statusConfig.icon;
 
-  // Debug: verificar dados do checklist
-  console.log(
-    "[v0] JourneyKanbanCard - journey.rejectedItems:",
-    journey.rejectedItems,
-  );
-  console.log(
-    "[v0] JourneyKanbanCard - journey.checklistItems:",
-    journey.checklistItems,
-  );
-
   const isCritical =
     variant === "critical" || journey.status === "pending_approval";
   const isResting = journey.status === "resting";
   const isMeal = journey.status === "meal";
   const isPaused = isResting || isMeal;
   const hasProblems = journey.rejectedItems && journey.rejectedItems.length > 0;
+  const hasIncidents = journey.incidents && journey.incidents.length > 0;
 
   // Determina as cores do card baseado no status
   const getCardClasses = () => {
@@ -325,6 +318,18 @@ export function JourneyKanbanCard({
                   +{(journey.rejectedItems?.length || 0) - 3}
                 </span>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Badge de Sinistro */}
+        {hasIncidents && (
+          <div className="mt-3 rounded-lg border-2 border-red-400 bg-red-100 p-2.5">
+            <div className="flex items-center gap-2">
+              <TriangleAlert className="h-4 w-4 text-red-600 shrink-0" />
+              <span className="text-xs font-bold text-red-700 uppercase">
+                Com Sinistro ({journey.incidents?.length})
+              </span>
             </div>
           </div>
         )}
@@ -532,12 +537,91 @@ export function JourneyDetailsModal({
                         </span>
                       </div>
                     ),
+            )}
+            </div>
+          </div>
+        )}
+
+        {/* Sinistros Registrados */}
+        {journey.incidents && journey.incidents.length > 0 && (
+          <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-red-700 mb-3">
+              <TriangleAlert className="h-5 w-5" />
+              <span>
+                Sinistros Registrados Nesta Viagem ({journey.incidents.length})
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {journey.incidents.map((incident) => (
+                <div
+                  key={incident.id}
+                  className="rounded-lg bg-white border border-red-200 p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-red-800 bg-red-100 px-2 py-0.5 rounded">
+                          {incident.tipo}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {incident.dataOcorrencia
+                            ? new Date(incident.dataOcorrencia).toLocaleDateString("pt-BR")
+                            : ""}
+                          {incident.horaOcorrencia && ` as ${incident.horaOcorrencia}`}
+                        </span>
+                      </div>
+                      <p className="text-sm text-red-800 line-clamp-2">
+                        {incident.descricao || "Sem descricao"}
+                      </p>
+                      {incident.localizacao && (
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {incident.localizacao}
+                        </p>
+                      )}
+                    </div>
+                    <a
+                      href={`/incidents?id=${incident.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Ver Detalhes
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+
+                  {/* Fotos em miniatura */}
+                  {incident.fotos && incident.fotos.length > 0 && (
+                    <div className="flex gap-1.5 mt-2">
+                      {incident.fotos.slice(0, 3).map((foto, idx) => (
+                        <div
+                          key={idx}
+                          className="w-10 h-10 rounded overflow-hidden bg-muted border"
+                        >
+                          <img
+                            src={foto}
+                            alt={`Foto ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                      {incident.fotos.length > 3 && (
+                        <div className="w-10 h-10 rounded bg-red-100 border border-red-200 flex items-center justify-center text-xs font-medium text-red-600">
+                          +{incident.fotos.length - 3}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
-        </ScrollArea>
+        )}
+        </div>
+      </ScrollArea>
       </DialogContent>
     </Dialog>
   );

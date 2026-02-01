@@ -9,7 +9,7 @@ import {
   type JourneyStatus,
   type VehicleData,
 } from "@/contexts/journey-context";
-import { buscarFrotaAPI, salvarManutencaoAPI } from "@/lib/api-service";
+import { buscarFrotaAPI, salvarManutencaoAPI, criarIncidenteJornadaAPI } from "@/lib/api-service";
 import {
   Card,
   CardContent,
@@ -76,6 +76,11 @@ import {
   ChevronsUpDown,
   Search,
   Check,
+  TriangleAlert,
+  Camera,
+  Loader2,
+  ImageIcon,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -347,6 +352,14 @@ export function DriverJourneyView() {
   const [observations, setObservations] = useState("");
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
 
+  // --- INCIDENT REPORTING STATE ---
+  const [showIncidentModal, setShowIncidentModal] = useState(false);
+  const [incidentDescription, setIncidentDescription] = useState("");
+  const [incidentLocation, setIncidentLocation] = useState("");
+  const [incidentPhotos, setIncidentPhotos] = useState<File[]>([]);
+  const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  
   // --- CURRENT STEP FOR UI ---
   const getCurrentStep = () => {
     switch (journey.status) {
@@ -687,6 +700,105 @@ export function DriverJourneyView() {
     setShowMaintenanceDialog(false);
     setShowUrgentApprovalOption(false);
     completeInspection(true); // Marca que tem problemas e continua
+  };
+
+  // --- INCIDENT HANDLERS ---
+  const handleOpenIncidentModal = () => {
+    // Preenche localizacao automaticamente
+    setIncidentLocation(journey.lastLocation || currentLocation || "");
+    setShowIncidentModal(true);
+  };
+
+  const handleGetCurrentLocation = () => {
+    setIsGettingLocation(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          // Converte para formato legivel (pode ser melhorado com geocoding reverso)
+          setIncidentLocation(`Lat: ${latitude.toFixed(6)}, Long: ${longitude.toFixed(6)}`);
+          setIsGettingLocation(false);
+        },
+        (error) => {
+          console.error("Erro ao obter localizacao:", error);
+          setIncidentLocation(journey.lastLocation || "Localizacao nao disponivel");
+          setIsGettingLocation(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      setIncidentLocation(journey.lastLocation || "Localizacao nao disponivel");
+      setIsGettingLocation(false);
+    }
+  };
+
+  const handleIncidentPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setIncidentPhotos((prev) => [...prev, ...files].slice(0, 5)); // Max 5 fotos
+    }
+  };
+
+  const handleRemoveIncidentPhoto = (index: number) => {
+    setIncidentPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitIncident = async () => {
+    if (!incidentDescription.trim()) {
+      alert("Por favor, descreva o acidente/sinistro.");
+      return;
+    }
+
+    if (!journey.journeyId) {
+      alert("Erro: Jornada nao identificada.");
+      return;
+    }
+
+    setIsSubmittingIncident(true);
+
+    try {
+      const formData = new FormData();
+
+      // Dados preenchidos automaticamente
+      formData.append("journeyId", String(journey.journeyId));
+      formData.append("vehiclePlate", journey.vehicleData?.plate || "");
+      formData.append("vehicleModel", journey.vehicleData?.model || "");
+      formData.append("driverName", user?.name || "");
+      formData.append("driverId", String(user?.id || ""));
+      formData.append("type", "Acidente em Viagem");
+      formData.append("status", "Aberto");
+
+      // Data/Hora atual
+      const now = new Date();
+      formData.append("date", now.toISOString().split("T")[0]);
+      formData.append("time", now.toTimeString().slice(0, 5));
+
+      // Dados preenchidos pelo motorista
+      formData.append("location", incidentLocation || "Nao informada");
+      formData.append("description", incidentDescription);
+      formData.append("estimatedCost", "0"); // A ser definido pelo admin
+      formData.append("insuranceClaim", "false");
+
+      // Fotos
+      incidentPhotos.forEach((file) => {
+        formData.append("photos", file);
+      });
+
+      await criarIncidenteJornadaAPI(formData);
+
+      // Limpa o formulario e fecha o modal
+      setIncidentDescription("");
+      setIncidentLocation("");
+      setIncidentPhotos([]);
+      setShowIncidentModal(false);
+
+      alert("Sinistro registrado com sucesso! A central foi notificada.");
+    } catch (error) {
+      console.error("Erro ao registrar sinistro:", error);
+      alert("Erro ao registrar sinistro. Tente novamente.");
+    } finally {
+      setIsSubmittingIncident(false);
+    }
   };
 
   const calculateDistance = () => {
@@ -1979,6 +2091,223 @@ export function DriverJourneyView() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Botao Reportar Sinistro/Acidente */}
+        <Card className="border-red-200 bg-red-50/50">
+          <CardContent className="pt-4">
+            <Button
+              variant="outline"
+              className="w-full h-14 border-2 border-red-300 bg-white text-red-700 hover:bg-red-100 hover:border-red-400 font-semibold active:scale-95 transition-all"
+              onClick={handleOpenIncidentModal}
+            >
+              <TriangleAlert className="mr-2 h-5 w-5" />
+              Reportar Sinistro / Acidente
+            </Button>
+            <p className="text-xs text-red-600 text-center mt-2">
+              Use em caso de colisao, avaria ou ocorrencia durante a viagem
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Modal de Reportar Incidente */}
+        <Dialog open={showIncidentModal} onOpenChange={setShowIncidentModal}>
+          <DialogContent className="max-w-lg max-h-[90dvh] p-0 flex flex-col gap-0 overflow-hidden">
+            <DialogHeader className="shrink-0 p-6 pb-4 bg-red-50 border-b border-red-200">
+              <DialogTitle className="flex items-center gap-2 text-red-700">
+                <TriangleAlert className="h-6 w-6" />
+                Reportar Sinistro
+              </DialogTitle>
+              <DialogDescription className="text-red-600">
+                Registre o acidente para notificar a central imediatamente
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-4">
+              {/* Dados Pre-Preenchidos (Somente Leitura) */}
+              <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+                  Dados Automaticos
+                </p>
+                
+                {/* Data/Hora */}
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Data/Hora</p>
+                    <p className="font-medium">
+                      {new Date().toLocaleDateString("pt-BR")} as{" "}
+                      {new Date().toLocaleTimeString("pt-BR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Veiculo */}
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <Truck className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Veiculo</p>
+                    <p className="font-medium">
+                      {journey.vehicleData?.plate} - {journey.vehicleData?.model}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Localizacao */}
+              <div className="space-y-2">
+                <Label className="text-sm flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  Localizacao do Acidente
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Local do acidente"
+                    value={incidentLocation}
+                    onChange={(e) => setIncidentLocation(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={handleGetCurrentLocation}
+                    disabled={isGettingLocation}
+                  >
+                    {isGettingLocation ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Navigation className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Clique no icone para usar sua localizacao atual
+                </p>
+              </div>
+
+              {/* Descricao */}
+              <div className="space-y-2">
+                <Label className="text-sm">
+                  Descricao do Ocorrido *
+                </Label>
+                <Textarea
+                  placeholder="Descreva o que aconteceu: tipo de acidente, danos, terceiros envolvidos..."
+                  value={incidentDescription}
+                  onChange={(e) => setIncidentDescription(e.target.value)}
+                  className="min-h-[120px]"
+                />
+              </div>
+
+              {/* Upload de Fotos */}
+              <div className="space-y-2">
+                <Label className="text-sm flex items-center gap-1">
+                  <Camera className="h-4 w-4" />
+                  Fotos do Acidente (opcional)
+                </Label>
+
+                {/* Preview das fotos */}
+                {incidentPhotos.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    {incidentPhotos.map((file, index) => (
+                      <div key={index} className="relative group">
+                        <div className="aspect-square rounded-lg overflow-hidden bg-muted border">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`Foto ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveIncidentPhoto(index)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Input de arquivo */}
+                {incidentPhotos.length < 5 && (
+                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-muted-foreground/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-2 pb-2">
+                      <ImageIcon className="h-6 w-6 text-muted-foreground mb-1" />
+                      <p className="text-xs text-muted-foreground">
+                        Toque para adicionar fotos
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        ({incidentPhotos.length}/5 fotos)
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      multiple
+                      className="hidden"
+                      onChange={handleIncidentPhotoChange}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Info box */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-800">
+                    <p className="font-semibold">Importante:</p>
+                    <p>
+                      A central sera notificada imediatamente. Aguarde instrucoes
+                      antes de tomar qualquer providencia.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <DialogFooter className="shrink-0 p-6 pt-4 border-t bg-muted/30">
+              <div className="w-full space-y-3">
+                <Button
+                  className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-semibold"
+                  onClick={handleSubmitIncident}
+                  disabled={isSubmittingIncident || !incidentDescription.trim()}
+                >
+                  {isSubmittingIncident ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Enviando...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <TriangleAlert className="h-4 w-4" />
+                      Enviar Relato de Sinistro
+                    </span>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setShowIncidentModal(false)}
+                  disabled={isSubmittingIncident}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
