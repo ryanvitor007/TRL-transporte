@@ -456,6 +456,23 @@ export async function concluirIncidenteAPI(id: number, formData: FormData) {
   return adapterIncidente(novoRegistro);
 }
 
+// Converte um incidente/sinistro em manutenção
+export async function transformarIncidenteEmManutencaoAPI(id: number) {
+  const response = await fetch(
+    `${API_BASE_URL}/incidents/${id}/create-maintenance`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Erro ao transformar incidente em manutenção");
+  }
+
+  return response.json();
+}
+
 // --- MÓDULO: TACÓGRAFOS (Mock LocalStorage) ---
 
 export const buscarTacografosAPI = async () => {
