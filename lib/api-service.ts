@@ -487,7 +487,7 @@ export async function concluirIncidenteAPI(id: number, formData: FormData) {
 }
 
 // Converte um incidente/sinistro em manutenção
-export async function transformarIncidenteEmManutencaoAPI(id: number) {
+export async function transformarIncidenteEmManutencao(id: number) {
   const response = await fetch(
     `${API_BASE_URL}/incidents/${id}/create-maintenance`,
     {

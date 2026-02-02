@@ -65,9 +65,9 @@ import {
   buscarIncidentesAPI,
   salvarIncidenteAPI,
   buscarFrotaAPI,
-  salvarManutencaoAPI,
   atualizarStatusIncidenteAPI,
   concluirIncidenteAPI, // Nova função
+  transformarIncidenteEmManutencao,
 } from "@/lib/api-service";
 
 export function IncidentsView() {
@@ -263,15 +263,7 @@ export function IncidentsView() {
     if (!selectedIncident) return;
     setProcessingMaintenance(true);
     try {
-      const maintenanceData = {
-        vehicle_plate: selectedIncident.vehiclePlate,
-        type: "Corretiva (Sinistro)",
-        description: `⚠️ [ORIGEM: SINISTRO] ${selectedIncident.type} - ${selectedIncident.description}`,
-        scheduled_date: new Date().toISOString().split("T")[0],
-        cost: selectedIncident.estimatedCost,
-        status: "Pendente",
-      };
-      await salvarManutencaoAPI(maintenanceData);
+      await transformarIncidenteEmManutencao(selectedIncident.id);
       await atualizarStatusIncidenteAPI(selectedIncident.id, "Em Manutenção");
 
       const updatedList = incidents.map((inc) =>
