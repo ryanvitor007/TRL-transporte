@@ -60,6 +60,8 @@ const adapterIncidente = (dbData: any) => {
   };
 };
 
+
+
 // --- FUNÇÕES AUXILIARES ---
 
 async function handleResponse(response: Response) {
