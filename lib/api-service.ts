@@ -492,7 +492,6 @@ export async function transformarIncidenteEmManutencaoAPI(id: number) {
     `${API_BASE_URL}/incidents/${id}/create-maintenance`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
     },
   );
 
