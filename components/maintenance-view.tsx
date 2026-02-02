@@ -42,6 +42,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import {
   Wrench,
@@ -64,6 +69,7 @@ import {
   Link as LinkIcon,
   CloudUpload,
   MessageSquareText,
+  ImageIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -110,6 +116,11 @@ interface ExtendedMaintenance {
   invoice_url?: string;
   checklist_data?: any;
   driver_name?: string;
+  created_at?: string | null;
+  incident?: {
+    created_at?: string | null;
+    fotos?: string[] | null;
+  } | null;
   vehicle?: {
     placa?: string;
     modelo?: string;
@@ -196,6 +207,14 @@ const maintenanceTypes = [
   { value: "Preditiva", label: "Preditiva" },
 ];
 
+const getRequestDate = (maintenance: ExtendedMaintenance): string => {
+  const dateValue =
+    maintenance.created_at || maintenance.incident?.created_at || null;
+  return dateValue
+    ? new Date(dateValue).toLocaleDateString("pt-BR")
+    : "-";
+};
+
 export function MaintenanceView() {
   const toast = useToastNotification();
 
@@ -209,6 +228,10 @@ export function MaintenanceView() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedMaintenance, setSelectedMaintenance] =
     useState<ExtendedMaintenance | null>(null);
+  const [showPhotos, setShowPhotos] = useState(false);
+  const [activePhotosMaintenanceId, setActivePhotosMaintenanceId] = useState<
+    number | null
+  >(null);
 
   // --- ESTADOS DO FORMULÁRIO (Nova Manutenção) ---
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
@@ -277,6 +300,11 @@ export function MaintenanceView() {
   useEffect(() => {
     carregarTudo();
   }, []);
+
+  useEffect(() => {
+    setShowPhotos(false);
+    setActivePhotosMaintenanceId(null);
+  }, [selectedMaintenance?.id]);
 
   const carregarTudo = async () => {
     try {
@@ -672,6 +700,12 @@ export function MaintenanceView() {
     }
   };
 
+  const selectedIncidentPhotos = selectedMaintenance?.incident?.fotos || [];
+  const isModalPhotosOpen =
+    !!selectedMaintenance &&
+    showPhotos &&
+    activePhotosMaintenanceId === selectedMaintenance.id;
+
   return (
     <div className="space-y-6">
       {/* CABEÇALHO */}
@@ -969,6 +1003,9 @@ export function MaintenanceView() {
                   provider: "",
                   invoiceUrl: "",
                 };
+                const incidentPhotos = maintenance.incident?.fotos || [];
+                const isPhotosOpen =
+                  showPhotos && activePhotosMaintenanceId === maintenance.id;
 
                 return (
                   <AccordionItem
@@ -1001,11 +1038,7 @@ export function MaintenanceView() {
 
                         {/* Data */}
                         <span className="text-sm text-muted-foreground">
-                          {maintenance.scheduled_date
-                            ? new Date(
-                                maintenance.scheduled_date,
-                              ).toLocaleDateString("pt-BR")
-                            : "-"}
+                          {getRequestDate(maintenance)}
                         </span>
 
                         {/* Badges */}
@@ -1097,6 +1130,55 @@ export function MaintenanceView() {
                             <Wrench className="h-4 w-4 text-primary" />
                             Acao do Administrador
                           </h4>
+
+                          <div className="rounded-xl border bg-background p-4 space-y-3">
+                            <Collapsible
+                              open={isPhotosOpen}
+                              onOpenChange={(open) => {
+                                setActivePhotosMaintenanceId(
+                                  open ? maintenance.id : null,
+                                );
+                                setShowPhotos(open);
+                              }}
+                            >
+                              <CollapsibleTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-start gap-2 text-blue-600 border-blue-200/70 hover:text-blue-700 hover:bg-blue-50/60"
+                                >
+                                  <ImageIcon className="h-4 w-4" />
+                                  {isPhotosOpen
+                                    ? "Ocultar Fotos"
+                                    : "Ver Fotos do Sinistro"}
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="mt-3 overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+                                {incidentPhotos.length > 0 ? (
+                                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                    {incidentPhotos.map((foto, index) => (
+                                      <a
+                                        key={`${maintenance.id}-foto-${index}`}
+                                        href={foto}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="block"
+                                      >
+                                        <img
+                                          src={foto}
+                                          alt={`Foto do sinistro ${index + 1}`}
+                                          className="aspect-square w-full rounded-lg object-cover"
+                                        />
+                                      </a>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">
+                                    Nenhuma foto do sinistro disponível.
+                                  </p>
+                                )}
+                              </CollapsibleContent>
+                            </Collapsible>
+                          </div>
 
                           {isCompleted ? (
                             <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-center">
@@ -1278,7 +1360,7 @@ export function MaintenanceView() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Data</TableHead>
+                <TableHead>Data da Solicitação</TableHead>
                 <TableHead>Veículo</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Oficina</TableHead>
@@ -1319,13 +1401,7 @@ export function MaintenanceView() {
                         setIsDetailsOpen(true);
                       }}
                     >
-                      <TableCell>
-                        {maintenance.scheduled_date
-                          ? new Date(
-                              maintenance.scheduled_date,
-                            ).toLocaleDateString("pt-BR")
-                          : "-"}
-                      </TableCell>
+                      <TableCell>{getRequestDate(maintenance)}</TableCell>
                       <TableCell>
                         <div>
                           <p className="font-medium">
@@ -1638,11 +1714,11 @@ export function MaintenanceView() {
                   <p className="font-medium">{selectedMaintenance.type}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Data</p>
+                  <p className="text-sm text-muted-foreground">
+                    Data da Solicitação
+                  </p>
                   <p className="font-medium">
-                    {new Date(
-                      selectedMaintenance.scheduled_date,
-                    ).toLocaleDateString("pt-BR")}
+                    {getRequestDate(selectedMaintenance)}
                   </p>
                 </div>
                 <div>
@@ -1665,6 +1741,55 @@ export function MaintenanceView() {
                 <p className="p-2 bg-muted rounded">
                   {selectedMaintenance.description}
                 </p>
+              </div>
+
+              <div className="space-y-3">
+                <Collapsible
+                  open={isModalPhotosOpen}
+                  onOpenChange={(open) => {
+                    setActivePhotosMaintenanceId(
+                      open ? selectedMaintenance.id : null,
+                    );
+                    setShowPhotos(open);
+                  }}
+                >
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 text-blue-600 border-blue-200/70 hover:text-blue-700 hover:bg-blue-50/60"
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                      {isModalPhotosOpen
+                        ? "Ocultar Fotos"
+                        : "Ver Fotos do Sinistro"}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-3 overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+                    {selectedIncidentPhotos.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {selectedIncidentPhotos.map((foto, index) => (
+                          <a
+                            key={`${selectedMaintenance.id}-modal-foto-${index}`}
+                            href={foto}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block"
+                          >
+                            <img
+                              src={foto}
+                              alt={`Foto do sinistro ${index + 1}`}
+                              className="aspect-square w-full rounded-lg object-cover"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Nenhuma foto do sinistro disponível.
+                      </p>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
 
               {/* LÓGICA DE NOTA FISCAL (Com e Sem arquivo) */}
