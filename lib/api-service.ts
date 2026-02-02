@@ -419,6 +419,34 @@ export async function buscarIncidentesAPI() {
   }
 }
 
+export async function criarIncidenteAPI(dados: any, fotos: File[]) {
+  const formData = new FormData();
+
+  // Anexar campos de texto
+  formData.append("tipo", dados.type || "Sinistro");
+  formData.append("descricao", dados.description || "");
+
+  // CRUCIAL: Verifique se journeyId existe antes de anexar
+  if (dados.journeyId) {
+    formData.append("journeyId", String(dados.journeyId));
+  }
+
+  // Anexar fotos
+  fotos.forEach((foto) => {
+    formData.append("files", foto);
+  });
+
+  const response = await fetch(`${API_BASE_URL}/incidents`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) throw new Error("Erro ao salvar incidente");
+
+  const novoRegistro = await response.json();
+  return adapterIncidente(novoRegistro);
+}
+
 // Nota: Agora recebe FormData para upload de fotos
 export async function salvarIncidenteAPI(formData: FormData) {
   const response = await fetch(`${API_BASE_URL}/incidents`, {
