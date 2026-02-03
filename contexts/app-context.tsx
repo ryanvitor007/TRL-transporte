@@ -17,6 +17,11 @@ interface AppContextType {
   comparison: ComparisonConfig
   setComparison: (config: ComparisonConfig) => void
   toggleComparison: () => void
+  activeView: string
+  setActiveView: (view: string) => void
+  targetMaintenanceId: number | null
+  setTargetMaintenanceId: (maintenanceId: number | null) => void
+  navigateToMaintenance: (maintenanceId: number) => void
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -30,9 +35,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     referenceMonth: "Nov/25",
     currentMonth: "Jan/26",
   })
+  const [activeView, setActiveView] = useState("dashboard")
+  const [targetMaintenanceId, setTargetMaintenanceId] = useState<number | null>(
+    null,
+  )
 
   const toggleComparison = () => {
     setComparison((prev) => ({ ...prev, isActive: !prev.isActive }))
+  }
+
+  const navigateToMaintenance = (maintenanceId: number) => {
+    setTargetMaintenanceId(maintenanceId)
+    setActiveView("maintenance")
   }
 
   return (
@@ -43,6 +57,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         comparison,
         setComparison,
         toggleComparison,
+        activeView,
+        setActiveView,
+        targetMaintenanceId,
+        setTargetMaintenanceId,
+        navigateToMaintenance,
       }}
     >
       {children}
