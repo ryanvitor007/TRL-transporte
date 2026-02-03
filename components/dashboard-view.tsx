@@ -28,7 +28,17 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { useApp } from "@/contexts/app-context";
+import { useApp as useAppContext } from "@/contexts/app-context";
+import { MonitoringView } from "@/components/monitoring-view";
+import { FleetView } from "@/components/fleet-view";
+import { FinancialsView } from "@/components/financials-view";
+import { TiresView } from "@/components/tires-view";
+import { TachographView } from "@/components/tachograph-view";
+import { IncidentsView } from "@/components/incidents-view";
+import { MaintenanceView } from "@/components/maintenance-view";
+import { DocumentsView } from "@/components/documents-view";
+import { ReportsView } from "@/components/reports-view";
+import { SettingsView } from "@/components/settings-view";
 import { getPlateRestriction } from "@/lib/mock-data";
 import {
   buscarFrotaAPI,
@@ -55,7 +65,7 @@ interface DashboardAlert {
 }
 
 export function DashboardView() {
-  const { selectedBranch } = useApp();
+  const { activeView, setActiveView } = useAppContext();
   const [loading, setLoading] = useState(true);
   const isFetched = useRef(false); // Ref para evitar chamadas duplas (React 18 Strict Mode)
 
@@ -419,20 +429,7 @@ export function DashboardView() {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">
-            Carregando dados da frota...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
+  const renderDashboard = () => (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
@@ -606,4 +603,52 @@ export function DashboardView() {
       </Dialog>
     </div>
   );
+
+  const renderView = () => {
+    switch (activeView) {
+      case "dashboard":
+        return renderDashboard();
+      case "monitoring":
+        return <MonitoringView />;
+      case "fleet":
+        return <FleetView />;
+      case "financials":
+        return <FinancialsView />;
+      case "tires":
+        return <TiresView />;
+      case "tachograph":
+        return <TachographView />;
+      case "incidents":
+        return <IncidentsView />;
+      case "maintenance":
+        return <MaintenanceView />;
+      case "documents":
+        return <DocumentsView />;
+      case "reports":
+        return <ReportsView />;
+      case "settings":
+        return <SettingsView />;
+      default:
+        return renderDashboard();
+    }
+  };
+
+  if (activeView !== "dashboard") {
+    return renderView();
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            Carregando dados da frota...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return renderView();
 }
