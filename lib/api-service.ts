@@ -57,6 +57,8 @@ const adapterIncidente = (dbData: any) => {
     // CORREÇÃO: Mapeia o array de fotos do banco para o front
     fotos: dbData.fotos || [],
     invoiceUrl: dbData.nota_fiscal_url || null, // <--- NOVO CAMPO
+    journeyId: dbData.journey_id ?? dbData.journeyId ?? null,
+    maintenanceId: dbData.maintenance_id ?? dbData.maintenanceId ?? null,
   };
 };
 
@@ -176,18 +178,12 @@ export async function concluirManutencaoAPI(id: number) {
 // Atualiza uma manutencao existente (usado para finalizar vistorias com custo/fornecedor)
 export async function atualizarManutencaoAPI(
   id: number,
-  dados: {
-    status?: string;
-    cost?: number;
-    provider?: string;
-    invoice_url?: string;
-    completed_date?: string;
-  },
+  formData: FormData,
 ) {
   const response = await fetch(`${API_BASE_URL}/maintenances/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(dados),
+    headers: { "Content-Type": "multipart/form-data" },
+    body: formData,
   });
   return handleResponse(response);
 }
