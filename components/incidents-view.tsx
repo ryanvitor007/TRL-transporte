@@ -335,7 +335,7 @@ export function IncidentsView() {
     selectedIncident?.status === "Em Manutenção";
 
   const handleGoToMaintenance = () => {
-    router.push("/?view=maintenance");
+    router.push("/admin/manutencao");
   };
 
   if (loading)
@@ -910,6 +910,27 @@ export function IncidentsView() {
                 </div>
               </div>
 
+              {selectedIncident && shouldShowMaintenanceCTA && (
+                <div className="mt-4 p-4 border rounded-md bg-yellow-50 border-yellow-200">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-2 text-sm text-yellow-900">
+                      <AlertTriangle className="mt-0.5 h-4 w-4" />
+                      <span>
+                        Este sinistro gerou uma manutenção e precisa ser
+                        finalizado na aba de manutenções.
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="border-yellow-200 text-yellow-900 hover:bg-yellow-100"
+                      onClick={handleGoToMaintenance}
+                    >
+                      Gerenciar na Aba Manutenções
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Exibição de Nota Fiscal se existir */}
               {selectedIncident.invoiceUrl && (
                 <div className="p-4 bg-green-50 border border-green-200 rounded-md flex items-center justify-between">
@@ -1014,15 +1035,7 @@ export function IncidentsView() {
                   {selectedIncident &&
                     (selectedIncident.status === "Em Manutenção" ||
                       selectedIncident.status === "Em Reparo") &&
-                    (hasMaintenanceOrigin ? (
-                      <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span>
-                          Para concluir este sinistro, finalize a manutenção
-                          vinculada na gestão de manutenções.
-                        </span>
-                      </div>
-                    ) : (
+                    !hasMaintenanceOrigin && (
                       <Button
                         className="bg-green-600 hover:bg-green-700 text-white"
                         onClick={() => setIsConcludingMode(true)}
@@ -1030,16 +1043,7 @@ export function IncidentsView() {
                         <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir / Dar
                         Baixa
                       </Button>
-                    ))}
-                  {selectedIncident && shouldShowMaintenanceCTA && (
-                    <Button
-                      variant="outline"
-                      className="border-blue-200 text-blue-700 hover:bg-blue-50"
-                      onClick={handleGoToMaintenance}
-                    >
-                      Ir para Gestão de Manutenção
-                    </Button>
-                  )}
+                    )}
                 </div>
               </>
             ) : (

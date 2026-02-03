@@ -69,6 +69,7 @@ import {
   CloudUpload,
   MessageSquareText,
   ImageIcon,
+  Pencil,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -120,6 +121,7 @@ interface ExtendedMaintenance {
     created_at?: string | null;
     fotos?: string[] | null;
   } | null;
+  incident_id?: number | null;
   vehicle?: {
     placa?: string;
     modelo?: string;
@@ -1183,15 +1185,6 @@ export function MaintenanceView() {
                                   </p>
                                 )}
                               </div>
-                              <Button
-                                variant="outline"
-                                className="w-full"
-                                onClick={() =>
-                                  openEditMaintenanceModal(maintenance)
-                                }
-                              >
-                                Editar / Dar Baixa
-                              </Button>
                             </div>
                           ) : (
                             <div className="space-y-3 rounded-xl border bg-background p-4">
@@ -1199,17 +1192,19 @@ export function MaintenanceView() {
                                 Atualize status, valores finais e anexe a nota
                                 fiscal para concluir a manutenção.
                               </p>
-                              <Button
-                                className="w-full"
-                                onClick={() =>
-                                  openEditMaintenanceModal(maintenance)
-                                }
-                              >
-                                Editar / Dar Baixa
-                              </Button>
                             </div>
                           )}
                         </div>
+                      </div>
+
+                      <div className="flex justify-end border-t pt-4">
+                        <Button
+                          onClick={() => openEditMaintenanceModal(maintenance)}
+                          className="gap-2"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Editar / Finalizar Manutenção
+                        </Button>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -1631,11 +1626,13 @@ export function MaintenanceView() {
               </div>
             </div>
 
-            {editMaintenanceData.status === "Concluída" && (
+            {editMaintenanceData.status === "Concluída" &&
+              editingMaintenance?.incident_id && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                 <AlertCircle className="mt-0.5 h-4 w-4" />
                 <span>
-                  Isso também encerrará o Sinistro vinculado.
+                  Ao concluir, o Sinistro vinculado também será baixado
+                  automaticamente.
                 </span>
               </div>
             )}
