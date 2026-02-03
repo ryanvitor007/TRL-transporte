@@ -319,6 +319,17 @@ export function IncidentsView() {
     return <AlertTriangle className="h-5 w-5 text-blue-500" />;
   };
 
+  const linkedMaintenanceId = selectedIncident?.maintenanceId;
+  const hasMaintenanceOrigin = Boolean(
+    selectedIncident?.maintenanceId || selectedIncident?.journeyId
+  );
+  const maintenanceLinkHref = linkedMaintenanceId
+    ? `/maintenance?id=${linkedMaintenanceId}`
+    : "/maintenance";
+  const maintenanceLinkLabel = linkedMaintenanceId
+    ? `Manutenção associada (ID #${linkedMaintenanceId})`
+    : "Manutenção associada";
+
   if (loading)
     return (
       <div className="flex h-96 items-center justify-center">
@@ -994,7 +1005,22 @@ export function IncidentsView() {
                   {/* Botão Dar Baixa (Aparece apenas se estiver Em Manutenção) */}
                   {selectedIncident &&
                     (selectedIncident.status === "Em Manutenção" ||
-                      selectedIncident.status === "Em Reparo") && (
+                      selectedIncident.status === "Em Reparo") &&
+                    (hasMaintenanceOrigin ? (
+                      <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span>
+                          Para concluir este sinistro, finalize a{" "}
+                          <a
+                            href={maintenanceLinkHref}
+                            className="font-semibold underline underline-offset-4"
+                          >
+                            {maintenanceLinkLabel}
+                          </a>
+                          .
+                        </span>
+                      </div>
+                    ) : (
                       <Button
                         className="bg-green-600 hover:bg-green-700 text-white"
                         onClick={() => setIsConcludingMode(true)}
@@ -1002,7 +1028,7 @@ export function IncidentsView() {
                         <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir / Dar
                         Baixa
                       </Button>
-                    )}
+                    ))}
                 </div>
               </>
             ) : (

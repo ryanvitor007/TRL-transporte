@@ -66,7 +66,6 @@ import {
   ClipboardList,
   User,
   XCircle,
-  Link as LinkIcon,
   CloudUpload,
   MessageSquareText,
   ImageIcon,
@@ -215,6 +214,20 @@ const getRequestDate = (maintenance: ExtendedMaintenance): string => {
     : "-";
 };
 
+const normalizeStatus = (status?: string) => {
+  if (!status) return "Pendente";
+  if (status === "Agendado") return "Agendada";
+  if (status === "Concluído") return "Concluída";
+  return status;
+};
+
+const formatDateInput = (dateValue?: string) => {
+  if (!dateValue) return "";
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().split("T")[0];
+};
+
 export function MaintenanceView() {
   const toast = useToastNotification();
 
@@ -251,24 +264,19 @@ export function MaintenanceView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompletingService, setIsCompletingService] = useState(false);
 
-  // --- ESTADOS DO FORMULÁRIO IN-PLACE (Accordion de Vistoria) ---
-  const [accordionFormData, setAccordionFormData] = useState<
-    Record<
-      number,
-      {
-        cost: string;
-        provider: string;
-        invoiceUrl?: string;
-      }
-    >
-  >({});
-  const [accordionFiles, setAccordionFiles] = useState<
-    Record<number, File | null>
-  >({});
-  const [finalizingId, setFinalizingId] = useState<number | null>(null);
-  const accordionFileInputRefs = useRef<
-    Record<number, HTMLInputElement | null>
-  >({});
+  // --- ESTADOS DO MODAL EDITAR/DAR BAIXA ---
+  const [isEditMaintenanceOpen, setIsEditMaintenanceOpen] = useState(false);
+  const [editingMaintenance, setEditingMaintenance] =
+    useState<ExtendedMaintenance | null>(null);
+  const [editMaintenanceData, setEditMaintenanceData] = useState({
+    status: "Pendente",
+    provider: "",
+    cost: "",
+    completedDate: "",
+  });
+  const [editInvoiceFile, setEditInvoiceFile] = useState<File | null>(null);
+  const [isSavingMaintenance, setIsSavingMaintenance] = useState(false);
+  const editInvoiceInputRef = useRef<HTMLInputElement>(null);
 
   // --- ESTADO DOS FILTROS ---
   const [filters, setFilters] = useState({
@@ -417,78 +425,63 @@ export function MaintenanceView() {
     (m) => m.status !== "Concluída" && m.status !== "Concluído",
   ).length;
 
-  // --- HANDLER: Finalizar Vistoria via Accordion ---
-  const handleFinalizeVistoria = async (maintenanceId: number) => {
-    const formData = accordionFormData[maintenanceId];
-    if (!formData) {
-      toast.error("Atenção", "Preencha os dados antes de finalizar.");
-      return;
-    }
+  const openEditMaintenanceModal = (maintenance: ExtendedMaintenance) => {
+    setEditingMaintenance(maintenance);
+    setEditMaintenanceData({
+      status: normalizeStatus(maintenance.status),
+      provider: maintenance.provider || "",
+      cost: maintenance.cost ? String(maintenance.cost) : "",
+      completedDate: formatDateInput(maintenance.completed_date),
+    });
+    setEditInvoiceFile(null);
+    setIsEditMaintenanceOpen(true);
+  };
 
-    setFinalizingId(maintenanceId);
+  const handleEditMaintenanceSave = async () => {
+    if (!editingMaintenance) return;
+    setIsSavingMaintenance(true);
 
     try {
-      // Limpa formatacao do custo
-      const rawCost = formData.cost
-        ? Number(formData.cost.replace(/[^\d,]/g, "").replace(",", "."))
-        : 0;
+      const formData = new FormData();
+      formData.append("status", editMaintenanceData.status);
+      if (editMaintenanceData.provider) {
+        formData.append("provider", editMaintenanceData.provider);
+      }
+      if (editMaintenanceData.cost) {
+        const parsedCost = Number(editMaintenanceData.cost);
+        if (!Number.isNaN(parsedCost)) {
+          formData.append("cost", String(parsedCost));
+        }
+      }
 
-      await atualizarManutencaoAPI(maintenanceId, {
-        status: "Concluída",
-        cost: rawCost,
-        provider: formData.provider || "Interno",
-        invoice_url: formData.invoiceUrl || undefined,
-        completed_date: new Date().toISOString(),
-      });
+      const completedDate =
+        editMaintenanceData.completedDate ||
+        (editMaintenanceData.status === "Concluída"
+          ? formatDateInput(new Date().toISOString())
+          : "");
+      if (completedDate) {
+        formData.append("completed_date", completedDate);
+      }
 
-      toast.success("Concluído", "Vistoria finalizada com sucesso!");
+      if (editInvoiceFile) {
+        formData.append("invoice", editInvoiceFile);
+      }
 
-      // Limpa o form do accordion
-      setAccordionFormData((prev) => {
-        const newData = { ...prev };
-        delete newData[maintenanceId];
-        return newData;
-      });
+      await atualizarManutencaoAPI(editingMaintenance.id, formData);
 
+      toast.success("Atualizado", "Manutenção atualizada com sucesso!");
+      setIsEditMaintenanceOpen(false);
       carregarTudo();
     } catch (error) {
       console.error(error);
-      toast.error("Erro", "Falha ao finalizar vistoria.");
+      toast.error("Erro", "Falha ao atualizar manutenção.");
     } finally {
-      setFinalizingId(null);
+      setIsSavingMaintenance(false);
     }
   };
 
-  // Helper para atualizar form do accordion
-  const updateAccordionForm = (id: number, field: string, value: string) => {
-    setAccordionFormData((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value,
-      },
-    }));
-  };
-
-  // Formata custo no accordion
-  const handleAccordionCostChange = (id: number, rawValue: string) => {
-    const value = rawValue.replace(/\D/g, "");
-    if (value === "") {
-      updateAccordionForm(id, "cost", "");
-      return;
-    }
-    const amount = Number(value) / 100;
-    const formatted = amount.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
-    updateAccordionForm(id, "cost", formatted);
-  };
-
-  // --- FILE UPLOAD HANDLERS (ACCORDION) ---
-  const handleAccordionFileSelect = (id: number, file: File | null) => {
+  const handleEditInvoiceSelect = (file: File | null) => {
     if (file) {
-      // Valida tipo de arquivo (PDF ou imagem)
       const validTypes = [
         "application/pdf",
         "image/png",
@@ -503,7 +496,6 @@ export function MaintenanceView() {
         );
         return;
       }
-      // Valida tamanho (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         toast.error(
           "Arquivo muito grande",
@@ -512,20 +504,17 @@ export function MaintenanceView() {
         return;
       }
     }
-    setAccordionFiles((prev) => ({ ...prev, [id]: file }));
+    setEditInvoiceFile(file);
   };
 
-  const handleAccordionFileDrop = (
-    id: number,
-    e: React.DragEvent<HTMLDivElement>,
-  ) => {
+  const handleEditInvoiceDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     const file = e.dataTransfer.files?.[0] || null;
-    handleAccordionFileSelect(id, file);
+    handleEditInvoiceSelect(file);
   };
 
-  const handleAccordionDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleEditInvoiceDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
   };
@@ -998,11 +987,6 @@ export function MaintenanceView() {
                 const isCompleted =
                   maintenance.status === "Concluída" ||
                   maintenance.status === "Concluído";
-                const formData = accordionFormData[maintenance.id] || {
-                  cost: "",
-                  provider: "",
-                  invoiceUrl: "",
-                };
                 const incidentPhotos = maintenance.incident?.fotos || [];
                 const isPhotosOpen =
                   showPhotos && activePhotosMaintenanceId === maintenance.id;
@@ -1181,158 +1165,48 @@ export function MaintenanceView() {
                           </div>
 
                           {isCompleted ? (
-                            <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-center">
-                              <CheckCircle className="h-10 w-10 text-green-600 mx-auto mb-2" />
-                              <p className="text-sm font-semibold text-green-800">
-                                Manutencao Finalizada
-                              </p>
-                              <p className="text-xs text-green-700 mt-1">
-                                Custo: R${" "}
-                                {Number(maintenance.cost || 0).toLocaleString(
-                                  "pt-BR",
-                                  { minimumFractionDigits: 2 },
-                                )}
-                              </p>
-                              {maintenance.provider && (
-                                <p className="text-xs text-green-700">
-                                  Oficina: {maintenance.provider}
+                            <div className="space-y-3">
+                              <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-center">
+                                <CheckCircle className="h-10 w-10 text-green-600 mx-auto mb-2" />
+                                <p className="text-sm font-semibold text-green-800">
+                                  Manutencao Finalizada
                                 </p>
-                              )}
+                                <p className="text-xs text-green-700 mt-1">
+                                  Custo: R${" "}
+                                  {Number(maintenance.cost || 0).toLocaleString(
+                                    "pt-BR",
+                                    { minimumFractionDigits: 2 },
+                                  )}
+                                </p>
+                                {maintenance.provider && (
+                                  <p className="text-xs text-green-700">
+                                    Oficina: {maintenance.provider}
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={() =>
+                                  openEditMaintenanceModal(maintenance)
+                                }
+                              >
+                                Editar / Dar Baixa
+                              </Button>
                             </div>
                           ) : (
-                            <div className="space-y-4 p-4 rounded-xl border bg-background">
-                              {/* Campo Custo */}
-                              <div className="space-y-1.5">
-                                <Label className="text-xs font-medium">
-                                  Custo (R$)
-                                </Label>
-                                <Input
-                                  placeholder="R$ 0,00"
-                                  value={formData.cost}
-                                  onChange={(e) =>
-                                    handleAccordionCostChange(
-                                      maintenance.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                />
-                              </div>
-
-                              {/* Campo Fornecedor */}
-                              <div className="space-y-1.5">
-                                <Label className="text-xs font-medium">
-                                  Fornecedor / Oficina
-                                </Label>
-                                <Input
-                                  placeholder="Nome da oficina..."
-                                  value={formData.provider}
-                                  onChange={(e) =>
-                                    updateAccordionForm(
-                                      maintenance.id,
-                                      "provider",
-                                      e.target.value,
-                                    )
-                                  }
-                                />
-                              </div>
-
-                              {/* Drag-and-Drop Upload Area */}
-                              <div className="space-y-1.5">
-                                <Label className="text-xs font-medium">
-                                  Nota Fiscal (Opcional)
-                                </Label>
-
-                                {/* Input file hidden */}
-                                <input
-                                  type="file"
-                                  accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
-                                  className="hidden"
-                                  ref={(el) => {
-                                    accordionFileInputRefs.current[
-                                      maintenance.id
-                                    ] = el;
-                                  }}
-                                  onChange={(e) =>
-                                    handleAccordionFileSelect(
-                                      maintenance.id,
-                                      e.target.files?.[0] || null,
-                                    )
-                                  }
-                                />
-
-                                {accordionFiles[maintenance.id] ? (
-                                  /* Estado: Arquivo Selecionado */
-                                  <div className="flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-green-300 bg-green-50">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-                                      <FileText className="h-5 w-5 text-green-600" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-green-800 truncate">
-                                        {accordionFiles[maintenance.id]?.name}
-                                      </p>
-                                      <p className="text-xs text-green-600">
-                                        {(
-                                          (accordionFiles[maintenance.id]
-                                            ?.size || 0) / 1024
-                                        ).toFixed(1)}{" "}
-                                        KB
-                                      </p>
-                                    </div>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                      onClick={() =>
-                                        handleAccordionFileSelect(
-                                          maintenance.id,
-                                          null,
-                                        )
-                                      }
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  /* Estado: Aguardando Upload */
-                                  <div
-                                    className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 cursor-pointer transition-colors hover:border-primary hover:bg-accent/50"
-                                    onClick={() =>
-                                      accordionFileInputRefs.current[
-                                        maintenance.id
-                                      ]?.click()
-                                    }
-                                    onDragOver={handleAccordionDragOver}
-                                    onDrop={(e) =>
-                                      handleAccordionFileDrop(maintenance.id, e)
-                                    }
-                                  >
-                                    <CloudUpload className="h-8 w-8 text-muted-foreground" />
-                                    <p className="text-sm font-medium text-muted-foreground text-center">
-                                      Arraste e solte sua Nota Fiscal aqui
-                                    </p>
-                                    <p className="text-xs text-muted-foreground/70 text-center">
-                                      Ou clique para selecionar arquivo (PDF,
-                                      Imagem)
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Botao Finalizar */}
+                            <div className="space-y-3 rounded-xl border bg-background p-4">
+                              <p className="text-xs text-muted-foreground">
+                                Atualize status, valores finais e anexe a nota
+                                fiscal para concluir a manutenção.
+                              </p>
                               <Button
-                                className="w-full bg-green-600 hover:bg-green-700 mt-2"
+                                className="w-full"
                                 onClick={() =>
-                                  handleFinalizeVistoria(maintenance.id)
+                                  openEditMaintenanceModal(maintenance)
                                 }
-                                disabled={finalizingId === maintenance.id}
                               >
-                                {finalizingId === maintenance.id ? (
-                                  <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                                ) : (
-                                  <CheckCircle className="mr-2 h-4 w-4" />
-                                )}
-                                Aprovar e Finalizar Manutencao
+                                Editar / Dar Baixa
                               </Button>
                             </div>
                           )}
@@ -1677,6 +1551,180 @@ export function MaintenanceView() {
                 <Loader2 className="animate-spin" />
               ) : (
                 "Agendar Manutenção"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- MODAL EDITAR / DAR BAIXA --- */}
+      <Dialog
+        open={isEditMaintenanceOpen}
+        onOpenChange={(open) => {
+          setIsEditMaintenanceOpen(open);
+          if (!open) {
+            setEditingMaintenance(null);
+            setEditInvoiceFile(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Finalizar Manutenção</DialogTitle>
+            <DialogDescription>
+              Atualize os detalhes finais antes de concluir o processo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={editMaintenanceData.status}
+                  onValueChange={(value) =>
+                    setEditMaintenanceData((prev) => ({
+                      ...prev,
+                      status: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[300]">
+                    <SelectItem value="Pendente">Pendente</SelectItem>
+                    <SelectItem value="Agendada">Agendada</SelectItem>
+                    <SelectItem value="Em Andamento">Em Andamento</SelectItem>
+                    <SelectItem value="Concluída">Concluída</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Oficina/Fornecedor</Label>
+                <Input
+                  value={editMaintenanceData.provider}
+                  onChange={(e) =>
+                    setEditMaintenanceData((prev) => ({
+                      ...prev,
+                      provider: e.target.value,
+                    }))
+                  }
+                  placeholder="Nome da oficina..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Valor Total (R$)</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  value={editMaintenanceData.cost}
+                  onChange={(e) =>
+                    setEditMaintenanceData((prev) => ({
+                      ...prev,
+                      cost: e.target.value,
+                    }))
+                  }
+                  placeholder="0,00"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Data de Conclusão</Label>
+                <Input
+                  type="date"
+                  value={editMaintenanceData.completedDate}
+                  onChange={(e) =>
+                    setEditMaintenanceData((prev) => ({
+                      ...prev,
+                      completedDate: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            {editMaintenanceData.status === "Concluída" && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <AlertCircle className="mt-0.5 h-4 w-4" />
+                <span>
+                  Isso também encerrará o Sinistro vinculado.
+                </span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Nota Fiscal</Label>
+              <input
+                type="file"
+                accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
+                className="hidden"
+                ref={editInvoiceInputRef}
+                onChange={(e) =>
+                  handleEditInvoiceSelect(e.target.files?.[0] || null)
+                }
+              />
+              {editInvoiceFile ? (
+                <div className="flex items-center gap-3 rounded-xl border-2 border-dashed border-green-300 bg-green-50 p-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                    <FileText className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-green-800 truncate">
+                      {editInvoiceFile.name}
+                    </p>
+                    <p className="text-xs text-green-600">
+                      {(editInvoiceFile.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => handleEditInvoiceSelect(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-6 text-center cursor-pointer transition-colors hover:border-primary hover:bg-accent/50"
+                  onClick={() => editInvoiceInputRef.current?.click()}
+                  onDragOver={handleEditInvoiceDragOver}
+                  onDrop={handleEditInvoiceDrop}
+                >
+                  <CloudUpload className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Arraste e solte sua Nota Fiscal aqui
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">
+                    Ou clique para selecionar arquivo (PDF, Imagem)
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditMaintenanceOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleEditMaintenanceSave}
+              disabled={isSavingMaintenance}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {isSavingMaintenance ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                "Salvar Alterações"
               )}
             </Button>
           </DialogFooter>
