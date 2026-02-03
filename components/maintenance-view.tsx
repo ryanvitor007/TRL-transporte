@@ -215,10 +215,12 @@ const getRequestDate = (maintenance: ExtendedMaintenance): string => {
 };
 
 const normalizeStatus = (status?: string) => {
-  if (!status) return "Pendente";
+  if (!status) return "Agendada";
   if (status === "Agendado") return "Agendada";
   if (status === "Concluído") return "Concluída";
-  return status;
+  if (status === "Em andamento") return "Em Andamento";
+  const allowed = ["Agendada", "Em Andamento", "Concluída"];
+  return allowed.includes(status) ? status : "Agendada";
 };
 
 const formatDateInput = (dateValue?: string) => {
@@ -265,14 +267,13 @@ export function MaintenanceView() {
   const [isCompletingService, setIsCompletingService] = useState(false);
 
   // --- ESTADOS DO MODAL EDITAR/DAR BAIXA ---
-  const [isEditMaintenanceOpen, setIsEditMaintenanceOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingMaintenance, setEditingMaintenance] =
     useState<ExtendedMaintenance | null>(null);
   const [editMaintenanceData, setEditMaintenanceData] = useState({
-    status: "Pendente",
+    status: "Agendada",
     provider: "",
     cost: "",
-    completedDate: "",
   });
   const [editInvoiceFile, setEditInvoiceFile] = useState<File | null>(null);
   const [isSavingMaintenance, setIsSavingMaintenance] = useState(false);
@@ -431,10 +432,9 @@ export function MaintenanceView() {
       status: normalizeStatus(maintenance.status),
       provider: maintenance.provider || "",
       cost: maintenance.cost ? String(maintenance.cost) : "",
-      completedDate: formatDateInput(maintenance.completed_date),
     });
     setEditInvoiceFile(null);
-    setIsEditMaintenanceOpen(true);
+    setIsEditModalOpen(true);
   };
 
   const handleEditMaintenanceSave = async () => {
@@ -455,10 +455,9 @@ export function MaintenanceView() {
       }
 
       const completedDate =
-        editMaintenanceData.completedDate ||
-        (editMaintenanceData.status === "Concluída"
+        editMaintenanceData.status === "Concluída"
           ? formatDateInput(new Date().toISOString())
-          : "");
+          : "";
       if (completedDate) {
         formData.append("completed_date", completedDate);
       }
@@ -470,7 +469,7 @@ export function MaintenanceView() {
       await atualizarManutencaoAPI(editingMaintenance.id, formData);
 
       toast.success("Atualizado", "Manutenção atualizada com sucesso!");
-      setIsEditMaintenanceOpen(false);
+      setIsEditModalOpen(false);
       carregarTudo();
     } catch (error) {
       console.error(error);
@@ -1559,9 +1558,9 @@ export function MaintenanceView() {
 
       {/* --- MODAL EDITAR / DAR BAIXA --- */}
       <Dialog
-        open={isEditMaintenanceOpen}
+        open={isEditModalOpen}
         onOpenChange={(open) => {
-          setIsEditMaintenanceOpen(open);
+          setIsEditModalOpen(open);
           if (!open) {
             setEditingMaintenance(null);
             setEditInvoiceFile(null);
@@ -1570,9 +1569,9 @@ export function MaintenanceView() {
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Finalizar Manutenção</DialogTitle>
+            <DialogTitle>Editar / Dar Baixa</DialogTitle>
             <DialogDescription>
-              Atualize os detalhes finais antes de concluir o processo.
+              Atualize status, valores e anexe a nota fiscal.
             </DialogDescription>
           </DialogHeader>
 
@@ -1593,7 +1592,6 @@ export function MaintenanceView() {
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent className="z-[300]">
-                    <SelectItem value="Pendente">Pendente</SelectItem>
                     <SelectItem value="Agendada">Agendada</SelectItem>
                     <SelectItem value="Em Andamento">Em Andamento</SelectItem>
                     <SelectItem value="Concluída">Concluída</SelectItem>
@@ -1629,20 +1627,6 @@ export function MaintenanceView() {
                     }))
                   }
                   placeholder="0,00"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Data de Conclusão</Label>
-                <Input
-                  type="date"
-                  value={editMaintenanceData.completedDate}
-                  onChange={(e) =>
-                    setEditMaintenanceData((prev) => ({
-                      ...prev,
-                      completedDate: e.target.value,
-                    }))
-                  }
                 />
               </div>
             </div>
@@ -1712,7 +1696,7 @@ export function MaintenanceView() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setIsEditMaintenanceOpen(false)}
+              onClick={() => setIsEditModalOpen(false)}
             >
               Cancelar
             </Button>

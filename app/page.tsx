@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
@@ -22,7 +22,28 @@ export default function Home() {
   const [activeView, setActiveView] = useState("dashboard");
   const { isAuthenticated } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const viewParam = searchParams.get("view");
+    const validViews = [
+      "dashboard",
+      "monitoring",
+      "fleet",
+      "financials",
+      "tires",
+      "tachograph",
+      "incidents",
+      "maintenance",
+      "documents",
+      "reports",
+      "settings",
+    ];
+    if (viewParam && validViews.includes(viewParam)) {
+      setActiveView(viewParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

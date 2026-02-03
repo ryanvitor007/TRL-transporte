@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -71,6 +72,8 @@ import {
 } from "@/lib/api-service";
 
 export function IncidentsView() {
+  const router = useRouter();
+
   // --- ESTADOS DE CONTROLE ---
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -197,6 +200,11 @@ export function IncidentsView() {
       icon: Wrench,
       label: "Em Manutenção",
     },
+    "Aguardando Manutenção": {
+      color: "bg-amber-100 text-amber-800 border-amber-200",
+      icon: Clock,
+      label: "Aguardando Manutenção",
+    },
     Concluído: {
       color: "bg-green-100 text-green-800 border-green-200",
       icon: CheckCircle2,
@@ -319,16 +327,16 @@ export function IncidentsView() {
     return <AlertTriangle className="h-5 w-5 text-blue-500" />;
   };
 
-  const linkedMaintenanceId = selectedIncident?.maintenanceId;
   const hasMaintenanceOrigin = Boolean(
     selectedIncident?.maintenanceId || selectedIncident?.journeyId
   );
-  const maintenanceLinkHref = linkedMaintenanceId
-    ? `/maintenance?id=${linkedMaintenanceId}`
-    : "/maintenance";
-  const maintenanceLinkLabel = linkedMaintenanceId
-    ? `Manutenção associada (ID #${linkedMaintenanceId})`
-    : "Manutenção associada";
+  const shouldShowMaintenanceCTA =
+    selectedIncident?.status === "Aguardando Manutenção" ||
+    selectedIncident?.status === "Em Manutenção";
+
+  const handleGoToMaintenance = () => {
+    router.push("/?view=maintenance");
+  };
 
   if (loading)
     return (
@@ -1010,14 +1018,8 @@ export function IncidentsView() {
                       <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
                         <AlertTriangle className="h-4 w-4" />
                         <span>
-                          Para concluir este sinistro, finalize a{" "}
-                          <a
-                            href={maintenanceLinkHref}
-                            className="font-semibold underline underline-offset-4"
-                          >
-                            {maintenanceLinkLabel}
-                          </a>
-                          .
+                          Para concluir este sinistro, finalize a manutenção
+                          vinculada na gestão de manutenções.
                         </span>
                       </div>
                     ) : (
@@ -1029,6 +1031,15 @@ export function IncidentsView() {
                         Baixa
                       </Button>
                     ))}
+                  {selectedIncident && shouldShowMaintenanceCTA && (
+                    <Button
+                      variant="outline"
+                      className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                      onClick={handleGoToMaintenance}
+                    >
+                      Ir para Gestão de Manutenção
+                    </Button>
+                  )}
                 </div>
               </>
             ) : (

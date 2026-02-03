@@ -178,12 +178,19 @@ export async function concluirManutencaoAPI(id: number) {
 // Atualiza uma manutencao existente (usado para finalizar vistorias com custo/fornecedor)
 export async function atualizarManutencaoAPI(
   id: number,
-  formData: FormData,
+  data: FormData | any,
 ) {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const token = getAuthToken();
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+  };
+
   const response = await fetch(`${API_BASE_URL}/maintenances/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "multipart/form-data" },
-    body: formData,
+    headers,
+    body: isFormData ? data : JSON.stringify(data),
   });
   return handleResponse(response);
 }
