@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { useApp } from "@/contexts/app-context";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
 import { DashboardView } from "@/components/dashboard-view";
@@ -19,8 +20,8 @@ import { MonitoringView } from "@/components/monitoring-view";
 import { Loader2 } from "lucide-react";
 
 export default function Home() {
-  const [activeView, setActiveView] = useState("dashboard");
   const { isAuthenticated } = useAuth();
+  const { activeView, setActiveView } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);

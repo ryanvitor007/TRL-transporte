@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useApp } from "@/contexts/app-context";
 import {
   Card,
   CardContent,
@@ -72,7 +72,7 @@ import {
 } from "@/lib/api-service";
 
 export function IncidentsView() {
-  const router = useRouter();
+  const { navigateToMaintenance } = useApp();
 
   // --- ESTADOS DE CONTROLE ---
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -335,7 +335,8 @@ export function IncidentsView() {
     selectedIncident?.status === "Em Manutenção";
 
   const handleGoToMaintenance = () => {
-    router.push("/admin/manutencao");
+    if (!selectedIncident?.maintenanceId) return;
+    navigateToMaintenance(selectedIncident.maintenanceId);
   };
 
   if (loading)

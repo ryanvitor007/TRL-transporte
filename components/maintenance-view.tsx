@@ -73,6 +73,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useApp } from "@/contexts/app-context";
 import { useToastNotification } from "@/contexts/notification-context";
 // Importações da API
 import {
@@ -234,6 +235,7 @@ const formatDateInput = (dateValue?: string) => {
 
 export function MaintenanceView() {
   const toast = useToastNotification();
+  const { targetMaintenanceId, setTargetMaintenanceId } = useApp();
 
   // --- ESTADOS DE DADOS (API) ---
   const [maintenances, setMaintenances] = useState<ExtendedMaintenance[]>([]);
@@ -311,6 +313,31 @@ export function MaintenanceView() {
   useEffect(() => {
     carregarTudo();
   }, []);
+
+  useEffect(() => {
+    if (loading || targetMaintenanceId == null) return;
+    const maintenance = maintenances.find(
+      (item) => item.id === targetMaintenanceId,
+    );
+    if (maintenance) {
+      setSelectedMaintenance(maintenance);
+      setIsDetailsOpen(true);
+      setShowPhotos(false);
+      setActivePhotosMaintenanceId(null);
+    } else {
+      toast.error(
+        "Manutenção não encontrada",
+        "Não foi possível localizar a manutenção solicitada.",
+      );
+    }
+    setTargetMaintenanceId(null);
+  }, [
+    loading,
+    maintenances,
+    targetMaintenanceId,
+    setTargetMaintenanceId,
+    toast,
+  ]);
 
   useEffect(() => {
     setShowPhotos(false);
