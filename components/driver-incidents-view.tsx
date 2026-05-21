@@ -777,87 +777,87 @@ export function DriverIncidentsView() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto overscroll-contain px-6">
-            <div className="space-y-4 pb-4">
-              {/* Veiculo e Tipo */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="text-sm">Veiculo *</Label>
-                  <Select
-                    value={selectedVehicleId}
-                    onValueChange={setSelectedVehicleId}
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vehicles.map((v) => (
-                        <SelectItem key={v.id} value={String(v.id)}>
-                          {v.placa} - {v.modelo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm">Tipo *</Label>
-                  <Select
-                    value={newIncident.type}
-                    onValueChange={(v) =>
-                      setNewIncident((prev) => ({ ...prev, type: v }))
-                    }
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {incidentTypes.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4">
+              {/* Veiculo */}
+              <div className="space-y-2">
+                <Label className="text-sm">Veiculo *</Label>
+                <Select
+                  value={selectedVehicleId}
+                  onValueChange={setSelectedVehicleId}
+                >
+                  <SelectTrigger className="h-11 w-full">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehicles.map((v) => (
+                      <SelectItem key={v.id} value={String(v.id)}>
+                        {v.placa} - {v.modelo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Data e Hora */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-sm">Data *</Label>
-                  <Input
-                    type="date"
-                    className="h-11"
-                    value={newIncident.date}
-                    onChange={(e) =>
-                      setNewIncident((prev) => ({
-                        ...prev,
-                        date: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm">Hora *</Label>
-                  <Input
-                    type="time"
-                    className="h-11"
-                    value={newIncident.time}
-                    onChange={(e) =>
-                      setNewIncident((prev) => ({
-                        ...prev,
-                        time: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
+              {/* Tipo */}
+              <div className="space-y-2">
+                <Label className="text-sm">Tipo *</Label>
+                <Select
+                  value={newIncident.type}
+                  onValueChange={(v) =>
+                    setNewIncident((prev) => ({ ...prev, type: v }))
+                  }
+                >
+                  <SelectTrigger className="h-11 w-full">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {incidentTypes.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Data */}
+              <div className="space-y-2">
+                <Label className="text-sm">Data *</Label>
+                <Input
+                  type="date"
+                  className="h-11 w-full"
+                  value={newIncident.date}
+                  onChange={(e) =>
+                    setNewIncident((prev) => ({
+                      ...prev,
+                      date: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              {/* Hora */}
+              <div className="space-y-2">
+                <Label className="text-sm">Hora *</Label>
+                <Input
+                  type="time"
+                  className="h-11 w-full"
+                  value={newIncident.time}
+                  onChange={(e) =>
+                    setNewIncident((prev) => ({
+                      ...prev,
+                      time: e.target.value,
+                    }))
+                  }
+                />
               </div>
 
               {/* Local */}
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-1 sm:col-span-2">
                 <Label className="text-sm">Local da Ocorrencia *</Label>
                 <Input
                   placeholder="Ex: BR-116, km 340"
-                  className="h-11"
+                  className="h-11 w-full"
                   value={newIncident.location}
                   onChange={(e) =>
                     setNewIncident((prev) => ({
@@ -869,14 +869,14 @@ export function DriverIncidentsView() {
               </div>
 
               {/* Vitimas */}
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-1 sm:col-span-2">
                 <Label className="text-sm">Houve vitimas? *</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     className={cn(
-                      "h-11 active:scale-95 transition-transform",
+                      "h-11 w-full active:scale-95 transition-transform",
                       newIncident.houve_vitimas === true &&
                         "border-red-500 bg-red-50 text-red-700",
                     )}
@@ -890,7 +890,7 @@ export function DriverIncidentsView() {
                     type="button"
                     variant="outline"
                     className={cn(
-                      "h-11 active:scale-95 transition-transform",
+                      "h-11 w-full active:scale-95 transition-transform",
                       newIncident.houve_vitimas === false &&
                         "border-green-500 bg-green-50 text-green-700",
                     )}
@@ -904,11 +904,11 @@ export function DriverIncidentsView() {
               </div>
 
               {/* Descricao */}
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-1 sm:col-span-2">
                 <Label className="text-sm">Descricao</Label>
                 <Textarea
                   placeholder="Descreva como aconteceu..."
-                  className="min-h-[80px] resize-none"
+                  className="min-h-[80px] w-full resize-none"
                   value={newIncident.description}
                   onChange={(e) =>
                     setNewIncident((prev) => ({
@@ -920,11 +920,11 @@ export function DriverIncidentsView() {
               </div>
 
               {/* Fotos */}
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-1 sm:col-span-2">
                 <Label className="text-sm">Fotos (ate 5)</Label>
                 <div
                   className={cn(
-                    "relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors active:bg-muted/50",
+                    "relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors active:bg-muted/50 w-full",
                     selectedFiles.length > 0
                       ? "border-primary bg-primary/5"
                       : "border-border hover:border-primary/50",
