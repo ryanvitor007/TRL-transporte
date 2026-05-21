@@ -1108,12 +1108,16 @@ export function DriverIncidentsView() {
                 )}
 
                 {/* Galeria de Fotos */}
-                {selectedIncident.fotos && selectedIncident.fotos.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Camera className="h-3 w-3" />
-                      Fotos Anexadas
+                <div className="space-y-2 pt-2 border-t">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Camera className="h-3 w-3" />
+                    Fotos Anexadas
+                  </p>
+                  {!selectedIncident.fotos || selectedIncident.fotos.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic py-2 text-center">
+                      Nenhuma foto anexada a esta ocorrência.
                     </p>
+                  ) : (
                     <div className="grid grid-cols-3 gap-2">
                       {selectedIncident.fotos.map((foto, index) => (
                         <a
@@ -1121,18 +1125,18 @@ export function DriverIncidentsView() {
                           href={foto}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="relative aspect-video rounded-lg overflow-hidden border border-border group"
+                          className="group block h-20 w-full overflow-hidden rounded-lg border border-border bg-muted"
                         >
                           <img
                             src={foto}
                             alt={`Foto ${index + 1}`}
-                            className="object-cover w-full h-full group-hover:scale-105 transition-transform"
+                            className="h-20 w-full object-cover transition-transform duration-200 group-hover:scale-110"
                           />
                         </a>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           )}
