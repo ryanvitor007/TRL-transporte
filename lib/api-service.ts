@@ -54,6 +54,7 @@ const adapterIncidente = (dbData: any) => {
     estimatedCost: Number(dbData.custo_estimado),
     insuranceClaim: dbData.acionamento_seguro,
     status: dbData.status,
+    hasVictims: dbData.houve_vitimas ?? false,
     // CORREÇÃO: Mapeia o array de fotos do banco para o front
     fotos: dbData.fotos || [],
     invoiceUrl: dbData.nota_fiscal_url || null, // <--- NOVO CAMPO

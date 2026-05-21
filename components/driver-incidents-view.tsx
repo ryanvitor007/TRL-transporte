@@ -59,14 +59,19 @@ import { format, subDays, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
+import {
+  buscarIncidentesAPI,
+  salvarIncidenteAPI,
+  buscarFrotaAPI,
+} from "@/lib/api-service";
 
 // --- INTERFACES ---
 interface IncidentRecord {
   id: number;
   date: string;
   time: string;
-  vehicle_plate: string;
-  vehicle_model: string;
+  vehiclePlate: string;
+  vehicleModel: string;
   type: string;
   description: string;
   location: string;
@@ -75,6 +80,7 @@ interface IncidentRecord {
   hasVictims: boolean;
   insuranceClaim: boolean;
   driverName: string;
+  fotos?: string[];
 }
 
 // --- CONFIGURACAO DE STATUS ---
@@ -143,8 +149,8 @@ const generateDriverIncidents = (driverName: string): IncidentRecord[] => {
       id: i + 1,
       date: format(subDays(new Date(), i * 5), "yyyy-MM-dd"),
       time: `${8 + (i % 12)}:${(i * 15) % 60}`.padStart(5, "0"),
-      vehicle_plate: vehicle.placa,
-      vehicle_model: vehicle.modelo,
+      vehiclePlate: vehicle.placa,
+      vehicleModel: vehicle.modelo,
       type: types[i % 4],
       description: `Ocorrencia ${i + 1} - ${types[i % 4]} registrada pelo motorista durante viagem. Danos materiais no veiculo.`,
       location: locations[i % 4],
@@ -239,6 +245,7 @@ export function DriverIncidentsView() {
 
   // --- ESTADOS DE DADOS ---
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
 
   // --- ESTADOS DOS MODAIS ---
   const [isNewIncidentOpen, setIsNewIncidentOpen] = useState(false);
@@ -248,15 +255,22 @@ export function DriverIncidentsView() {
 
   // --- ESTADOS DO FORMULARIO ---
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
-  const [newIncident, setNewIncident] = useState({
+  const [newIncident, setNewIncident] = useState<{
+    type: string;
+    date: string;
+    time: string;
+    location: string;
+    description: string;
+    houve_vitimas: boolean | null;
+  }>({
     type: "",
     date: format(new Date(), "yyyy-MM-dd"),
     time: format(new Date(), "HH:mm"),
     location: "",
     description: "",
-    hasVictims: "",
+    houve_vitimas: null,
   });
-  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -267,17 +281,25 @@ export function DriverIncidentsView() {
     type: "all",
   });
 
-  // --- SIMULAR CARREGAMENTO ---
+  // --- CARREGAR DADOS ---
   const loadData = async () => {
     setIsLoading(true);
     setHasError(false);
     try {
-      // Simula delay de rede
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      // Simula erro aleatoriamente (descomentar para testar)
-      // if (Math.random() > 0.7) throw new Error("Network error");
-      setIncidents(generateDriverIncidents(driverName));
-    } catch {
+      const [incidentsData, vehiclesData] = await Promise.all([
+        buscarIncidentesAPI(),
+        buscarFrotaAPI(),
+      ]);
+
+      // Filtra no front para mostrar apenas os incidentes do motorista logado
+      const driverIncidents = Array.isArray(incidentsData)
+        ? incidentsData.filter((inc: any) => inc.driverName === driverName)
+        : [];
+
+      setIncidents(driverIncidents);
+      setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
+    } catch (error) {
+      console.error("Erro ao carregar dados do painel do motorista:", error);
       setHasError(true);
     } finally {
       setIsLoading(false);
@@ -301,7 +323,7 @@ export function DriverIncidentsView() {
     return incidents.filter((item) => {
       if (
         filters.vehicleId !== "all" &&
-        item.vehicle_plate !== filters.vehicleId
+        item.vehiclePlate !== filters.vehicleId
       )
         return false;
       if (filters.status !== "all" && item.status !== filters.status)
@@ -334,15 +356,13 @@ export function DriverIncidentsView() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      const names = Array.from(files)
-        .map((f) => f.name)
-        .slice(0, 5 - uploadedPhotos.length);
-      setUploadedPhotos((prev) => [...prev, ...names].slice(0, 5));
+      const arrayFiles = Array.from(files).slice(0, 5 - selectedFiles.length);
+      setSelectedFiles((prev) => [...prev, ...arrayFiles].slice(0, 5));
     }
   };
 
   const removePhoto = (index: number) => {
-    setUploadedPhotos((prev) => prev.filter((_, i) => i !== index));
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmitIncident = async () => {
@@ -350,15 +370,39 @@ export function DriverIncidentsView() {
       !selectedVehicleId ||
       !newIncident.type ||
       !newIncident.location ||
-      !newIncident.hasVictims
+      newIncident.houve_vitimas === null
     ) {
       return;
     }
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const selectedVehicle = vehicles.find((v) => String(v.id) === selectedVehicleId);
+      const vehiclePlate = selectedVehicle?.placa || "";
+      const vehicleModel = selectedVehicle?.modelo || selectedVehicle?.marca_modelo || "Não informado";
+
+      const formData = new FormData();
+      formData.append("type", newIncident.type);
+      formData.append("date", newIncident.date);
+      formData.append("time", newIncident.time);
+      formData.append("vehiclePlate", vehiclePlate);
+      formData.append("vehicleModel", vehicleModel);
+      formData.append("driverName", driverName);
+      formData.append("location", newIncident.location);
+      formData.append("description", newIncident.description || "");
+      formData.append("estimatedCost", "0");
+      formData.append("insuranceClaim", "false");
+      formData.append("status", "Aberto");
+      formData.append("houve_vitimas", String(newIncident.houve_vitimas));
+      formData.append("hasVictims", String(newIncident.houve_vitimas));
+
+      selectedFiles.forEach((file) => {
+        formData.append("photos", file);
+      });
+
+      await salvarIncidenteAPI(formData);
+
       setIsNewIncidentOpen(false);
       setNewIncident({
         type: "",
@@ -366,12 +410,17 @@ export function DriverIncidentsView() {
         time: format(new Date(), "HH:mm"),
         location: "",
         description: "",
-        hasVictims: "",
+        houve_vitimas: null,
       });
       setSelectedVehicleId("");
-      setUploadedPhotos([]);
-      loadData();
-    }, 1500);
+      setSelectedFiles([]);
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao salvar sinistro:", error);
+      alert("Erro ao registrar sinistro. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openDetails = (incident: IncidentRecord) => {
@@ -474,7 +523,7 @@ export function DriverIncidentsView() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
-                      {mockVehicles.map((v) => (
+                      {vehicles.map((v) => (
                         <SelectItem key={v.id} value={v.placa}>
                           {v.placa}
                         </SelectItem>
@@ -687,7 +736,7 @@ export function DriverIncidentsView() {
                           {/* Footer: Plate + Insurance */}
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span className="font-mono">
-                              {incident.vehicle_plate}
+                              {incident.vehiclePlate}
                             </span>
                             {incident.insuranceClaim && (
                               <>
@@ -736,7 +785,7 @@ export function DriverIncidentsView() {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockVehicles.map((v) => (
+                      {vehicles.map((v) => (
                         <SelectItem key={v.id} value={String(v.id)}>
                           {v.placa} - {v.modelo}
                         </SelectItem>
@@ -823,11 +872,11 @@ export function DriverIncidentsView() {
                     variant="outline"
                     className={cn(
                       "h-11 active:scale-95 transition-transform",
-                      newIncident.hasVictims === "sim" &&
+                      newIncident.houve_vitimas === true &&
                         "border-red-500 bg-red-50 text-red-700",
                     )}
                     onClick={() =>
-                      setNewIncident((prev) => ({ ...prev, hasVictims: "sim" }))
+                      setNewIncident((prev) => ({ ...prev, houve_vitimas: true }))
                     }
                   >
                     Sim
@@ -837,11 +886,11 @@ export function DriverIncidentsView() {
                     variant="outline"
                     className={cn(
                       "h-11 active:scale-95 transition-transform",
-                      newIncident.hasVictims === "nao" &&
+                      newIncident.houve_vitimas === false &&
                         "border-green-500 bg-green-50 text-green-700",
                     )}
                     onClick={() =>
-                      setNewIncident((prev) => ({ ...prev, hasVictims: "nao" }))
+                      setNewIncident((prev) => ({ ...prev, houve_vitimas: false }))
                     }
                   >
                     Nao
@@ -871,7 +920,7 @@ export function DriverIncidentsView() {
                 <div
                   className={cn(
                     "relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors active:bg-muted/50",
-                    uploadedPhotos.length > 0
+                    selectedFiles.length > 0
                       ? "border-primary bg-primary/5"
                       : "border-border hover:border-primary/50",
                   )}
@@ -889,24 +938,24 @@ export function DriverIncidentsView() {
                   <Camera
                     className={cn(
                       "h-6 w-6 mx-auto mb-2",
-                      uploadedPhotos.length > 0
+                      selectedFiles.length > 0
                         ? "text-primary"
                         : "text-muted-foreground",
                     )}
                   />
-                  {uploadedPhotos.length > 0 ? (
+                  {selectedFiles.length > 0 ? (
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-primary">
-                        {uploadedPhotos.length} foto(s)
+                        {selectedFiles.length} foto(s)
                       </p>
                       <div className="flex flex-wrap gap-1 justify-center">
-                        {uploadedPhotos.map((photo, i) => (
+                        {selectedFiles.map((file, i) => (
                           <Badge
                             key={i}
                             variant="secondary"
                             className="gap-1 text-xs"
                           >
-                            {photo.substring(0, 10)}...
+                            {file.name.substring(0, 10)}...
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -942,7 +991,7 @@ export function DriverIncidentsView() {
                 !selectedVehicleId ||
                 !newIncident.type ||
                 !newIncident.location ||
-                !newIncident.hasVictims ||
+                newIncident.houve_vitimas === null ||
                 isSubmitting
               }
               className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 active:scale-95 transition-transform"
@@ -987,11 +1036,11 @@ export function DriverIncidentsView() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">Veiculo</p>
-                    <p className="text-sm font-medium">
-                      {selectedIncident.vehicle_plate}
+                    <p className="text-sm font-medium font-mono">
+                      {selectedIncident.vehiclePlate}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {selectedIncident.vehicle_model}
+                      {selectedIncident.vehicleModel}
                     </p>
                   </div>
                   <div className="space-y-1">
@@ -1000,7 +1049,7 @@ export function DriverIncidentsView() {
                       {format(new Date(selectedIncident.date), "dd/MM/yyyy")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      as {selectedIncident.time}
+                      às {selectedIncident.time}
                     </p>
                   </div>
                 </div>
@@ -1056,6 +1105,33 @@ export function DriverIncidentsView() {
                     <FileText className="mr-2 h-4 w-4" />
                     Seguro Acionado
                   </Badge>
+                )}
+
+                {/* Galeria de Fotos */}
+                {selectedIncident.fotos && selectedIncident.fotos.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Camera className="h-3 w-3" />
+                      Fotos Anexadas
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {selectedIncident.fotos.map((foto, index) => (
+                        <a
+                          key={index}
+                          href={foto}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative aspect-video rounded-lg overflow-hidden border border-border group"
+                        >
+                          <img
+                            src={foto}
+                            alt={`Foto ${index + 1}`}
+                            className="object-cover w-full h-full group-hover:scale-105 transition-transform"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
