@@ -435,13 +435,18 @@ export async function criarIncidenteAPI(dados: any, fotos: File[]) {
     formData.append("journeyId", String(dados.journeyId));
   }
 
-  // Anexar fotos
+  // Anexar fotos - CORREÇÃO: Usar a chave 'photos' que o NestJS espera
   fotos.forEach((foto) => {
-    formData.append("files", foto);
+    formData.append("photos", foto);
   });
 
+  const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/incidents`, {
     method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // Sem Content-Type para o navegador definir automaticamente o boundary correto
+    },
     body: formData,
   });
 
@@ -453,8 +458,13 @@ export async function criarIncidenteAPI(dados: any, fotos: File[]) {
 
 // Nota: Agora recebe FormData para upload de fotos
 export async function salvarIncidenteAPI(formData: FormData) {
+  const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/incidents`, {
     method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // Sem Content-Type para o navegador definir automaticamente o boundary correto
+    },
     body: formData, // Envia o FormData diretamente (sem JSON.stringify)
   });
 
@@ -480,8 +490,13 @@ export async function atualizarStatusIncidenteAPI(id: number, status: string) {
 // função para concluir incidente com upload opcional de nota fiscal
 export async function concluirIncidenteAPI(id: number, formData: FormData) {
   // O FormData aqui deve conter o arquivo 'invoice' (opcional)
+  const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/incidents/${id}/conclude`, {
     method: "PATCH",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // Sem Content-Type para o navegador definir automaticamente o boundary correto
+    },
     body: formData,
   });
 
