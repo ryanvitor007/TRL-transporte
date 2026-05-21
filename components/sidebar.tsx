@@ -43,8 +43,11 @@ const menuItems = [
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const isMobile = useMobile();
+
+  const isEffectivelyCollapsed = isCollapsed && !isHovered;
 
   const handleViewChange = (view: string) => {
     onViewChange(view);
@@ -57,7 +60,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo */}
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-        {!isCollapsed && (
+        {!isEffectivelyCollapsed && (
           <div className="flex items-center gap-3">
             <Image
               src="/images/image.png"
@@ -79,7 +82,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
             <ChevronLeft
               className={cn(
                 "h-5 w-5 transition-transform",
-                isCollapsed && "rotate-180",
+                isEffectivelyCollapsed && "rotate-180",
               )}
             />
           </Button>
@@ -110,13 +113,13 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
             )}
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            {!isCollapsed && <span>{item.label}</span>}
+            {!isEffectivelyCollapsed && <span>{item.label}</span>}
           </button>
         ))}
       </nav>
 
       {/* Footer */}
-      {!isCollapsed && (
+      {!isEffectivelyCollapsed && (
         <div className="border-t border-sidebar-border p-4">
           <p className="text-xs text-sidebar-foreground/70">
             © 2026 TRL Transporte
@@ -154,9 +157,11 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
   return (
     <aside
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        "sticky top-0 hidden h-screen border-r border-sidebar-border transition-all lg:block",
-        isCollapsed ? "w-16" : "w-64",
+        "sticky top-0 hidden h-screen border-r border-sidebar-border transition-all duration-300 lg:block overflow-hidden z-50",
+        isEffectivelyCollapsed ? "w-16" : "w-64",
       )}
     >
       {sidebarContent}

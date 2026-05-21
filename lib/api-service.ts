@@ -573,7 +573,7 @@ export async function cadastrarFuncionarioAPI(driverForm: any) {
 
   const response = await fetch(`${API_BASE_URL}/employees`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify(payload),
   });
 
@@ -626,7 +626,7 @@ export async function atualizarFuncionarioAPI(id: string | number, dados: any) {
 
   const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify(payload),
   });
 
@@ -644,7 +644,7 @@ export async function atualizarFuncionarioAPI(id: string | number, dados: any) {
 export async function excluirFuncionarioAPI(id: string | number) {
   const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
   });
 
   if (!response.ok) {
@@ -657,7 +657,7 @@ export async function excluirFuncionarioAPI(id: string | number) {
 export async function listarFuncionariosAPI() {
   const response = await fetch(`${API_BASE_URL}/employees`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
   });
 
   if (!response.ok) {
