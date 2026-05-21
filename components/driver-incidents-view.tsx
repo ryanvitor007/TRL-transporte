@@ -401,6 +401,11 @@ export function DriverIncidentsView() {
         formData.append("photos", file);
       });
 
+      console.log("--- Conteúdo do FormData sendo enviado ---");
+      for (const [key, value] of formData.entries()) {
+        console.log(key, value);
+      }
+
       await salvarIncidenteAPI(formData);
 
       setIsNewIncidentOpen(false);
