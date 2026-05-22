@@ -1004,55 +1004,55 @@ export function MaintenanceView() {
       </div>
 
       {/* KPI CARDS */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="flex items-center gap-4 pt-6">
-            <div className="rounded-full bg-primary/10 p-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="w-full transition-all duration-300">
+          <CardContent className="flex items-center justify-center gap-4 p-6 h-full">
+            <div className="rounded-full bg-primary/10 p-3 shrink-0">
               <DollarSign className="h-6 w-6 text-primary" />
             </div>
-            <div>
-              <p className="text-2xl font-bold">
+            <div className="min-w-0">
+              <p className="text-2xl font-bold truncate">
                 {totalCostMonth.toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",
                 })}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground truncate">
                 Custo Total (Filtro)
               </p>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 pt-6">
-            <div className="rounded-full bg-blue-100 p-3">
+        <Card className="w-full transition-all duration-300">
+          <CardContent className="flex items-center justify-center gap-4 p-6 h-full">
+            <div className="rounded-full bg-blue-100 p-3 shrink-0">
               <Clock className="h-6 w-6 text-blue-600" />
             </div>
-            <div>
-              <p className="text-2xl font-bold">{scheduledCount}</p>
-              <p className="text-sm text-muted-foreground">Agendadas</p>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold truncate">{scheduledCount}</p>
+              <p className="text-sm text-muted-foreground truncate">Agendadas</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 pt-6">
-            <div className="rounded-full bg-yellow-100 p-3">
+        <Card className="w-full transition-all duration-300">
+          <CardContent className="flex items-center justify-center gap-4 p-6 h-full">
+            <div className="rounded-full bg-yellow-100 p-3 shrink-0">
               <Wrench className="h-6 w-6 text-yellow-600" />
             </div>
-            <div>
-              <p className="text-2xl font-bold">{inProgressCount}</p>
-              <p className="text-sm text-muted-foreground">Em Andamento</p>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold truncate">{inProgressCount}</p>
+              <p className="text-sm text-muted-foreground truncate">Em Andamento</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 pt-6">
-            <div className="rounded-full bg-green-100 p-3">
+        <Card className="w-full transition-all duration-300">
+          <CardContent className="flex items-center justify-center gap-4 p-6 h-full">
+            <div className="rounded-full bg-green-100 p-3 shrink-0">
               <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
-            <div>
-              <p className="text-2xl font-bold">{completedCount}</p>
-              <p className="text-sm text-muted-foreground">Concluídas</p>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold truncate">{completedCount}</p>
+              <p className="text-sm text-muted-foreground truncate">Concluídas</p>
             </div>
           </CardContent>
         </Card>
