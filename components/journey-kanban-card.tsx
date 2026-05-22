@@ -186,8 +186,8 @@ export function JourneyKanbanCard({
   return (
     <Card
       className={cn(
-        // Base
-        "group relative cursor-pointer w-full min-w-[280px]",
+        // Base — w-full so it fills the column; no fixed min-w here (column handles that)
+        "group relative cursor-pointer w-full h-auto",
         // Transition & hover lift
         "transition-all duration-300 ease-in-out",
         "hover:scale-[1.03] hover:z-10 hover:shadow-xl",
@@ -235,11 +235,12 @@ export function JourneyKanbanCard({
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="font-semibold text-foreground truncate">
+            <div className="flex items-start justify-between gap-2">
+              {/* break-words prevents a long name from overflowing the card */}
+              <h4 className="font-semibold text-foreground text-sm leading-snug break-words min-w-0">
                 {journey.driverName}
               </h4>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
             </div>
 
             {/* Placa Badge */}
@@ -252,12 +253,12 @@ export function JourneyKanbanCard({
                 isMeal && "border-orange-300 bg-orange-100 text-orange-700",
               )}
             >
-              <Truck className="mr-1 h-3 w-3" />
+              <Truck className="mr-1 h-3 w-3 shrink-0" />
               {journey.vehiclePlate}
             </Badge>
 
-            {/* Modelo */}
-            <p className="mt-1 text-xs text-muted-foreground truncate">
+            {/* Modelo — wraps instead of clipping */}
+            <p className="mt-1 text-xs text-muted-foreground break-words leading-snug">
               {journey.vehicleModel}
             </p>
           </div>
@@ -341,9 +342,10 @@ export function JourneyKanbanCard({
 
         {/* Localizacao */}
         {journey.currentLocation && (
-          <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <MapPin className="h-3 w-3" />
-            <span className="truncate">{journey.currentLocation}</span>
+          <div className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+            <MapPin className="h-3 w-3 shrink-0 mt-0.5" />
+            {/* break-words: a very long location string won't blow the card width */}
+            <span className="break-words min-w-0">{journey.currentLocation}</span>
           </div>
         )}
       </CardContent>
@@ -363,10 +365,12 @@ export function JourneyDetailsModal({
   open,
   onOpenChange,
 }: JourneyDetailsModalProps) {
+  // Call all hooks first to respect the Rules of Hooks
+  const elapsedSeconds = useElapsedTime(journey ? journey.startTime : null);
+
   if (!journey) return null;
 
   const statusConfig = getStatusConfig(journey.status);
-  const elapsedSeconds = useElapsedTime(journey.startTime);
 
   // Mapeia IDs de checklist para labels legiveis
   const checklistLabels: Record<string, string> = {

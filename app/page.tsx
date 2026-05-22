@@ -19,6 +19,35 @@ import { ReportsView } from "@/components/reports-view";
 import { MonitoringView } from "@/components/monitoring-view";
 import { Loader2 } from "lucide-react";
 
+const ActiveViewRenderer = ({ view }: { view: string }) => {
+  switch (view) {
+    case "dashboard":
+      return <DashboardView />;
+    case "monitoring":
+      return <MonitoringView />;
+    case "fleet":
+      return <FleetView />;
+    case "financials":
+      return <FinancialsView />;
+    case "tires":
+      return <TiresView />;
+    case "tachograph":
+      return <TachographView />;
+    case "incidents":
+      return <IncidentsView />;
+    case "maintenance":
+      return <MaintenanceView />;
+    case "documents":
+      return <DocumentsView />;
+    case "reports":
+      return <ReportsView />;
+    case "settings":
+      return <SettingsView />;
+    default:
+      return <DashboardView />;
+  }
+};
+
 export default function Home() {
   const { isAuthenticated } = useAuth();
   const { activeView, setActiveView } = useApp();
@@ -65,42 +94,13 @@ export default function Home() {
     );
   }
 
-  const renderView = () => {
-    switch (activeView) {
-      case "dashboard":
-        return <DashboardView />;
-      case "monitoring":
-        return <MonitoringView />;
-      case "fleet":
-        return <FleetView />;
-      case "financials":
-        return <FinancialsView />;
-      case "tires":
-        return <TiresView />;
-      case "tachograph":
-        return <TachographView />;
-      case "incidents":
-        return <IncidentsView />;
-      case "maintenance":
-        return <MaintenanceView />;
-      case "documents":
-        return <DocumentsView />;
-      case "reports":
-        return <ReportsView />;
-      case "settings":
-        return <SettingsView />;
-      default:
-        return <DashboardView />;
-    }
-  };
-
   return (
     <div className="flex min-h-screen">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
       <div className="flex flex-1 flex-col">
         <TopBar />
         <main className="flex-1 overflow-auto bg-background p-4 pt-4 lg:p-8 lg:pt-6 max-h-[calc(100vh-57px)]">
-          {renderView()}
+          <ActiveViewRenderer view={activeView} />
         </main>
       </div>
     </div>

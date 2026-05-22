@@ -303,72 +303,81 @@ export function MonitoringView() {
         </Card>
       </div>
 
-      {/* Kanban Board */}
-      <div className="group grid gap-4 lg:grid-cols-4">
-        {kanbanColumns.map((column) => {
-          const columnJourneys =
-            grouped[column.id as keyof typeof grouped] || [];
-          const ColumnIcon = column.icon;
+      {/* Kanban Board — horizontally scrollable so zoom never clips content */}
+      <div className="w-full overflow-x-auto pb-2">
+        <div className="group flex gap-4" style={{ minWidth: "min-content" }}>
+          {kanbanColumns.map((column) => {
+            const columnJourneys =
+              grouped[column.id as keyof typeof grouped] || [];
+            const ColumnIcon = column.icon;
 
-          return (
-            <Card
-              key={column.id}
-              className={cn("min-h-[400px]", column.borderColor)}
-            >
-              <CardHeader className={cn("pb-3", column.bgColor)}>
-                <CardTitle className="flex items-center justify-between text-sm">
-                  <div className={cn("flex items-center gap-2", column.color)}>
-                    <ColumnIcon className="h-4 w-4" />
-                    {column.title}
-                  </div>
-                  <Badge
-                    variant="secondary"
-                    className={cn(
-                      "font-mono",
-                      column.id === "pending" &&
-                        columnJourneys.length > 0 &&
-                        "bg-red-500 text-white",
-                    )}
-                  >
-                    {columnJourneys.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3">
-                {isLoading ? (
-                  <KanbanColumnSkeleton />
-                ) : columnJourneys.length === 0 ? (
-                  <div className="flex h-32 flex-col items-center justify-center text-center">
-                    <ColumnIcon className="mb-2 h-8 w-8 text-muted-foreground/30" />
-                    <p className="text-xs text-muted-foreground">
-                      {column.emptyText}
-                    </p>
-                  </div>
-                ) : (
-                  <ScrollArea className="h-[350px] pr-2">
-                    {/* group on the list so siblings dim when one card is hovered */}
-                    <div className="group/cards space-y-3">
-                      {columnJourneys.map((journey) => (
-                        <div
-                          key={journey.id}
-                          className="transition-opacity duration-300 group-has-[.group:hover]/cards:opacity-60 hover:!opacity-100"
-                        >
-                          <JourneyKanbanCard
-                            journey={journey}
-                            onOpenDetails={handleOpenDetails}
-                            variant={
-                              column.id === "pending" ? "critical" : "default"
-                            }
-                          />
+            return (
+              <div
+                key={column.id}
+                className="flex-1 min-w-[260px] max-w-sm"
+              >
+                <Card
+                  className={cn(
+                    "flex flex-col min-h-[400px] h-full",
+                    column.borderColor,
+                  )}
+                >
+                  <CardHeader className={cn("pb-3 shrink-0", column.bgColor)}>
+                    <CardTitle className="flex items-center justify-between text-sm">
+                      <div className={cn("flex items-center gap-2 min-w-0", column.color)}>
+                        <ColumnIcon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{column.title}</span>
+                      </div>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "font-mono shrink-0 ml-2",
+                          column.id === "pending" &&
+                            columnJourneys.length > 0 &&
+                            "bg-red-500 text-white",
+                        )}
+                      >
+                        {columnJourneys.length}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 flex-1">
+                    {isLoading ? (
+                      <KanbanColumnSkeleton />
+                    ) : columnJourneys.length === 0 ? (
+                      <div className="flex h-32 flex-col items-center justify-center text-center">
+                        <ColumnIcon className="mb-2 h-8 w-8 text-muted-foreground/30" />
+                        <p className="text-xs text-muted-foreground">
+                          {column.emptyText}
+                        </p>
+                      </div>
+                    ) : (
+                      <ScrollArea className="max-h-[60vh] pr-2">
+                        {/* group on the list so siblings dim when one card is hovered */}
+                        <div className="group/cards space-y-3">
+                          {columnJourneys.map((journey) => (
+                            <div
+                              key={journey.id}
+                              className="transition-opacity duration-300 group-has-[.group:hover]/cards:opacity-60 hover:!opacity-100"
+                            >
+                              <JourneyKanbanCard
+                                journey={journey}
+                                onOpenDetails={handleOpenDetails}
+                                variant={
+                                  column.id === "pending" ? "critical" : "default"
+                                }
+                              />
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Historico do Dia */}
