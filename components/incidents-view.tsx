@@ -60,6 +60,7 @@ import {
   Download,
 } from "lucide-react";
 import Image from "next/image";
+import { toast } from "sonner";
 
 // Importação dos serviços reais
 import {
@@ -67,8 +68,9 @@ import {
   salvarIncidenteAPI,
   buscarFrotaAPI,
   atualizarStatusIncidenteAPI,
-  concluirIncidenteAPI, // Nova função
+  concluirIncidenteAPI,
   transformarIncidenteEmManutencao,
+  enviarIncidenteParaManutencaoAPI,
 } from "@/lib/api-service";
 
 export function IncidentsView() {
@@ -259,8 +261,13 @@ export function IncidentsView() {
       const saved = await salvarIncidenteAPI(formData);
       setIncidents([saved, ...incidents]);
       setIsCreateOpen(false);
-    } catch (error) {
-      alert("Erro ao salvar.");
+      toast.success("Ocorrência registrada!", {
+        description: "O sinistro foi salvo com sucesso.",
+      });
+    } catch (error: any) {
+      toast.error("Erro ao salvar", {
+        description: error?.message || "Verifique os dados e tente novamente.",
+      });
     } finally {
       setSaving(false);
     }
@@ -271,19 +278,28 @@ export function IncidentsView() {
     if (!selectedIncident) return;
     setProcessingMaintenance(true);
     try {
-      await transformarIncidenteEmManutencao(selectedIncident.id);
-      await atualizarStatusIncidenteAPI(selectedIncident.id, "Em Manutenção");
+      // Chama o endpoint real que cria a manutenção E atualiza o status atomicamente
+      await enviarIncidenteParaManutencaoAPI(selectedIncident.id);
 
-      const updatedList = incidents.map((inc) =>
-        inc.id === selectedIncident.id
-          ? { ...inc, status: "Em Manutenção" }
-          : inc
+      // Recarrega a lista completa da API para refletir o novo estado para todos
+      const updatedList = await buscarIncidentesAPI();
+      setIncidents(Array.isArray(updatedList) ? updatedList : []);
+
+      // Atualiza o incidente selecionado localmente para o modal fechar atualizado
+      setSelectedIncident((prev: any) =>
+        prev ? { ...prev, status: "Em Manutenção" } : prev
       );
-      setIncidents(updatedList);
-      setSelectedIncident({ ...selectedIncident, status: "Em Manutenção" });
-      alert("Solicitação de manutenção criada com sucesso!");
-    } catch (error) {
-      alert("Erro ao solicitar manutenção.");
+
+      toast.success("Sinistro enviado para manutenção!", {
+        description: `O incidente #${selectedIncident.id} foi encaminhado com sucesso.`,
+      });
+
+      setIsDetailsOpen(false);
+    } catch (error: any) {
+      console.error("Erro ao solicitar manutenção:", error);
+      toast.error("Erro ao solicitar manutenção", {
+        description: error?.message || "Tente novamente.",
+      });
     } finally {
       setProcessingMaintenance(false);
     }
@@ -302,18 +318,21 @@ export function IncidentsView() {
     try {
       const updated = await concluirIncidenteAPI(selectedIncident.id, formData);
 
-      // Atualiza lista e seleção
-      const updatedList = incidents.map((inc) =>
-        inc.id === selectedIncident.id ? updated : inc
-      );
-      setIncidents(updatedList);
+      // Recarrega a lista completa para garantir sincronia com todos os usuários
+      const updatedList = await buscarIncidentesAPI();
+      setIncidents(Array.isArray(updatedList) ? updatedList : []);
       setSelectedIncident(updated);
       setIsConcludingMode(false);
+      setIsDetailsOpen(false);
 
-      alert("Manutenção concluída e baixa realizada com sucesso!");
-    } catch (error) {
+      toast.success("Baixa realizada com sucesso!", {
+        description: `O incidente #${selectedIncident.id} foi concluído.`,
+      });
+    } catch (error: any) {
       console.error(error);
-      alert("Erro ao dar baixa. Tente novamente.");
+      toast.error("Erro ao dar baixa", {
+        description: error?.message || "Tente novamente.",
+      });
     } finally {
       setProcessingConclusion(false);
     }
@@ -610,12 +629,6 @@ export function IncidentsView() {
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
-                        <span className="text-lg font-bold">
-                          {Number(incident.estimatedCost).toLocaleString(
-                            "pt-BR",
-                            { style: "currency", currency: "BRL" }
-                          )}
-                        </span>
                         {incident.insuranceClaim && (
                           <Badge variant="secondary" className="text-xs">
                             <FileText className="mr-1 h-3 w-3" /> Seguro
@@ -725,20 +738,9 @@ export function IncidentsView() {
                 required
               />
             </div>
-            <div className="grid grid-cols-2 gap-4 items-end">
-              <div className="grid gap-2">
-                <Label>Custo Estimado (R$)</Label>
-                <Input
-                  name="estimatedCost"
-                  type="number"
-                  step="0.01"
-                  placeholder="0,00"
-                />
-              </div>
-              <div className="flex items-center space-x-2 pb-3">
-                <Checkbox id="insurance" name="insuranceClaim" />
-                <Label htmlFor="insurance">Acionar Seguro?</Label>
-              </div>
+            <div className="flex items-center space-x-2 pb-1">
+              <Checkbox id="insurance" name="insuranceClaim" />
+              <Label htmlFor="insurance">Acionar Seguro?</Label>
             </div>
             <div className="grid gap-2">
               <Label>Descrição</Label>
@@ -887,15 +889,10 @@ export function IncidentsView() {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-muted-foreground">
-                    Custo Estimado
-                  </Label>
-                  <div className="flex items-center gap-1 font-bold text-lg text-red-600">
-                    <DollarSign className="h-4 w-4" />
-                    {Number(selectedIncident.estimatedCost).toLocaleString(
-                      "pt-BR",
-                      { minimumFractionDigits: 2 }
-                    )}
+                  <Label className="text-muted-foreground">Data / Hora</Label>
+                  <div className="text-sm font-medium">
+                    {format(new Date(selectedIncident.date), "dd/MM/yyyy")} às{" "}
+                    {selectedIncident.time}
                   </div>
                   {selectedIncident.insuranceClaim && (
                     <Badge variant="secondary" className="text-xs mt-1">

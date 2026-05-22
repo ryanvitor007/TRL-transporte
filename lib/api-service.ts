@@ -505,7 +505,7 @@ export async function concluirIncidenteAPI(id: number, formData: FormData) {
   return adapterIncidente(novoRegistro);
 }
 
-// Converte um incidente/sinistro em manutenção
+// Converte um incidente/sinistro em manutenção (legado)
 export async function transformarIncidenteEmManutencao(id: number) {
   const response = await fetch(
     `${API_BASE_URL}/incidents/${id}/create-maintenance`,
@@ -516,6 +516,28 @@ export async function transformarIncidenteEmManutencao(id: number) {
 
   if (!response.ok) {
     throw new Error("Erro ao transformar incidente em manutenção");
+  }
+
+  return response.json();
+}
+
+// Envia um sinistro para manutenção via endpoint real.
+// O backend cria a manutenção e atualiza o status do incidente para 'Em Manutenção' atomicamente.
+export async function enviarIncidenteParaManutencaoAPI(id: number) {
+  const token = getAuthToken();
+  const response = await fetch(
+    `${API_BASE_URL}/incidents/${id}/create-maintenance`,
+    {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || "Erro ao enviar sinistro para manutenção");
   }
 
   return response.json();
