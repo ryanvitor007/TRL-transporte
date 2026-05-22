@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { format, isWithinInterval, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
+import { useToastNotification } from "@/contexts/notification-context";
 import {
   FileText,
   ShieldCheck,
@@ -161,6 +162,7 @@ const generateDocHash = () => {
 // ==================== COMPONENT ====================
 export function ReportsView() {
   // --- 1. HOOKS DE ESTADO (Devem ficar sempre no topo) ---
+  const toast = useToastNotification();
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -261,15 +263,13 @@ export function ReportsView() {
 
   const handleGenerateReport = async () => {
     if (!dateRange?.from || !dateRange?.to) {
-      alert("Por favor, selecione um período válido.");
+      toast.warning("Período inválido", "Por favor, selecione um período válido para gerar o relatório.");
       return;
     }
 
     // Validação da Senha
     if (!pdfPassword || pdfPassword.length < 4) {
-      alert(
-        "Por favor, defina uma senha de segurança (mínimo 4 dígitos) para visualizar o relatório.",
-      );
+      toast.warning("Senha muito curta", "Defina uma senha de segurança com mínimo 4 dígitos para visualizar o relatório.");
       return;
     }
 
@@ -294,7 +294,7 @@ export function ReportsView() {
       setIsPreviewOpen(true);
     } catch (error) {
       console.error(error);
-      alert("Erro ao buscar dados. Verifique a conexão com o servidor.");
+      toast.error("Erro ao buscar dados", "Verifique a conexão com o servidor e tente novamente.");
     } finally {
       setIsGenerating(false);
     }
@@ -337,7 +337,7 @@ export function ReportsView() {
       console.log("Relatório salvo no histórico com sucesso.");
     } catch (error) {
       console.error("Erro ao processar download:", error);
-      alert("O arquivo foi gerado, mas houve um erro ao salvar no histórico.");
+      toast.error("Erro ao salvar histórico", "O arquivo foi gerado, mas houve um erro ao salvar no histórico.");
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -345,7 +345,7 @@ export function ReportsView() {
 
   // Função legado para baixar histórico (mantida para compatibilidade visual)
   const handleDownloadHistoryPDF = async (report: ReportHistory) => {
-    alert("Função de download de histórico em manutenção.");
+    toast.info("Em manutenção", "A função de download do histórico está temporáriamente indisponível.");
   };
 
   // Dados da empresa

@@ -57,6 +57,7 @@ import {
   salvarIncidenteAPI,
   buscarFrotaAPI,
 } from "@/lib/api-service";
+import { useToastNotification } from "@/contexts/notification-context";
 
 // --- INTERFACES ---
 interface IncidentRecord {
@@ -230,6 +231,7 @@ function EmptyState() {
 
 export function DriverIncidentsView() {
   const { user } = useAuth();
+  const toast = useToastNotification();
   const driverName = user?.name || "Motorista";
 
   // --- ESTADOS DE LOADING/ERROR ---
@@ -415,7 +417,7 @@ export function DriverIncidentsView() {
       await loadData();
     } catch (error) {
       console.error("Erro ao salvar sinistro:", error);
-      alert("Erro ao registrar sinistro. Tente novamente.");
+      toast.error("Erro ao registrar sinistro", "Tente novamente. Se o problema persistir, contate o suporte.");
     } finally {
       setIsSubmitting(false);
     }

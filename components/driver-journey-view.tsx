@@ -10,6 +10,7 @@ import {
   type VehicleData,
 } from "@/contexts/journey-context";
 import { buscarFrotaAPI, salvarManutencaoAPI, criarIncidenteJornadaAPI } from "@/lib/api-service";
+import { useToastNotification } from "@/contexts/notification-context";
 import {
   Card,
   CardContent,
@@ -577,6 +578,8 @@ export function DriverJourneyView() {
     }
   };
 
+  const toast = useToastNotification();
+
   const handleCheckIn = async () => {
     // Adicionado verificação do veículo selecionado
     if (!startKm || !journey.selectedVehicle) return;
@@ -585,7 +588,7 @@ export function DriverJourneyView() {
       // CORREÇÃO: Passando os 3 argumentos exigidos (Km, Veículo, Localização)
       await startJourney(startKm, journey.selectedVehicle, currentLocation);
     } catch (error) {
-      alert("Erro ao iniciar jornada. Tente novamente.");
+      toast.error("Erro ao iniciar jornada", "Tente novamente em instantes.");
     }
   };
 
@@ -661,9 +664,7 @@ export function DriverJourneyView() {
       const selectedVehicle = journey.selectedVehicle;
       if (!selectedVehicle.plate || !selectedVehicle.model) {
         console.error("[v0] Dados do veiculo incompletos:", selectedVehicle);
-        alert(
-          "Erro: Dados do veiculo incompletos. Tente selecionar novamente.",
-        );
+        toast.error("Dados do veículo incompletos", "Tente selecionar o veículo novamente.");
         setIsSubmittingMaintenance(false);
         return;
       }
@@ -701,10 +702,10 @@ export function DriverJourneyView() {
       cancelJourney();
 
       // Mostra mensagem de sucesso
-      alert("Solicitacao de manutencao enviada com sucesso!");
+      toast.success("Manutenção solicitada!", "A equipe de manutenção foi notificada e verificará o veículo.");
     } catch (error) {
       console.error("Erro ao criar manutencao:", error);
-      alert("Erro ao solicitar manutencao. Tente novamente.");
+      toast.error("Erro ao solicitar manutenção", "Tente novamente em instantes.");
     } finally {
       setIsSubmittingMaintenance(false);
     }
@@ -760,12 +761,12 @@ export function DriverJourneyView() {
 
   const handleSubmitIncident = async () => {
     if (!incidentDescription.trim()) {
-      alert("Por favor, descreva o acidente/sinistro.");
+      toast.warning("Descrição obrigatória", "Por favor, descreva o acidente ou sinistro ocorrido.");
       return;
     }
 
     if (!journey.journeyId) {
-      alert("Erro: Jornada nao identificada.");
+      toast.error("Jornada não identificada", "Não foi possível vincular o sinistro. Recarregue a página.");
       return;
     }
 
@@ -807,10 +808,10 @@ export function DriverJourneyView() {
       setIncidentPhotos([]);
       setShowIncidentModal(false);
 
-      alert("Sinistro registrado com sucesso! A central foi notificada.");
+      toast.success("Sinistro registrado!", "A central foi notificada e irá tratar a ocorrência.");
     } catch (error) {
       console.error("Erro ao registrar sinistro:", error);
-      alert("Erro ao registrar sinistro. Tente novamente.");
+      toast.error("Erro ao registrar sinistro", "Tente novamente. Se o problema persistir, contate o suporte.");
     } finally {
       setIsSubmittingIncident(false);
     }

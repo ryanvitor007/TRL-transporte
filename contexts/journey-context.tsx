@@ -380,7 +380,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         }));
       } catch (error) {
         console.error("Erro ao iniciar jornada:", error);
-        alert("Erro de conexão ao iniciar jornada. Tente novamente.");
+        toast.error("Erro de conexão", "Não foi possível iniciar a jornada. Tente novamente.");
       }
     },
     [
