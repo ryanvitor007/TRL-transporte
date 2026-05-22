@@ -283,6 +283,76 @@ export function MaintenanceView() {
   const [isSavingMaintenance, setIsSavingMaintenance] = useState(false);
   const editInvoiceInputRef = useRef<HTMLInputElement>(null);
 
+  // --- ESTADOS DO FORMULÁRIO DE ENCERRAMENTO (dentro do modal de detalhes) ---
+  const [isCloseFormMode, setIsCloseFormMode] = useState(false);
+  const [closeFormData, setCloseFormData] = useState({
+    provider: "",
+    cost: "",
+    completedDate: "",
+  });
+  const [closeInvoiceFile, setCloseInvoiceFile] = useState<File | null>(null);
+  const [isSubmittingClose, setIsSubmittingClose] = useState(false);
+  const closeInvoiceInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCloseInvoiceSelect = (file: File | null) => {
+    if (file) {
+      const validTypes = [
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/webp",
+      ];
+      if (!validTypes.includes(file.type)) {
+        toast.error("Arquivo inválido", "Selecione um PDF ou imagem (PNG, JPG, WEBP).");
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Arquivo muito grande", "O arquivo deve ter no máximo 10MB.");
+        return;
+      }
+    }
+    setCloseInvoiceFile(file);
+  };
+
+  const handleConfirmBaixa = async () => {
+    if (!selectedMaintenance) return;
+    if (!closeFormData.provider.trim()) {
+      toast.error("Campo obrigatório", "Informe o nome da oficina.");
+      return;
+    }
+    if (!closeFormData.cost || isNaN(Number(closeFormData.cost))) {
+      toast.error("Campo obrigatório", "Informe o valor real do reparo.");
+      return;
+    }
+    if (!closeFormData.completedDate) {
+      toast.error("Campo obrigatório", "Informe a data de conclusão.");
+      return;
+    }
+    setIsSubmittingClose(true);
+    try {
+      const formData = new FormData();
+      formData.append("status", "Concluída");
+      formData.append("provider", closeFormData.provider);
+      formData.append("cost", String(Number(closeFormData.cost)));
+      formData.append("completed_date", closeFormData.completedDate);
+      if (closeInvoiceFile) {
+        formData.append("invoice", closeInvoiceFile);
+      }
+      await atualizarManutencaoAPI(selectedMaintenance.id, formData);
+      toast.success("Concluído", "Manutenção encerrada com sucesso!");
+      setIsDetailsOpen(false);
+      setIsCloseFormMode(false);
+      setCloseFormData({ provider: "", cost: "", completedDate: "" });
+      setCloseInvoiceFile(null);
+      carregarTudo();
+    } catch (error) {
+      toast.error("Erro", "Falha ao encerrar manutenção.");
+    } finally {
+      setIsSubmittingClose(false);
+    }
+  };
+
   // --- ESTADO DOS FILTROS ---
   const [filters, setFilters] = useState({
     vehicleId: "all",
@@ -1739,66 +1809,98 @@ export function MaintenanceView() {
         </DialogContent>
       </Dialog>
 
-      {/* --- MODAL DETALHES + DAR BAIXA --- */}
-      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Detalhes da Manutenção</DialogTitle>
-          </DialogHeader>
-
+      {/* --- MODAL DETALHES + DAR BAIXA (Refatorado) --- */}
+      <Dialog
+        open={isDetailsOpen}
+        onOpenChange={(open) => {
+          setIsDetailsOpen(open);
+          if (!open) {
+            setIsCloseFormMode(false);
+            setCloseFormData({ provider: "", cost: "", completedDate: "" });
+            setCloseInvoiceFile(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           {selectedMaintenance && (
-            <div className="space-y-6 py-4">
-              <Card className="bg-muted/50">
-                <CardContent className="pt-4 flex items-center gap-4">
-                  <div className="rounded-full bg-primary/10 p-3">
-                    <Car className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold">
-                      {selectedMaintenance.vehicle_plate}
-                    </p>
-                    <p className="text-muted-foreground">
-                      {selectedMaintenance.vehicle_model}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Tipo</p>
-                  <p className="font-medium">{selectedMaintenance.type}</p>
+            <div className="space-y-6 py-2">
+              {/* ===== CABEÇALHO CENTRALIZADO ===== */}
+              <div className="text-center pt-2 pb-4 border-b">
+                <div className="inline-flex items-center justify-center rounded-full bg-primary/10 p-4 mb-3">
+                  <Car className="h-8 w-8 text-primary" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Data da Solicitação
-                  </p>
-                  <p className="font-medium">
-                    {getRequestDate(selectedMaintenance)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Oficina</p>
-                  <p className="font-medium">{selectedMaintenance.provider}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Custo</p>
-                  <p className="font-medium">
-                    R${" "}
-                    {Number(selectedMaintenance.cost).toLocaleString("pt-BR", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-muted-foreground">Descrição</p>
-                <p className="p-2 bg-muted rounded">
-                  {selectedMaintenance.description}
+                <h2 className="text-2xl font-bold tracking-tight">
+                  {selectedMaintenance.vehicle_plate || "—"}
+                </h2>
+                <p className="text-base text-muted-foreground font-medium mt-0.5">
+                  {selectedMaintenance.vehicle_model || "Modelo não informado"}
                 </p>
+                {selectedMaintenance.driver_name && (
+                  <div className="flex items-center justify-center gap-1.5 mt-2">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      {selectedMaintenance.driver_name}
+                    </p>
+                  </div>
+                )}
+                <div className="mt-3">
+                  {(() => {
+                    const s = normalizeStatus(selectedMaintenance.status);
+                    const cfg = statusConfig[s] || statusConfig.Agendada;
+                    const Icon = cfg.icon;
+                    return (
+                      <Badge className={cn("text-sm px-3 py-1", cfg.color)}>
+                        <Icon className="mr-1.5 h-3.5 w-3.5" />
+                        {selectedMaintenance.status}
+                      </Badge>
+                    );
+                  })()}
+                </div>
               </div>
 
+              {/* ===== GRID DE INFORMAÇÕES (3 colunas) ===== */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="rounded-xl border bg-muted/30 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Tipo</p>
+                  <p className="font-semibold text-base">{selectedMaintenance.type || "—"}</p>
+                </div>
+                <div className="rounded-xl border bg-muted/30 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Oficina</p>
+                  <p className="font-semibold text-base">{selectedMaintenance.provider || "Não informada"}</p>
+                </div>
+                <div className="rounded-xl border bg-muted/30 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Data da Solicitação</p>
+                  <p className="font-semibold text-base">{getRequestDate(selectedMaintenance)}</p>
+                </div>
+                <div className="rounded-xl border bg-muted/30 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Custo Registrado</p>
+                  <p className="font-semibold text-base">
+                    {Number(selectedMaintenance.cost || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </p>
+                </div>
+                {selectedMaintenance.completed_date && (
+                  <div className="rounded-xl border bg-green-50 border-green-200 p-4">
+                    <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Data de Conclusão</p>
+                    <p className="font-semibold text-base text-green-800">
+                      {new Date(selectedMaintenance.completed_date).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                )}
+                <div className="rounded-xl border bg-muted/30 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">ID do Sinistro</p>
+                  <p className="font-semibold text-base">{selectedMaintenance.incident_id ? `#${selectedMaintenance.incident_id}` : "—"}</p>
+                </div>
+              </div>
+
+              {/* ===== DESCRIÇÃO ===== */}
+              {selectedMaintenance.description && (
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Descrição</p>
+                  <p className="text-sm leading-relaxed">{selectedMaintenance.description}</p>
+                </div>
+              )}
+
+              {/* ===== FOTOS DO SINISTRO ===== */}
               <div className="space-y-3">
                 <Collapsible
                   open={isModalPhotosOpen}
@@ -1812,12 +1914,10 @@ export function MaintenanceView() {
                   <CollapsibleTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-full justify-start gap-2 text-blue-600 border-blue-200/70 hover:text-blue-700 hover:bg-blue-50/60"
+                      className="w-full justify-start gap-2 text-blue-600 border-blue-200 hover:text-blue-700 hover:bg-blue-50"
                     >
                       <ImageIcon className="h-4 w-4" />
-                      {isModalPhotosOpen
-                        ? "Ocultar Fotos"
-                        : "Ver Fotos do Sinistro"}
+                      {isModalPhotosOpen ? "Ocultar Fotos do Sinistro" : `Ver Fotos do Sinistro (${selectedIncidentPhotos.length})`}
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-3 overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
@@ -1829,18 +1929,18 @@ export function MaintenanceView() {
                             href={foto}
                             target="_blank"
                             rel="noreferrer"
-                            className="block"
+                            className="block group relative"
                           >
                             <img
                               src={foto}
                               alt={`Foto do sinistro ${index + 1}`}
-                              className="aspect-square w-full rounded-lg object-cover"
+                              className="aspect-square w-full rounded-xl object-cover ring-1 ring-border group-hover:ring-primary/50 transition-all"
                             />
                           </a>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground italic text-center py-4">
                         Nenhuma foto do sinistro disponível.
                       </p>
                     )}
@@ -1848,74 +1948,190 @@ export function MaintenanceView() {
                 </Collapsible>
               </div>
 
-              {/* LÓGICA DE NOTA FISCAL (Com e Sem arquivo) */}
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold text-muted-foreground">
-                  Nota Fiscal / Comprovante
-                </Label>
-
-                {selectedMaintenance.invoice_url ? (
-                  /* CASO COM ARQUIVO */
-                  <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 text-blue-600 rounded-full">
-                        <FileText className="h-4 w-4" />
+              {/* ===== NOTA FISCAL EXISTENTE ===== */}
+              {!isCloseFormMode && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Nota Fiscal / Comprovante
+                  </Label>
+                  {selectedMaintenance.invoice_url ? (
+                    <div className="flex items-center justify-between p-3 border rounded-xl bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 text-blue-600 rounded-full">
+                          <FileText className="h-4 w-4" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">Nota Fiscal Anexada</span>
+                          <span className="text-xs text-muted-foreground">Documento digital</span>
+                        </div>
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">
-                          Nota Fiscal Anexada
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          Documento digital
-                        </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(selectedMaintenance.invoice_url, "_blank")}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Visualizar
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-muted bg-muted/10 rounded-xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                      <FileX className="h-7 w-7 opacity-20" />
+                      <span className="text-sm italic">Nenhuma nota fiscal foi anexada</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ===== FORMULÁRIO DE ENCERRAMENTO ("DAR BAIXA") ===== */}
+              {isCloseFormMode && selectedMaintenance.status !== "Concluída" && selectedMaintenance.status !== "Concluído" && (
+                <div className="rounded-2xl border-2 border-green-200 bg-green-50/50 p-5 space-y-5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <h3 className="font-bold text-green-900 text-base">Formulário de Encerramento</h3>
+                  </div>
+                  <p className="text-xs text-green-700">Preencha os campos abaixo para concluir oficialmente esta manutenção. Todos os campos são obrigatórios.</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Nome da Oficina */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Nome da Oficina *</Label>
+                      <Input
+                        placeholder="Ex: Auto Mecânica Central"
+                        value={closeFormData.provider}
+                        onChange={(e) => setCloseFormData((prev) => ({ ...prev, provider: e.target.value }))}
+                        className="bg-white"
+                      />
+                    </div>
+
+                    {/* Data de Conclusão */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Data de Conclusão *</Label>
+                      <Input
+                        type="date"
+                        value={closeFormData.completedDate}
+                        onChange={(e) => setCloseFormData((prev) => ({ ...prev, completedDate: e.target.value }))}
+                        className="bg-white"
+                      />
+                    </div>
+
+                    {/* Valor Real do Reparo */}
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label className="text-sm font-semibold">Valor Real do Reparo (R$) *</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min="0"
+                          placeholder="0,00"
+                          value={closeFormData.cost}
+                          onChange={(e) => setCloseFormData((prev) => ({ ...prev, cost: e.target.value }))}
+                          className="pl-9 bg-white"
+                        />
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        window.open(selectedMaintenance.invoice_url, "_blank")
-                      }
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      Visualizar
-                    </Button>
                   </div>
-                ) : (
-                  /* CASO SEM ARQUIVO */
-                  <div className="border-2 border-dashed border-muted bg-muted/10 rounded-lg p-6 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                    <FileX className="h-8 w-8 opacity-20" />
-                    <span className="text-sm italic">
-                      Nenhuma nota fiscal foi anexada
-                    </span>
-                  </div>
-                )}
-              </div>
 
-              <DialogFooter className="gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsDetailsOpen(false)}
-                >
-                  Fechar
-                </Button>
-                {selectedMaintenance.status !== "Concluída" &&
-                  selectedMaintenance.status !== "Concluído" && (
+                  {/* Upload Nota Fiscal */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Nota Fiscal (PDF ou Imagem)</Label>
+                    <input
+                      type="file"
+                      accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      ref={closeInvoiceInputRef}
+                      onChange={(e) => handleCloseInvoiceSelect(e.target.files?.[0] || null)}
+                    />
+                    {closeInvoiceFile ? (
+                      <div className="flex items-center gap-3 rounded-xl border-2 border-dashed border-green-300 bg-white p-4">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                          <FileText className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-green-800 truncate">{closeInvoiceFile.name}</p>
+                          <p className="text-xs text-green-600">{(closeInvoiceFile.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleCloseInvoiceSelect(null)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-green-300/60 bg-white p-6 text-center cursor-pointer transition-colors hover:border-green-400 hover:bg-green-50/50"
+                        onClick={() => closeInvoiceInputRef.current?.click()}
+                      >
+                        <CloudUpload className="h-8 w-8 text-green-500" />
+                        <p className="text-sm font-medium text-muted-foreground">Arraste ou clique para selecionar</p>
+                        <p className="text-xs text-muted-foreground/70">PDF, PNG, JPG — máx. 10MB (opcional)</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedMaintenance.incident_id && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>Ao confirmar a baixa, o Sinistro vinculado (#{ selectedMaintenance.incident_id}) também será encerrado automaticamente.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ===== RODAPÉ DO MODAL ===== */}
+              <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2 border-t">
+                {isCloseFormMode ? (
+                  <>
                     <Button
-                      onClick={handleCompleteService}
-                      disabled={isCompletingService}
+                      variant="outline"
+                      onClick={() => {
+                        setIsCloseFormMode(false);
+                        setCloseFormData({ provider: "", cost: "", completedDate: "" });
+                        setCloseInvoiceFile(null);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleConfirmBaixa}
+                      disabled={isSubmittingClose}
                       className="bg-green-600 hover:bg-green-700"
                     >
-                      {isCompletingService ? (
-                        <Loader2 className="animate-spin" />
+                      {isSubmittingClose ? (
+                        <Loader2 className="animate-spin mr-2 h-4 w-4" />
                       ) : (
-                        <>
-                          <CheckCircle className="mr-2 h-4 w-4" /> Dar Baixa
-                        </>
+                        <CheckCircle className="mr-2 h-4 w-4" />
                       )}
+                      Confirmar Baixa
                     </Button>
-                  )}
-              </DialogFooter>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsDetailsOpen(false)}
+                    >
+                      Fechar
+                    </Button>
+                    {selectedMaintenance.status !== "Concluída" &&
+                      selectedMaintenance.status !== "Concluído" && (
+                        <Button
+                          onClick={() => setIsCloseFormMode(true)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Dar Baixa
+                        </Button>
+                      )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
