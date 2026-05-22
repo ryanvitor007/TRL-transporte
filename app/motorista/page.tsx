@@ -11,6 +11,7 @@ import { DriverTachographView } from "@/components/driver-tachograph-view";
 import { DriverMaintenanceView } from "@/components/driver-maintenance-view";
 import { DriverIncidentsView } from "@/components/driver-incidents-view";
 import { DriverJourneyView } from "@/components/driver-journey-view";
+import { DriverHistoryView } from "@/components/driver-history-view";
 import { DriverProfileView } from "@/components/driver-profile-view";
 import { ActiveJourneyWidget } from "@/components/active-journey-widget";
 import { LoaderTRL } from "@/components/ui/custom-loader";
@@ -60,6 +61,8 @@ export default function DriverDashboard() {
         return <DriverIncidentsView />;
       case "maintenance":
         return <DriverMaintenanceView />;
+      case "history":
+        return <DriverHistoryView />;
       case "profile":
         return <DriverProfileView />;
       default:

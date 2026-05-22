@@ -23,13 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -599,6 +593,7 @@ export function FleetView() {
                   ? "Confirmar Dados do Veículo"
                   : "Adicionar Novo Veículo"}
               </DialogTitle>
+            <DialogDescription className="sr-only">Descrição do modal para acessibilidade</DialogDescription>
             </DialogHeader>
 
             {!showForm ? (
@@ -858,6 +853,7 @@ export function FleetView() {
                       <AlertTriangle className="h-5 w-5" />
                       Confirmar Exclusão
                     </DialogTitle>
+            <DialogDescription className="sr-only">Descrição do modal para acessibilidade</DialogDescription>
                   </DialogHeader>
 
                   <div className="py-4">
@@ -975,6 +971,7 @@ export function FleetView() {
                   <DialogTitle className="text-xl">
                     {selectedVehicle?.modelo} - {selectedVehicle?.placa}
                   </DialogTitle>
+            <DialogDescription className="sr-only">Descrição do modal para acessibilidade</DialogDescription>
                   <p className="text-sm text-muted-foreground">
                     Ano {selectedVehicle?.ano} •{" "}
                     {selectedVehicle?.km_atual?.toLocaleString("pt-BR") || 0} km

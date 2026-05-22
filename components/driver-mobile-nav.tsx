@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Route, Gauge, AlertOctagon, Wrench, User } from "lucide-react";
+import { Route, Gauge, AlertOctagon, Wrench, User, History } from "lucide-react";
 
 interface DriverMobileNavProps {
   activeView: string;
@@ -13,6 +13,7 @@ const navItems = [
   { id: "tachograph", label: "Tacografo", icon: Gauge },
   { id: "incidents", label: "Incidentes", icon: AlertOctagon },
   { id: "maintenance", label: "Manutencao", icon: Wrench },
+  { id: "history", label: "Historico", icon: History },
   { id: "profile", label: "Perfil", icon: User },
 ];
 

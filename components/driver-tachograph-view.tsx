@@ -26,15 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,  } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -74,6 +66,7 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
+import { buscarFrotaAPI } from "@/lib/api-service";
 
 // --- INTERFACES TypeScript ---
 interface TachographRecord {
@@ -311,6 +304,39 @@ export function DriverTachographView() {
   });
   const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+
+  // Mapear veículos da API e mocks para unificar km_atual
+  const displayVehicles = useMemo(() => {
+    const apiVehicles = vehicles.map(v => ({
+      id: String(v.id),
+      plate: v.placa || v.plate,
+      model: v.modelo || v.model,
+      km_atual: v.km_atual ?? 0
+    }));
+    if (apiVehicles.length > 0) return apiVehicles;
+    return mockVehicles.map((v, idx) => ({
+      ...v,
+      km_atual: idx === 0 ? 150000 : idx === 1 ? 120000 : 180000
+    }));
+  }, [vehicles]);
+
+  // Auto-preenchimento do KM Inicial ao selecionar o veículo
+  useEffect(() => {
+    if (!newRecord.vehicleId) return;
+    const selected = displayVehicles.find((v) => String(v.id) === String(newRecord.vehicleId));
+    if (selected) {
+      setNewRecord((prev) => ({
+        ...prev,
+        kmStart: String(selected.km_atual),
+      }));
+    }
+  }, [newRecord.vehicleId, displayVehicles]);
+
+  const kmStartNum = Number(newRecord.kmStart) || 0;
+  const kmEndNum = Number(newRecord.kmEnd) || 0;
+  const kmPercorrido = kmEndNum > kmStartNum ? kmEndNum - kmStartNum : 0;
+  const isKmInvalid = kmEndNum > 0 && kmEndNum < kmStartNum;
 
   // Mock records do motorista
   const [mockRecords, setMockRecords] = useState<TachographRecord[]>([]);
@@ -320,7 +346,11 @@ export function DriverTachographView() {
     setIsLoading(true);
     setHasError(false);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      const [frota] = await Promise.all([
+        buscarFrotaAPI(),
+        new Promise((resolve) => setTimeout(resolve, 1200))
+      ]);
+      setVehicles(Array.isArray(frota) ? frota : []);
       setMockRecords(generateDriverMockRecords(driverId, driverName));
     } catch {
       setHasError(true);
@@ -620,7 +650,7 @@ export function DriverTachographView() {
                         <SelectValue placeholder="Selecione o veiculo" />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockVehicles.map((v) => (
+                        {displayVehicles.map((v) => (
                           <SelectItem key={v.id} value={v.id}>
                             {v.plate} - {v.model}
                           </SelectItem>
@@ -677,7 +707,7 @@ export function DriverTachographView() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label className="text-sm">KM Inicial</Label>
+                      <Label className="text-sm">KM Inicial *</Label>
                       <Input
                         type="number"
                         placeholder="0"
@@ -692,7 +722,7 @@ export function DriverTachographView() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm">KM Final</Label>
+                      <Label className="text-sm">KM Final *</Label>
                       <Input
                         type="number"
                         placeholder="0"
@@ -706,6 +736,25 @@ export function DriverTachographView() {
                         }
                       />
                     </div>
+                  </div>
+                  
+                  {/* Feedback Visual de Quilometragem */}
+                  <div className="text-sm mt-1">
+                    {!newRecord.kmEnd && newRecord.kmStart && (
+                      <p className="text-muted-foreground flex items-center gap-1">
+                        Último KM registrado: {Number(newRecord.kmStart).toLocaleString("pt-BR")}
+                      </p>
+                    )}
+                    {newRecord.kmEnd && !isKmInvalid && (
+                      <p className="text-green-600 flex items-center gap-1 font-medium">
+                        <span>🛣️</span> Distância percorrida: {kmPercorrido.toLocaleString("pt-BR")} km
+                      </p>
+                    )}
+                    {isKmInvalid && (
+                      <p className="text-red-500 flex items-center gap-1 font-medium">
+                        O KM final não pode ser menor que o KM inicial.
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -758,7 +807,10 @@ export function DriverTachographView() {
                     !newRecord.vehicleId ||
                     !newRecord.startTime ||
                     !newRecord.endTime ||
-                    isSubmitting
+                    !newRecord.kmStart ||
+                    !newRecord.kmEnd ||
+                    isSubmitting ||
+                    isKmInvalid
                   }
                   className="flex-1 sm:flex-none active:scale-95 transition-transform"
                 >
@@ -1112,6 +1164,7 @@ export function DriverTachographView() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle>Detalhes do Registro</DialogTitle>
+            <DialogDescription className="sr-only">Descrição do modal para acessibilidade</DialogDescription>
           </DialogHeader>
           {selectedRecord && (
             <ScrollArea className="flex-1 -mx-6 px-6">

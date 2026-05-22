@@ -106,14 +106,21 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
             key={item.id}
             onClick={() => handleViewChange(item.id)}
             className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors overflow-hidden whitespace-nowrap",
               activeView === item.id
                 ? "bg-sidebar-primary text-sidebar-primary-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             )}
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            {!isEffectivelyCollapsed && <span>{item.label}</span>}
+            <span
+              className={cn(
+                "transition-opacity duration-200",
+                isEffectivelyCollapsed ? "opacity-0" : "opacity-100"
+              )}
+            >
+              {item.label}
+            </span>
           </button>
         ))}
       </nav>

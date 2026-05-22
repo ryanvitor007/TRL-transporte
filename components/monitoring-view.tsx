@@ -304,7 +304,7 @@ export function MonitoringView() {
       </div>
 
       {/* Kanban Board */}
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="group grid gap-4 lg:grid-cols-4">
         {kanbanColumns.map((column) => {
           const columnJourneys =
             grouped[column.id as keyof typeof grouped] || [];
@@ -346,16 +346,21 @@ export function MonitoringView() {
                   </div>
                 ) : (
                   <ScrollArea className="h-[350px] pr-2">
-                    <div className="space-y-3">
+                    {/* group on the list so siblings dim when one card is hovered */}
+                    <div className="group/cards space-y-3">
                       {columnJourneys.map((journey) => (
-                        <JourneyKanbanCard
+                        <div
                           key={journey.id}
-                          journey={journey}
-                          onOpenDetails={handleOpenDetails}
-                          variant={
-                            column.id === "pending" ? "critical" : "default"
-                          }
-                        />
+                          className="transition-opacity duration-300 group-has-[.group:hover]/cards:opacity-60 hover:!opacity-100"
+                        >
+                          <JourneyKanbanCard
+                            journey={journey}
+                            onOpenDetails={handleOpenDetails}
+                            variant={
+                              column.id === "pending" ? "critical" : "default"
+                            }
+                          />
+                        </div>
                       ))}
                     </div>
                   </ScrollArea>

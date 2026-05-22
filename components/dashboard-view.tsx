@@ -46,14 +46,7 @@ import {
   buscarMultasAPI,
   buscarDocumentosAPI,
 } from "@/lib/api-service";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,  } from "@/components/ui/dialog";
 
 // --- INTERFACE PARA TIPAGEM DOS ALERTAS ---
 interface DashboardAlert {
@@ -594,6 +587,7 @@ export function DashboardView() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Detalhes</DialogTitle>
+            <DialogDescription className="sr-only">Descrição do modal para acessibilidade</DialogDescription>
           </DialogHeader>
           {renderAlertDetails()}
           <DialogFooter>

@@ -23,14 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,  } from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
@@ -516,6 +509,34 @@ export function DriverMaintenanceView() {
     }, 1500);
   };
 
+  // --- FORMATADORES DE INPUT (MÁSCARAS) ---
+  const formatKeystrokeToCurrency = (value: string): string => {
+    const cleanValue = value.replace(/\D/g, ""); // Remove tudo que não é dígito
+    if (cleanValue === "") return "";
+    const amount = Number(cleanValue) / 100;
+    return amount.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  };
+
+  const formatNumberToCurrency = (val: number | string | null | undefined): string => {
+    if (val === null || val === undefined || val === "") return "";
+    const num = Number(val);
+    if (isNaN(num)) return "";
+    return num.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  };
+
+  const parseCurrencyToNumber = (val: string): number => {
+    if (!val) return 0;
+    const clean = val.replace(/[^\d,]/g, "").replace(",", ".");
+    const num = Number(clean);
+    return isNaN(num) ? 0 : num;
+  };
+
   const resetForm = () => {
     setNewMaintenance({
       type: "",
@@ -564,7 +585,7 @@ export function DriverMaintenanceView() {
         provider: selectedMaintenance.provider ?? "",
         estimatedCost:
           selectedMaintenance.cost != null
-            ? String(selectedMaintenance.cost)
+            ? formatNumberToCurrency(selectedMaintenance.cost)
             : "",
       });
       setSelectedVehicleId(String(selectedMaintenance.vehicle_id));
@@ -1204,14 +1225,14 @@ export function DriverMaintenanceView() {
                 <div className="space-y-2">
                   <Label className="text-sm">Custo Estimado</Label>
                   <Input
-                    type="number"
+                    type="text"
                     className="h-11"
                     placeholder="R$ 0,00"
                     value={newMaintenance.estimatedCost}
                     onChange={(e) =>
                       setNewMaintenance((prev) => ({
                         ...prev,
-                        estimatedCost: e.target.value,
+                        estimatedCost: formatKeystrokeToCurrency(e.target.value),
                       }))
                     }
                   />
@@ -1378,6 +1399,7 @@ export function DriverMaintenanceView() {
         <DialogContent className="max-w-lg max-h-[90dvh] p-0 flex flex-col gap-0 overflow-hidden">
           <DialogHeader className="shrink-0 p-6 pb-4">
             <DialogTitle>Detalhes da Manutencao</DialogTitle>
+            <DialogDescription className="sr-only">Descrição do modal para acessibilidade</DialogDescription>
           </DialogHeader>
           {selectedMaintenance && (
             <div className="flex-1 overflow-y-auto overscroll-contain px-6">

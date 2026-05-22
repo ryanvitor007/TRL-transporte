@@ -11,6 +11,7 @@ import {
   X,
   ChevronLeft,
   Route,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMobile } from "@/hooks/use-mobile";
@@ -25,6 +26,7 @@ const driverMenuItems = [
   { id: "tachograph", label: "Tacógrafo", icon: Gauge },
   { id: "incidents", label: "Incidentes e Sinistros", icon: AlertOctagon },
   { id: "maintenance", label: "Manutenção", icon: Wrench },
+  { id: "history", label: "Histórico de Viagens", icon: History },
 ];
 
 export function DriverSidebar({
@@ -92,14 +94,21 @@ export function DriverSidebar({
             key={item.id}
             onClick={() => handleViewChange(item.id)}
             className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors overflow-hidden whitespace-nowrap",
               activeView === item.id
                 ? "bg-sidebar-primary text-sidebar-primary-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             )}
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            {!isCollapsed && <span>{item.label}</span>}
+            <span
+              className={cn(
+                "transition-opacity duration-200",
+                isCollapsed ? "opacity-0" : "opacity-100"
+              )}
+            >
+              {item.label}
+            </span>
           </button>
         ))}
       </nav>

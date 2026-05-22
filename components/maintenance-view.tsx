@@ -15,14 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,  } from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
@@ -321,7 +314,8 @@ export function MaintenanceView() {
       toast.error("Campo obrigatório", "Informe o nome da oficina.");
       return;
     }
-    if (!closeFormData.cost || isNaN(Number(closeFormData.cost))) {
+    const parsedCost = parseCurrencyToNumber(closeFormData.cost);
+    if (parsedCost <= 0) {
       toast.error("Campo obrigatório", "Informe o valor real do reparo.");
       return;
     }
@@ -334,10 +328,10 @@ export function MaintenanceView() {
       const formData = new FormData();
       formData.append("status", "Concluída");
       formData.append("provider", closeFormData.provider);
-      formData.append("cost", String(Number(closeFormData.cost)));
+      formData.append("cost", String(parsedCost));
       formData.append("completed_date", closeFormData.completedDate);
       if (closeInvoiceFile) {
-        formData.append("invoice", closeInvoiceFile);
+        formData.append("file", closeInvoiceFile);
       }
       await atualizarManutencaoAPI(selectedMaintenance.id, formData);
       toast.success("Concluído", "Manutenção encerrada com sucesso!");
@@ -437,6 +431,14 @@ export function MaintenanceView() {
     [selectedVehicleId, vehicles],
   );
 
+  // --- EXTRAÇÃO DE OFICINAS ÚNICAS ---
+  const uniqueProviders = useMemo(() => {
+    const providers = maintenances
+      .map((m) => m.provider?.trim())
+      .filter((p): p is string => Boolean(p));
+    return Array.from(new Set(providers)).sort();
+  }, [maintenances]);
+
   // --- LÓGICA DE FILTRAGEM ---
   const filteredMaintenances = useMemo(() => {
     return maintenances.filter((item) => {
@@ -469,8 +471,8 @@ export function MaintenanceView() {
       }
 
       const itemCost = Number(item.cost);
-      if (filters.minCost && itemCost < Number(filters.minCost)) return false;
-      if (filters.maxCost && itemCost > Number(filters.maxCost)) return false;
+      if (filters.minCost && itemCost < parseCurrencyToNumber(filters.minCost)) return false;
+      if (filters.maxCost && itemCost > parseCurrencyToNumber(filters.maxCost)) return false;
 
       return true;
     });
@@ -530,7 +532,7 @@ export function MaintenanceView() {
     setEditMaintenanceData({
       status: normalizeStatus(maintenance.status),
       provider: maintenance.provider || "",
-      cost: maintenance.cost ? String(maintenance.cost) : "",
+      cost: maintenance.cost ? formatNumberToCurrency(maintenance.cost) : "",
     });
     setEditInvoiceFile(null);
     setIsEditModalOpen(true);
@@ -547,8 +549,8 @@ export function MaintenanceView() {
         formData.append("provider", editMaintenanceData.provider);
       }
       if (editMaintenanceData.cost) {
-        const parsedCost = Number(editMaintenanceData.cost);
-        if (!Number.isNaN(parsedCost)) {
+        const parsedCost = parseCurrencyToNumber(editMaintenanceData.cost);
+        if (parsedCost > 0) {
           formData.append("cost", String(parsedCost));
         }
       }
@@ -562,7 +564,7 @@ export function MaintenanceView() {
       }
 
       if (editInvoiceFile) {
-        formData.append("invoice", editInvoiceFile);
+        formData.append("file", editInvoiceFile);
       }
 
       await atualizarManutencaoAPI(editingMaintenance.id, formData);
@@ -643,19 +645,36 @@ export function MaintenanceView() {
   };
 
   // --- FORMATADORES DE INPUT (MÁSCARAS) ---
-
-  // Formata Moeda (R$ 1.000,00)
-  const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, ""); // Remove tudo que não é dígito
-    if (value === "") {
-      setNewMaintenance((prev) => ({ ...prev, cost: "" }));
-      return;
-    }
-    const amount = Number(value) / 100;
-    const formatted = amount.toLocaleString("pt-BR", {
+  const formatKeystrokeToCurrency = (value: string): string => {
+    const cleanValue = value.replace(/\D/g, ""); // Remove tudo que não é dígito
+    if (cleanValue === "") return "";
+    const amount = Number(cleanValue) / 100;
+    return amount.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
     });
+  };
+
+  const formatNumberToCurrency = (val: number | string | null | undefined): string => {
+    if (val === null || val === undefined || val === "") return "";
+    const num = Number(val);
+    if (isNaN(num)) return "";
+    return num.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  };
+
+  const parseCurrencyToNumber = (val: string): number => {
+    if (!val) return 0;
+    const clean = val.replace(/[^\d,]/g, "").replace(",", ".");
+    const num = Number(clean);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Formata Moeda (R$ 1.000,00)
+  const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatKeystrokeToCurrency(e.target.value);
     setNewMaintenance((prev) => ({ ...prev, cost: formatted }));
   };
 
@@ -722,9 +741,7 @@ export function MaintenanceView() {
 
       // CONVERSÃO: Limpa a formatação para enviar números puros para a API
       // Remove R$, pontos e converte vírgula em ponto para float
-      const rawCost = newMaintenance.cost
-        ? Number(newMaintenance.cost.replace(/[^\d,]/g, "").replace(",", "."))
-        : 0;
+      const rawCost = parseCurrencyToNumber(newMaintenance.cost);
 
       const rawKm = newMaintenance.kmAtMaintenance
         ? Number(
@@ -962,25 +979,25 @@ export function MaintenanceView() {
                     <div className="flex gap-2">
                       <Input
                         placeholder="Mín"
-                        type="number"
+                        type="text"
                         className="h-8"
                         value={filters.minCost}
                         onChange={(e) =>
                           setFilters((prev) => ({
                             ...prev,
-                            minCost: e.target.value,
+                            minCost: formatKeystrokeToCurrency(e.target.value),
                           }))
                         }
                       />
                       <Input
                         placeholder="Máx"
-                        type="number"
+                        type="text"
                         className="h-8"
                         value={filters.maxCost}
                         onChange={(e) =>
                           setFilters((prev) => ({
                             ...prev,
-                            maxCost: e.target.value,
+                            maxCost: formatKeystrokeToCurrency(e.target.value),
                           }))
                         }
                       />
@@ -1708,17 +1725,15 @@ export function MaintenanceView() {
               <div className="space-y-2">
                 <Label>Valor Total (R$)</Label>
                 <Input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
+                  type="text"
                   value={editMaintenanceData.cost}
                   onChange={(e) =>
                     setEditMaintenanceData((prev) => ({
                       ...prev,
-                      cost: e.target.value,
+                      cost: formatKeystrokeToCurrency(e.target.value),
                     }))
                   }
-                  placeholder="0,00"
+                  placeholder="R$ 0,00"
                 />
               </div>
             </div>
@@ -1822,6 +1837,10 @@ export function MaintenanceView() {
         }}
       >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Título do Modal</DialogTitle>
+            <DialogDescription>Descrição do modal para acessibilidade</DialogDescription>
+          </DialogHeader>
           {selectedMaintenance && (
             <div className="space-y-6 py-2">
               {/* ===== CABEÇALHO CENTRALIZADO ===== */}
@@ -1997,11 +2016,17 @@ export function MaintenanceView() {
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold">Nome da Oficina *</Label>
                       <Input
+                        list="unique-providers-list"
                         placeholder="Ex: Auto Mecânica Central"
                         value={closeFormData.provider}
                         onChange={(e) => setCloseFormData((prev) => ({ ...prev, provider: e.target.value }))}
                         className="bg-white"
                       />
+                      <datalist id="unique-providers-list">
+                        {uniqueProviders.map((provider, idx) => (
+                          <option key={`provider-${idx}`} value={provider} />
+                        ))}
+                      </datalist>
                     </div>
 
                     {/* Data de Conclusão */}
@@ -2021,13 +2046,10 @@ export function MaintenanceView() {
                       <div className="relative">
                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                          type="number"
-                          inputMode="decimal"
-                          step="0.01"
-                          min="0"
-                          placeholder="0,00"
+                          type="text"
+                          placeholder="R$ 0,00"
                           value={closeFormData.cost}
-                          onChange={(e) => setCloseFormData((prev) => ({ ...prev, cost: e.target.value }))}
+                          onChange={(e) => setCloseFormData((prev) => ({ ...prev, cost: formatKeystrokeToCurrency(e.target.value) }))}
                           className="pl-9 bg-white"
                         />
                       </div>

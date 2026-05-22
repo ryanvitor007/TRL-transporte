@@ -21,14 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,  } from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
@@ -1012,6 +1005,7 @@ export function DriverIncidentsView() {
         <DialogContent className="max-w-lg max-h-[90dvh] p-0 flex flex-col gap-0 overflow-hidden">
           <DialogHeader className="shrink-0 p-6 pb-4">
             <DialogTitle>Detalhes do Incidente</DialogTitle>
+            <DialogDescription className="sr-only">Descrição do modal para acessibilidade</DialogDescription>
           </DialogHeader>
           {selectedIncident && (
             <div className="flex-1 overflow-y-auto overscroll-contain px-6">

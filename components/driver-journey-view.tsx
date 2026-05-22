@@ -420,6 +420,21 @@ export function DriverJourneyView() {
     }
   }, [journey.status, loadVehicles]);
 
+  // Auto-preenchimento do KM Inicial com base no veículo selecionado
+  useEffect(() => {
+    if (journey.status === "ready_to_start" && journey.selectedVehicle && !startKm) {
+      const matchedVehicle = vehicles.find(
+        (v) =>
+          String(v.id) === String(journey.selectedVehicle?.id) ||
+          v.placa === journey.selectedVehicle?.plate
+      );
+      const kmInicial = matchedVehicle?.km_atual || journey.selectedVehicle?.km_atual;
+      if (kmInicial) {
+        setStartKm(String(kmInicial));
+      }
+    }
+  }, [journey.status, journey.selectedVehicle, vehicles, startKm]);
+
   // --- SIMULATE GPS ---
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -2382,12 +2397,25 @@ export function DriverJourneyView() {
                 onChange={(e) => setEndKm(e.target.value)}
                 className="h-14 text-lg"
               />
-              {endKm && Number(endKm) > Number(journey.startKm) && (
-                <p className="text-sm text-green-600 flex items-center gap-1">
-                  <Route className="h-4 w-4" />
-                  Distancia percorrida: {calculateDistance()} km
-                </p>
-              )}
+              
+              {/* Feedback Visual de Quilometragem */}
+              <div className="text-sm mt-1">
+                {!endKm && journey.startKm && (
+                  <p className="text-muted-foreground flex items-center gap-1">
+                    Último KM registrado: {Number(journey.startKm).toLocaleString("pt-BR")}
+                  </p>
+                )}
+                {endKm && Number(endKm) > Number(journey.startKm) && (
+                  <p className="text-green-600 flex items-center gap-1 font-medium">
+                    <span>🛣️</span> Distância percorrida: {calculateDistance()} km
+                  </p>
+                )}
+                {endKm && Number(endKm) < Number(journey.startKm) && (
+                  <p className="text-red-500 flex items-center gap-1 font-medium">
+                    O KM final não pode ser menor que o KM inicial.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Observations */}

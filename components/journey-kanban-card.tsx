@@ -186,7 +186,12 @@ export function JourneyKanbanCard({
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all duration-200 hover:shadow-md active:scale-[0.98]",
+        // Base
+        "group relative cursor-pointer w-full min-w-[280px]",
+        // Transition & hover lift
+        "transition-all duration-300 ease-in-out",
+        "hover:scale-[1.03] hover:z-10 hover:shadow-xl",
+        // Status colors
         getCardClasses(),
       )}
       onClick={() => onOpenDetails?.(journey)}
