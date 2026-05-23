@@ -245,7 +245,7 @@ export function SettingsView() {
       role: driver.role || "Motorista",
     });
     setEditingDriverId(driver.id);
-    setIsDriverDialogOpen(true); // Use the declared variable here
+    setIsFormDialogOpen(true);
   };
 
   const handleDeleteClick = (driverId: string | number) => {
