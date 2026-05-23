@@ -87,14 +87,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data.token || data.accessToken || data.access_token || data.jwt;
 
       // Mapeia a resposta do banco para o formato de usuário do front-end
+      const userObj = data.user || data;
       const userData: User = {
-        id: data.id,
-        name: data.name,
-        email: data.email,
+        id: userObj.id,
+        name: userObj.name,
+        email: userObj.email || email, // A API não retorna e-mail no JWT/user para LGPD, então usamos o que foi digitado
         // Garante que o role seja 'admin' ou 'motorista' (lowercase)
-        role: (data.role || "motorista").toLowerCase() as UserRole,
-        cpf: data.cpf,
-        cnh: data.cnh,
+        role: (userObj.role || "motorista").toLowerCase() as UserRole,
+        cpf: userObj.cpf,
+        cnh: userObj.cnh,
       };
 
       setUser(userData);

@@ -1504,15 +1504,29 @@ export function ReportsView() {
                         Assinaturas Digitais Autorizadas:
                       </p>
                       <div className="flex gap-8">
-                        <div className="text-center">
-                          <div className="w-28 border-b-2 border-slate-400 mb-2 h-8" />
+                        <div className="text-center flex flex-col items-center">
+                          <div className="w-40 border-b-2 border-slate-400 mb-2 h-16 relative flex items-end justify-center">
+                            <img 
+                              src="/assinatura_luiz.png" 
+                              alt="Assinatura Luiz Henrique" 
+                              className="absolute -bottom-2 w-24 h-12 object-contain"
+                              style={{ mixBlendMode: "multiply" }}
+                            />
+                          </div>
                           <p className="font-bold text-slate-800">
                             Luiz Henrique
                           </p>
                           <p className="text-slate-500">Diretor Operacional</p>
                         </div>
-                        <div className="text-center">
-                          <div className="w-28 border-b-2 border-slate-400 mb-2 h-8" />
+                        <div className="text-center flex flex-col items-center">
+                          <div className="w-40 border-b-2 border-slate-400 mb-2 h-16 relative flex items-end justify-center">
+                            <img
+                              src="/assinatura_franciele.png"
+                              alt="Assinatura Franciele Silva"
+                              className="absolute -bottom-2 w-36 h-auto object-contain"
+                              style={{ mixBlendMode: "multiply" }}
+                            />
+                          </div>
                           <p className="font-bold text-slate-800">
                             Franciele Silva
                           </p>

@@ -15,6 +15,18 @@ const buildHeaders = (headers?: HeadersInit) => {
   };
 };
 
+async function customFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, init);
+  if (response.status === 401) {
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      localStorage.removeItem("trl_auth_token");
+      localStorage.removeItem("trl_user");
+      window.location.href = "/login";
+    }
+  }
+  return response;
+}
+
 // --- INTERFACES DE TIPAGEM ---
 
 export interface VeiculoDetran {
@@ -84,7 +96,7 @@ export async function consultarDetranAPI(
   renavam: string,
 ): Promise<VeiculoDetran> {
   try {
-    const response = await fetch(
+    const response = await customFetch(
       `${API_BASE_URL}/detran/consultar?placa=${placa}&renavam=${renavam}`,
       {
         method: "GET",
@@ -100,7 +112,7 @@ export async function consultarDetranAPI(
 
 export async function consultarVeiculoAPI(placa: string) {
   try {
-    const response = await fetch(
+    const response = await customFetch(
       `${API_BASE_URL}/vehicles/consultar?placa=${placa}`,
       {
         method: "GET",
@@ -118,7 +130,7 @@ export async function consultarVeiculoAPI(placa: string) {
 
 export async function buscarFrotaAPI() {
   try {
-    const response = await fetch(`${API_BASE_URL}/vehicles`, {
+    const response = await customFetch(`${API_BASE_URL}/vehicles`, {
       cache: "no-store",
     });
     return handleResponse(response);
@@ -129,7 +141,7 @@ export async function buscarFrotaAPI() {
 }
 
 export async function salvarVeiculoAPI(dadosVeiculo: any) {
-  const response = await fetch(`${API_BASE_URL}/vehicles`, {
+  const response = await customFetch(`${API_BASE_URL}/vehicles`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dadosVeiculo),
@@ -138,7 +150,7 @@ export async function salvarVeiculoAPI(dadosVeiculo: any) {
 }
 
 export async function excluirVeiculoAPI(id: number | string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/vehicles/${id}`, {
+  const response = await customFetch(`${API_BASE_URL}/vehicles/${id}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
   });
@@ -149,7 +161,7 @@ export async function excluirVeiculoAPI(id: number | string): Promise<void> {
 
 export async function buscarManutencoesAPI() {
   try {
-    const response = await fetch(`${API_BASE_URL}/maintenances`, {
+    const response = await customFetch(`${API_BASE_URL}/maintenances`, {
       cache: "no-store",
     });
     return handleResponse(response);
@@ -160,7 +172,7 @@ export async function buscarManutencoesAPI() {
 }
 
 export async function salvarManutencaoAPI(dados: any) {
-  const response = await fetch(`${API_BASE_URL}/maintenances`, {
+  const response = await customFetch(`${API_BASE_URL}/maintenances`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dados),
@@ -169,7 +181,7 @@ export async function salvarManutencaoAPI(dados: any) {
 }
 
 export async function concluirManutencaoAPI(id: number) {
-  const response = await fetch(`${API_BASE_URL}/maintenances/${id}/complete`, {
+  const response = await customFetch(`${API_BASE_URL}/maintenances/${id}/complete`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
   });
@@ -188,7 +200,7 @@ export async function atualizarManutencaoAPI(
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
   };
 
-  const response = await fetch(`${API_BASE_URL}/maintenances/${id}`, {
+  const response = await customFetch(`${API_BASE_URL}/maintenances/${id}`, {
     method: "PATCH",
     headers,
     body: isFormData ? data : JSON.stringify(data),
@@ -273,7 +285,7 @@ export async function buscarDadosRelatorioAPI(filtros: ReportFilter) {
     vehiclePlate: filtros.vehiclePlate,
   }).toString();
 
-  const response = await fetch(`${API_BASE_URL}/reports/data?${query}`, {
+  const response = await customFetch(`${API_BASE_URL}/reports/data?${query}`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
   });
@@ -285,7 +297,7 @@ export async function buscarDadosRelatorioAPI(filtros: ReportFilter) {
 }
 
 export async function salvarRelatorioGeradoAPI(formData: FormData) {
-  const response = await fetch(`${API_BASE_URL}/reports/upload`, {
+  const response = await customFetch(`${API_BASE_URL}/reports/upload`, {
     method: "POST",
     body: formData, // Envia arquivo + metadados
   });
@@ -297,7 +309,7 @@ export async function salvarRelatorioGeradoAPI(formData: FormData) {
 // FUNÇÃO: Salvar Histórico (Metadata)
 export async function salvarRelatorioHistoricoAPI(dadosRelatorio: any) {
   try {
-    const response = await fetch(`${API_BASE_URL}/reports`, {
+    const response = await customFetch(`${API_BASE_URL}/reports`, {
       // Endpoint POST para salvar no banco
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -313,7 +325,7 @@ export async function salvarRelatorioHistoricoAPI(dadosRelatorio: any) {
 // Adicione esta função para buscar a lista de relatórios do banco
 export async function buscarHistoricoRelatoriosAPI() {
   try {
-    const response = await fetch(`${API_BASE_URL}/reports`, {
+    const response = await customFetch(`${API_BASE_URL}/reports`, {
       method: "GET",
       cache: "no-store",
     });
@@ -359,7 +371,7 @@ export async function buscarHistoricoRelatoriosAPI() {
 
 export async function buscarMultasAPI() {
   try {
-    const response = await fetch(`${API_BASE_URL}/fines`, {
+    const response = await customFetch(`${API_BASE_URL}/fines`, {
       cache: "no-store",
     });
     return handleResponse(response);
@@ -370,7 +382,7 @@ export async function buscarMultasAPI() {
 }
 
 export async function salvarMultaAPI(multa: any) {
-  const response = await fetch(`${API_BASE_URL}/fines`, {
+  const response = await customFetch(`${API_BASE_URL}/fines`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(multa),
@@ -379,7 +391,7 @@ export async function salvarMultaAPI(multa: any) {
 }
 
 export async function atualizarStatusMultaAPI(id: number, status: string) {
-  const response = await fetch(`${API_BASE_URL}/fines/${id}/status`, {
+  const response = await customFetch(`${API_BASE_URL}/fines/${id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
@@ -391,7 +403,7 @@ export async function atualizarStatusMultaAPI(id: number, status: string) {
 
 export async function buscarDocumentosAPI() {
   try {
-    const response = await fetch(`${API_BASE_URL}/documents`, {
+    const response = await customFetch(`${API_BASE_URL}/documents`, {
       cache: "no-store",
     });
     return handleResponse(response);
@@ -405,7 +417,7 @@ export async function buscarDocumentosAPI() {
 
 export async function buscarIncidentesAPI() {
   try {
-    const response = await fetch(`${API_BASE_URL}/incidents`, {
+    const response = await customFetch(`${API_BASE_URL}/incidents`, {
       cache: "no-store",
     });
     if (!response.ok) return [];
@@ -441,7 +453,7 @@ export async function criarIncidenteAPI(dados: any, fotos: File[]) {
   });
 
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/incidents`, {
+  const response = await customFetch(`${API_BASE_URL}/incidents`, {
     method: "POST",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -459,7 +471,7 @@ export async function criarIncidenteAPI(dados: any, fotos: File[]) {
 // Nota: Agora recebe FormData para upload de fotos
 export async function salvarIncidenteAPI(formData: FormData) {
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/incidents`, {
+  const response = await customFetch(`${API_BASE_URL}/incidents`, {
     method: "POST",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -477,7 +489,7 @@ export async function salvarIncidenteAPI(formData: FormData) {
 
 // Adicione esta função logo abaixo de salvarIncidenteAPI
 export async function atualizarStatusIncidenteAPI(id: number, status: string) {
-  const response = await fetch(`${API_BASE_URL}/incidents/${id}/status`, {
+  const response = await customFetch(`${API_BASE_URL}/incidents/${id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
@@ -491,7 +503,7 @@ export async function atualizarStatusIncidenteAPI(id: number, status: string) {
 export async function concluirIncidenteAPI(id: number, formData: FormData) {
   // O FormData aqui deve conter o arquivo 'invoice' (opcional)
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/incidents/${id}/conclude`, {
+  const response = await customFetch(`${API_BASE_URL}/incidents/${id}/conclude`, {
     method: "PATCH",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -507,7 +519,7 @@ export async function concluirIncidenteAPI(id: number, formData: FormData) {
 
 // Converte um incidente/sinistro em manutenção (legado)
 export async function transformarIncidenteEmManutencao(id: number) {
-  const response = await fetch(
+  const response = await customFetch(
     `${API_BASE_URL}/incidents/${id}/create-maintenance`,
     {
       method: "POST",
@@ -525,7 +537,7 @@ export async function transformarIncidenteEmManutencao(id: number) {
 // O backend cria a manutenção e atualiza o status do incidente para 'Em Manutenção' atomicamente.
 export async function enviarIncidenteParaManutencaoAPI(id: number) {
   const token = getAuthToken();
-  const response = await fetch(
+  const response = await customFetch(
     `${API_BASE_URL}/incidents/${id}/create-maintenance`,
     {
       method: "POST",
@@ -609,7 +621,7 @@ export async function cadastrarFuncionarioAPI(driverForm: any) {
     role: "Motorista", // Define padrão como Motorista pelo formulário
   };
 
-  const response = await fetch(`${API_BASE_URL}/employees`, {
+  const response = await customFetch(`${API_BASE_URL}/employees`, {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify(payload),
@@ -623,7 +635,7 @@ export async function cadastrarFuncionarioAPI(driverForm: any) {
 }
 
 export async function loginAPI(credentials: any) {
-  const response = await fetch(`${API_BASE_URL}/employees/login`, {
+  const response = await customFetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(credentials),
@@ -662,7 +674,7 @@ export async function atualizarFuncionarioAPI(id: string | number, dados: any) {
     Object.assign(payload, { password: dados.password });
   }
 
-  const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
+  const response = await customFetch(`${API_BASE_URL}/employees/${id}`, {
     method: "PATCH",
     headers: buildHeaders(),
     body: JSON.stringify(payload),
@@ -680,7 +692,7 @@ export async function atualizarFuncionarioAPI(id: string | number, dados: any) {
 }
 
 export async function excluirFuncionarioAPI(id: string | number) {
-  const response = await fetch(`${API_BASE_URL}/employees/${id}`, {
+  const response = await customFetch(`${API_BASE_URL}/employees/${id}`, {
     method: "DELETE",
     headers: buildHeaders(),
   });
@@ -693,7 +705,7 @@ export async function excluirFuncionarioAPI(id: string | number) {
 }
 
 export async function listarFuncionariosAPI() {
-  const response = await fetch(`${API_BASE_URL}/employees`, {
+  const response = await customFetch(`${API_BASE_URL}/employees`, {
     method: "GET",
     headers: buildHeaders(),
   });
@@ -714,7 +726,7 @@ export async function iniciarJornadaAPI(dados: {
   startOdometer: number;
   checklist: any;
 }) {
-  const response = await fetch(`${API_BASE_URL}/journeys`, {
+  const response = await customFetch(`${API_BASE_URL}/journeys`, {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify(dados),
@@ -724,7 +736,7 @@ export async function iniciarJornadaAPI(dados: {
 
 export async function buscarJornadaAtivaAPI(motoristaId: number | string) {
   try {
-    const response = await fetch(
+    const response = await customFetch(
       `${API_BASE_URL}/journeys/active/${motoristaId}`,
       {
         cache: "no-store",
@@ -749,7 +761,7 @@ export async function registrarEventoJornadaAPI(dados: {
   location?: string;
 }) {
   // types: 'start_rest', 'end_rest', 'start_meal', 'end_meal', etc.
-  const response = await fetch(`${API_BASE_URL}/journeys/events`, {
+  const response = await customFetch(`${API_BASE_URL}/journeys/events`, {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify(dados),
@@ -765,7 +777,7 @@ export async function finalizarJornadaAPI(
     checklist: any;
   },
 ) {
-  const response = await fetch(`${API_BASE_URL}/journeys/${journeyId}/finish`, {
+  const response = await customFetch(`${API_BASE_URL}/journeys/${journeyId}/finish`, {
     method: "PATCH",
     headers: buildHeaders(),
     body: JSON.stringify(dados),
@@ -914,7 +926,7 @@ export async function buscarJornadasMonitoramentoAPI(): Promise<
   JornadaMonitoramento[]
 > {
   try {
-    const response = await fetch(`${API_BASE_URL}/journeys/monitoring`, {
+    const response = await customFetch(`${API_BASE_URL}/journeys/monitoring`, {
       method: "GET",
       headers: buildHeaders(),
       cache: "no-store",
@@ -936,7 +948,7 @@ export async function buscarHistoricoJornadasDiaAPI(): Promise<
 > {
   try {
     const today = new Date().toISOString().split("T")[0];
-    const response = await fetch(
+    const response = await customFetch(
       `${API_BASE_URL}/journeys/history?date=${today}`,
       {
         method: "GET",
@@ -960,7 +972,7 @@ export async function autorizarJornadaComRiscoAPI(
   journeyId: number,
   adminNotes?: string,
 ) {
-  const response = await fetch(
+  const response = await customFetch(
     `${API_BASE_URL}/journeys/${journeyId}/authorize`,
     {
       method: "PATCH",
@@ -977,7 +989,7 @@ export async function autorizarJornadaComRiscoAPI(
 
 // Bloquear jornada e solicitar manutencao
 export async function bloquearJornadaAPI(journeyId: number, reason: string) {
-  const response = await fetch(`${API_BASE_URL}/journeys/${journeyId}/block`, {
+  const response = await customFetch(`${API_BASE_URL}/journeys/${journeyId}/block`, {
     method: "PATCH",
     headers: buildHeaders(),
     body: JSON.stringify({
@@ -994,7 +1006,7 @@ export async function buscarStatusJornadaAPI(
   journeyId: number,
 ): Promise<string | null> {
   try {
-    const response = await fetch(
+    const response = await customFetch(
       `${API_BASE_URL}/journeys/${journeyId}/status`,
       {
         method: "GET",
@@ -1017,7 +1029,7 @@ export async function buscarStatusJornadaAPI(
 
 // Cria um incidente/sinistro vinculado a uma jornada ativa
 export async function criarIncidenteJornadaAPI(formData: FormData) {
-  const response = await fetch(`${API_BASE_URL}/incidents`, {
+  const response = await customFetch(`${API_BASE_URL}/incidents`, {
     method: "POST",
     body: formData, // FormData com journeyId, photos, description, location, etc.
   });
