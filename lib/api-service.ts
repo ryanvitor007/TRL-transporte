@@ -1025,6 +1025,20 @@ export async function buscarStatusJornadaAPI(
   }
 }
 
+// Cancelar jornada pelo motorista durante espera de aprovação
+export async function cancelarJornadaMotoristaAPI(
+  journeyId: number,
+): Promise<any> {
+  const response = await customFetch(
+    `${API_BASE_URL}/journeys/${journeyId}/cancel-by-driver`,
+    {
+      method: "PATCH",
+      headers: buildHeaders(),
+    },
+  );
+  return handleResponse(response);
+}
+
 // --- MÓDULO: INCIDENTES DE JORNADA (MOTORISTA) ---
 
 // Cria um incidente/sinistro vinculado a uma jornada ativa

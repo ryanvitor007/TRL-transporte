@@ -9,7 +9,7 @@ import {
   type JourneyStatus,
   type VehicleData,
 } from "@/contexts/journey-context";
-import { buscarFrotaAPI, salvarManutencaoAPI, criarIncidenteJornadaAPI } from "@/lib/api-service";
+import { buscarFrotaAPI, salvarManutencaoAPI, criarIncidenteJornadaAPI, atualizarManutencaoAPI, cancelarJornadaMotoristaAPI } from "@/lib/api-service";
 import { useToastNotification } from "@/contexts/notification-context";
 import {
   Card,
@@ -94,6 +94,7 @@ interface InspectionItem {
   icon: React.ReactNode;
   checked: boolean | null;
   problem?: string;
+  photos?: File[];
 }
 
 interface APIVehicle {
@@ -335,6 +336,27 @@ export function DriverJourneyView() {
     null,
   );
 
+  // --- CHECKLIST PHOTOS STATE ---
+  const [activePhotos, setActivePhotos] = useState<File[]>([]);
+  const [activePhotoPreviews, setActivePhotoPreviews] = useState<string[]>([]);
+
+  useEffect(() => {
+    const urls = activePhotos.map((file) => URL.createObjectURL(file));
+    setActivePhotoPreviews(urls);
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [activePhotos]);
+
+  useEffect(() => {
+    if (currentProblemItem) {
+      const item = inspectionItems.find((i) => i.id === currentProblemItem);
+      setActivePhotos(item?.photos || []);
+    } else {
+      setActivePhotos([]);
+    }
+  }, [currentProblemItem]);
+
   // --- CHECK-IN STATE ---
   const [startKm, setStartKm] = useState("");
   const [currentLocation, setCurrentLocation] = useState("Detectando...");
@@ -360,6 +382,7 @@ export function DriverJourneyView() {
   const [incidentPhotos, setIncidentPhotos] = useState<File[]>([]);
   const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
   
   // --- CURRENT STEP FOR UI ---
   const getCurrentStep = () => {
@@ -543,7 +566,7 @@ export function DriverJourneyView() {
       setInspectionItems((prev) =>
         prev.map((item) =>
           item.id === currentProblemItem
-            ? { ...item, checked: false, problem }
+            ? { ...item, checked: false, problem, photos: activePhotos }
             : item,
         ),
       );
@@ -621,12 +644,39 @@ export function DriverJourneyView() {
     await endJourney(endKm, observations);
   };
 
-  const handleCancelJourney = () => {
-    setInspectionItems((prev) =>
-      prev.map((item) => ({ ...item, checked: null, problem: undefined })),
-    );
-    setStartKm("");
-    cancelJourney();
+  const handleCancelJourney = async () => {
+    if (!journey.journeyId) {
+      setInspectionItems((prev) =>
+        prev.map((item) => ({ ...item, checked: null, problem: undefined })),
+      );
+      setStartKm("");
+      cancelJourney();
+      return;
+    }
+
+    setIsCanceling(true);
+    try {
+      await cancelarJornadaMotoristaAPI(journey.journeyId);
+
+      toast.success(
+        "Viagem cancelada!",
+        "Viagem cancelada com sucesso. A administração foi notificada."
+      );
+
+      setInspectionItems((prev) =>
+        prev.map((item) => ({ ...item, checked: null, problem: undefined })),
+      );
+      setStartKm("");
+      cancelJourney();
+    } catch (error) {
+      console.error("Erro ao cancelar jornada:", error);
+      toast.error(
+        "Erro ao cancelar",
+        "Não foi possível cancelar a viagem. Tente novamente em instantes."
+      );
+    } finally {
+      setIsCanceling(false);
+    }
   };
 
   // TAREFA 2: Handler para reportar manutencao via API
@@ -642,6 +692,14 @@ export function DriverJourneyView() {
         .map(
           (item) => `${item.label}${item.problem ? ` (${item.problem})` : ""}`,
         );
+
+      // Coleta todas as fotos dos itens reprovados
+      const allPhotos: File[] = [];
+      inspectionItems.forEach((item) => {
+        if (item.checked === false && item.photos && item.photos.length > 0) {
+          allPhotos.push(...item.photos);
+        }
+      });
 
       // Monta o objeto de checklist para o banco
       const checklistItems = inspectionItems.reduce<Record<string, boolean>>(
@@ -669,6 +727,39 @@ export function DriverJourneyView() {
         return;
       }
 
+      // 1. Se houver fotos, cria primeiro o incidente
+      let incidentId: number | null = null;
+      if (allPhotos.length > 0) {
+        const incidentFormData = new FormData();
+        incidentFormData.append("type", "Vistoria Inicial");
+        incidentFormData.append("date", new Date().toISOString().split("T")[0]);
+        incidentFormData.append("time", new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+        incidentFormData.append("vehiclePlate", selectedVehicle.plate);
+        incidentFormData.append("vehicleModel", selectedVehicle.model);
+        incidentFormData.append("driverName", user?.name || "Motorista");
+        incidentFormData.append("location", journey.lastLocation || currentLocation || "Vistoria");
+        incidentFormData.append("description", `Inconsistências detectadas no checklist inicial da viagem: ${itensReprovados.join(", ")}`);
+        incidentFormData.append("estimatedCost", "0");
+        incidentFormData.append("insuranceClaim", "false");
+        if (journey.id) {
+          incidentFormData.append("journeyId", String(journey.id));
+        }
+
+        allPhotos.forEach((photo) => {
+          incidentFormData.append("photos", photo);
+        });
+
+        try {
+          const incidentResult = await criarIncidenteJornadaAPI(incidentFormData);
+          if (incidentResult && incidentResult.id) {
+            incidentId = incidentResult.id;
+          }
+        } catch (err) {
+          console.error("Erro ao registrar fotos do incidente:", err);
+          // Continua o fluxo para não travar a criação da manutenção
+        }
+      }
+
       const maintenancePayload = {
         vehicle_id: selectedVehicle.id,
         vehicle_plate: selectedVehicle.plate,
@@ -689,7 +780,19 @@ export function DriverJourneyView() {
         JSON.stringify(maintenancePayload, null, 2),
       );
 
-      await salvarManutencaoAPI(maintenancePayload);
+      // 2. Cria a manutenção
+      const createdMaintenance = await salvarManutencaoAPI(maintenancePayload);
+
+      // 3. Se criamos um incidente e a manutenção com sucesso, vincula os dois
+      if (incidentId && createdMaintenance && createdMaintenance.id) {
+        try {
+          await atualizarManutencaoAPI(createdMaintenance.id, {
+            incident_id: incidentId,
+          });
+        } catch (err) {
+          console.error("Erro ao vincular incidente de fotos à manutenção:", err);
+        }
+      }
 
       // Fecha o modal e reseta estados
       setShowMaintenanceDialog(false);
@@ -697,7 +800,7 @@ export function DriverJourneyView() {
 
       // Reseta a vistoria
       setInspectionItems((prev) =>
-        prev.map((item) => ({ ...item, checked: null, problem: undefined })),
+        prev.map((item) => ({ ...item, checked: null, problem: undefined, photos: undefined })),
       );
       cancelJourney();
 
@@ -948,8 +1051,13 @@ export function DriverJourneyView() {
           variant="outline"
           className="gap-2"
           onClick={handleCancelJourney}
+          disabled={isCanceling}
         >
-          <XCircle className="h-4 w-4" />
+          {isCanceling ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <XCircle className="h-4 w-4" />
+          )}
           Cancelar e Voltar
         </Button>
       </div>
@@ -990,8 +1098,13 @@ export function DriverJourneyView() {
           variant="default"
           className="gap-2"
           onClick={handleCancelJourney}
+          disabled={isCanceling}
         >
-          <Home className="h-4 w-4" />
+          {isCanceling ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Home className="h-4 w-4" />
+          )}
           Voltar ao Inicio
         </Button>
       </div>
@@ -1589,12 +1702,66 @@ export function DriverJourneyView() {
                 }
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
+            <div className="py-4 space-y-4">
               <Textarea
                 id="problem-description"
                 placeholder="Ex: Pneu dianteiro esquerdo com calibragem baixa..."
                 className="min-h-[120px]"
+                defaultValue={inspectionItems.find(i => i.id === currentProblemItem)?.problem || ""}
               />
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                  <Camera className="h-4 w-4" />
+                  Fotos do Item ({activePhotos.length}/3)
+                </Label>
+
+                <div className="flex flex-wrap gap-2 items-center">
+                  {/* Prévia das Miniaturas */}
+                  {activePhotoPreviews.map((url, idx) => (
+                    <div key={url} className="relative w-16 h-16 shrink-0 mt-2 mr-2">
+                      <img
+                        src={url}
+                        alt={`Foto do problema ${idx + 1}`}
+                        className="w-full h-full object-cover rounded-lg border bg-muted"
+                      />
+                      {/* Botão de Descarte */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActivePhotos((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-md transition-colors border border-white z-10"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Botão de Câmera Direta */}
+                  {activePhotos.length < 3 && (
+                    <label className="flex flex-col items-center justify-center w-16 h-16 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50 cursor-pointer transition-all duration-200 shrink-0">
+                      <Camera className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-[9px] text-muted-foreground mt-1 font-semibold">Câmera</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            const filesArray = Array.from(e.target.files);
+                            setActivePhotos((prev) => {
+                              const next = [...prev, ...filesArray].slice(0, 3);
+                              return next;
+                            });
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
             </div>
             <DialogFooter className="gap-2">
               <Button

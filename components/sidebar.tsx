@@ -167,7 +167,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        "sticky top-0 hidden h-screen border-r border-sidebar-border transition-all duration-300 lg:block overflow-hidden z-50",
+        "sticky top-0 hidden h-screen border-r border-sidebar-border transition-all duration-300 lg:block overflow-hidden z-50 shrink-0",
         isEffectivelyCollapsed ? "w-16" : "w-64",
       )}
     >
