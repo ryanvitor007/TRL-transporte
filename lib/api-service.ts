@@ -839,6 +839,7 @@ export interface JornadaMonitoramento {
   };
   // Incidentes/Sinistros registrados nesta jornada
   incidents?: JornadaIncidente[];
+  blockReason?: string | null;
 }
 
 // Adaptador para converter dados do banco para o frontend
@@ -918,6 +919,7 @@ function adapterJornadaMonitoramento(data: any): JornadaMonitoramento {
     rejectedItems,
     checklistRaw: checklistData || undefined,
     incidents: incidents.length > 0 ? incidents : undefined,
+    blockReason: data.block_reason || data.blockReason || null,
   };
 }
 

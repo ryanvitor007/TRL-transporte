@@ -34,6 +34,7 @@ import {
   JourneyDetailsModal,
 } from "@/components/journey-kanban-card";
 import { AdminEmergencyModal } from "@/components/admin-emergency-modal";
+import { useToastNotification } from "@/contexts/notification-context";
 import {
   buscarJornadasMonitoramentoAPI,
   buscarHistoricoJornadasDiaAPI,
@@ -118,6 +119,7 @@ function KanbanColumnSkeleton() {
 }
 
 export function MonitoringView() {
+  const toast = useToastNotification();
   // Estados
   const [journeys, setJourneys] = useState<JornadaMonitoramento[]>([]);
   const [history, setHistory] = useState<JornadaMonitoramento[]>([]);
@@ -144,21 +146,66 @@ export function MonitoringView() {
       setHistory(historyJourneys);
       setLastUpdate(new Date());
 
-      // Verifica se tem alguma jornada pendente para alerta
-      const pendingJourneys = activeJourneys.filter(
-        (j) => j.status === "pending_approval",
-      );
-      if (pendingJourneys.length > 0 && !isEmergencyOpen) {
-        // Abre o modal de emergencia para a primeira pendente
-        setEmergencyJourney(pendingJourneys[0]);
-        setIsEmergencyOpen(true);
+      // Se o modal de emergência está aberto e temos uma jornada em foco
+      if (isEmergencyOpen && emergencyJourney) {
+        // Procure ela nas jornadas ativas
+        const activeMatch = activeJourneys.find((j) => j.id === emergencyJourney.id);
+        
+        if (activeMatch) {
+          // Se ela ainda está ativa mas não está mais "pending_approval", significa que foi autorizada
+          if (activeMatch.status !== "pending_approval") {
+            setIsEmergencyOpen(false);
+            setEmergencyJourney(null);
+            toast.success(
+              "Viagem Liberada",
+              `A viagem do motorista ${emergencyJourney.driverName} foi autorizada.`
+            );
+          }
+        } else {
+          // Se não está nas jornadas ativas, ela foi cancelada ou bloqueada!
+          // Vamos procurar no histórico para saber se foi cancelada
+          const historyMatch = historyJourneys.find((j) => j.id === emergencyJourney.id);
+          
+          setIsEmergencyOpen(false);
+          setEmergencyJourney(null);
+          
+          if (historyMatch && historyMatch.status === "cancelled") {
+            const isDriverCancel = historyMatch.blockReason?.toLowerCase().includes("motorista");
+            if (isDriverCancel) {
+              toast.warning(
+                "Viagem Cancelada",
+                `O motorista ${emergencyJourney.driverName} cancelou a viagem.`
+              );
+            } else {
+              toast.error(
+                "Viagem Bloqueada",
+                `A viagem do motorista ${emergencyJourney.driverName} foi bloqueada pela central.`
+              );
+            }
+          } else {
+            // Caso padrão
+            toast.warning(
+              "Viagem Cancelada",
+              `A viagem do motorista ${emergencyJourney.driverName} foi cancelada.`
+            );
+          }
+        }
+      } else {
+        // Se o modal NÃO está aberto, podemos abrir para a primeira jornada que estiver pendente
+        const pendingJourneys = activeJourneys.filter(
+          (j) => j.status === "pending_approval",
+        );
+        if (pendingJourneys.length > 0) {
+          setEmergencyJourney(pendingJourneys[0]);
+          setIsEmergencyOpen(true);
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar dados de monitoramento:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [isEmergencyOpen]);
+  }, [isEmergencyOpen, emergencyJourney, toast]);
 
   // Polling automatico
   useEffect(() => {
