@@ -29,6 +29,7 @@ import {
   Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToastNotification } from "@/contexts/notification-context";
 import type { JornadaMonitoramento } from "@/lib/api-service";
 import {
   autorizarJornadaComRiscoAPI,
@@ -64,6 +65,7 @@ export function AdminEmergencyModal({
   // TODOS OS HOOKS DEVEM VIR PRIMEIRO
   // Nunca coloque hooks depois de um return condicional
   // ========================================
+  const toast = useToastNotification();
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
@@ -96,9 +98,19 @@ export function AdminEmergencyModal({
       setTimeout(() => {
         onActionComplete?.();
       }, 100);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao autorizar jornada:", error);
       setIsAuthorizing(false);
+      
+      // Feedback amigável para o administrador
+      toast.error('Operação Negada', error.message || 'Não foi possível autorizar a viagem.');
+      
+      // Fecha o modal e atualiza o estado imediatamente
+      onOpenChange(false);
+      resetStates();
+      setTimeout(() => {
+        onActionComplete?.();
+      }, 100);
     }
   }, [
     journey,
@@ -107,6 +119,7 @@ export function AdminEmergencyModal({
     onOpenChange,
     onActionComplete,
     resetStates,
+    toast,
   ]);
 
   const handleBlock = useCallback(async () => {
@@ -129,9 +142,19 @@ export function AdminEmergencyModal({
       setTimeout(() => {
         onActionComplete?.();
       }, 100);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao bloquear jornada:", error);
       setIsBlocking(false);
+      
+      // Feedback amigável para o administrador
+      toast.error('Operação Negada', error.message || 'Não foi possível bloquear a viagem.');
+      
+      // Fecha o modal e atualiza o estado imediatamente
+      onOpenChange(false);
+      resetStates();
+      setTimeout(() => {
+        onActionComplete?.();
+      }, 100);
     }
   }, [
     journey,
@@ -140,6 +163,7 @@ export function AdminEmergencyModal({
     onOpenChange,
     onActionComplete,
     resetStates,
+    toast,
   ]);
 
   const handleClose = useCallback(
