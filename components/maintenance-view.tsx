@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,  } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, } from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
@@ -745,8 +745,8 @@ export function MaintenanceView() {
 
       const rawKm = newMaintenance.kmAtMaintenance
         ? Number(
-            newMaintenance.kmAtMaintenance.replace(/\./g, "").replace(",", "."),
-          )
+          newMaintenance.kmAtMaintenance.replace(/\./g, "").replace(",", "."),
+        )
         : selectedVehicle?.km_atual || 0;
 
       const payload = {
@@ -832,7 +832,7 @@ export function MaintenanceView() {
                 className={cn(
                   "gap-2",
                   isAnyFilterActive &&
-                    "border-primary text-primary bg-primary/5",
+                  "border-primary text-primary bg-primary/5",
                 )}
               >
                 <Filter className="h-4 w-4" />
@@ -1248,7 +1248,7 @@ export function MaintenanceView() {
                                   <ImageIcon className="h-4 w-4" />
                                   {isPhotosOpen
                                     ? "Ocultar Fotos"
-                                    : "Ver Fotos do Sinistro"}
+                                    : "Ver Fotos"}
                                 </Button>
                               </CollapsibleTrigger>
                               <CollapsibleContent className="mt-3 overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
@@ -1740,14 +1740,14 @@ export function MaintenanceView() {
 
             {editMaintenanceData.status === "Concluída" &&
               editingMaintenance?.incident_id && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                <AlertCircle className="mt-0.5 h-4 w-4" />
-                <span>
-                  Ao concluir, o Sinistro vinculado também será baixado
-                  automaticamente.
-                </span>
-              </div>
-            )}
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  <AlertCircle className="mt-0.5 h-4 w-4" />
+                  <span>
+                    Ao concluir, o Sinistro vinculado também será baixado
+                    automaticamente.
+                  </span>
+                </div>
+              )}
 
             <div className="space-y-2">
               <Label>Nota Fiscal</Label>
@@ -2100,7 +2100,7 @@ export function MaintenanceView() {
                   {selectedMaintenance.incident_id && (
                     <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>Ao confirmar a baixa, o Sinistro vinculado (#{ selectedMaintenance.incident_id}) também será encerrado automaticamente.</span>
+                      <span>Ao confirmar a baixa, o Sinistro vinculado (#{selectedMaintenance.incident_id}) também será encerrado automaticamente.</span>
                     </div>
                   )}
                 </div>

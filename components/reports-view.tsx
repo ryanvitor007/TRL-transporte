@@ -1052,25 +1052,25 @@ export function ReportsView() {
                   includeManutencoes ||
                   includeSinistros ||
                   includeLicenciamento) && (
-                  <div className="relative z-10 mb-8 p-6 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 shrink-0">
-                        <Brain className="h-6 w-6 text-blue-700" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
-                          Análise Executiva Inteligente
-                          <Badge className="bg-blue-600 text-white text-xs">
-                            AI
-                          </Badge>
-                        </h3>
-                        <p className="text-slate-700 text-xs leading-relaxed">
-                          {generateAIAnalysis}
-                        </p>
+                    <div className="relative z-10 mb-8 p-6 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 shrink-0">
+                          <Brain className="h-6 w-6 text-blue-700" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
+                            Análise Executiva Inteligente
+                            <Badge className="bg-blue-600 text-white text-xs">
+                              AI
+                            </Badge>
+                          </h3>
+                          <p className="text-slate-700 text-xs leading-relaxed">
+                            {generateAIAnalysis}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* RESUMO FINANCEIRO */}
                 {(includeMultas || includeManutencoes || includeSinistros) && (
@@ -1506,10 +1506,10 @@ export function ReportsView() {
                       <div className="flex gap-8">
                         <div className="text-center flex flex-col items-center">
                           <div className="w-40 border-b-2 border-slate-400 mb-2 h-16 relative flex items-end justify-center">
-                            <img 
-                              src="/assinatura_luiz.png" 
-                              alt="Assinatura Luiz Henrique" 
-                              className="absolute -bottom-2 w-24 h-12 object-contain"
+                            <img
+                              src="/assinatura_luiz.png"
+                              alt="Assinatura Luiz Henrique"
+                              className="absolute -bottom-2 w-40 h-22 object-contain"
                               style={{ mixBlendMode: "multiply" }}
                             />
                           </div>
@@ -1523,7 +1523,7 @@ export function ReportsView() {
                             <img
                               src="/assinatura_franciele.png"
                               alt="Assinatura Franciele Silva"
-                              className="absolute -bottom-2 w-36 h-auto object-contain"
+                              className="absolute -bottom-16 w-[280px] h-auto object-contain max-w-none"
                               style={{ mixBlendMode: "multiply" }}
                             />
                           </div>
