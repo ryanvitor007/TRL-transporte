@@ -16,15 +16,24 @@ const buildHeaders = (headers?: HeadersInit) => {
 };
 
 async function customFetch(input: RequestInfo | URL, init?: RequestInit) {
-  const response = await fetch(input, init);
-  if (response.status === 401) {
-    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-      localStorage.removeItem("trl_auth_token");
-      localStorage.removeItem("trl_user");
-      window.location.href = "/login";
+  try {
+    const response = await fetch(input, init);
+    if (response.status === 401) {
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        localStorage.removeItem("trl_auth_token");
+        localStorage.removeItem("trl_user");
+        window.location.href = "/login";
+      }
     }
+    return response;
+  } catch (error) {
+    console.warn("customFetch: Falha na conexão de rede (servidor offline ou erro de CORS).", error);
+    return new Response(JSON.stringify({ message: "Servidor fora do ar ou erro de rede" }), {
+      status: 503,
+      statusText: "Service Unavailable",
+      headers: { "Content-Type": "application/json" },
+    });
   }
-  return response;
 }
 
 // --- INTERFACES DE TIPAGEM ---
