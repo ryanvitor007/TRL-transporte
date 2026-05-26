@@ -668,12 +668,29 @@ export function DriverJourneyView() {
       );
       setStartKm("");
       cancelJourney();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao cancelar jornada:", error);
-      toast.error(
-        "Erro ao cancelar",
-        "Não foi possível cancelar a viagem. Tente novamente em instantes."
-      );
+      
+      const isNotFound = error.message?.toLowerCase().includes("não encontrada") || 
+                         error.message?.toLowerCase().includes("not found");
+                         
+      if (isNotFound) {
+        // Se a jornada não existe no banco (ex: foi excluída ou limpa), limpamos o estado local para destravar o motorista
+        toast.warning(
+          "Jornada não encontrada no servidor",
+          "O estado local foi limpo para permitir que você inicie uma nova jornada."
+        );
+        setInspectionItems((prev) =>
+          prev.map((item) => ({ ...item, checked: null, problem: undefined })),
+        );
+        setStartKm("");
+        cancelJourney();
+      } else {
+        toast.error(
+          "Erro ao cancelar",
+          "Não foi possível cancelar a viagem. Tente novamente em instantes."
+        );
+      }
     } finally {
       setIsCanceling(false);
     }
