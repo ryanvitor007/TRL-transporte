@@ -27,6 +27,10 @@ import {
   FileWarning,
   Loader2,
   Ban,
+  Camera,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToastNotification } from "@/contexts/notification-context";
@@ -54,6 +58,173 @@ const checklistLabels: Record<
   lights: { label: "Iluminacao e Sinalizacao", severity: "medium" },
   panel: { label: "Painel de Instrumentos", severity: "medium" },
 };
+
+// =============================================================
+// SUB-COMPONENTE: Visualizador de fotos com efeito de leque
+// =============================================================
+const PLACEHOLDER_PHOTOS = [
+  "https://placehold.co/800x600/1a1a2e/e94560?text=Foto+1",
+  "https://placehold.co/800x600/16213e/0f3460?text=Foto+2",
+  "https://placehold.co/800x600/0f3460/e94560?text=Foto+3",
+];
+
+function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Usa placeholders se não vier fotos reais
+  const displayPhotos =
+    photos && photos.length > 0 ? photos : PLACEHOLDER_PHOTOS;
+
+  const visibleCount = Math.min(displayPhotos.length, 3);
+
+  const openLightbox = (index: number) => {
+    setCurrentIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const goPrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) =>
+      prev === 0 ? displayPhotos.length - 1 : prev - 1,
+    );
+  };
+
+  const goNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) =>
+      prev === displayPhotos.length - 1 ? 0 : prev + 1,
+    );
+  };
+
+  return (
+    <>
+      {/* Leque de fotos */}
+      <div
+        className="group flex items-center cursor-pointer"
+        style={{ width: `${20 + (visibleCount - 1) * 14}px` }}
+        onClick={() => openLightbox(0)}
+        title={`Ver ${displayPhotos.length} foto(s)`}
+      >
+        {displayPhotos.slice(0, 3).map((src, idx) => (
+          <div
+            key={idx}
+            className="relative shrink-0 h-8 w-8 rounded-full border-2 border-white shadow-md overflow-hidden
+              transition-all duration-300 ease-out
+              group-hover:translate-x-0"
+            style={{
+              marginLeft: idx === 0 ? 0 : -10,
+              zIndex: 3 - idx,
+              transitionDelay: `${idx * 30}ms`,
+            }}
+          >
+            <img
+              src={src}
+              alt={`Evidência ${idx + 1}`}
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  "https://placehold.co/80x80/dc2626/ffffff?text=Err";
+              }}
+            />
+          </div>
+        ))}
+        {displayPhotos.length > 3 && (
+          <div
+            className="relative shrink-0 h-8 w-8 rounded-full border-2 border-white bg-red-600 shadow-md
+              flex items-center justify-center text-white text-[10px] font-bold"
+            style={{ marginLeft: -10, zIndex: 0 }}
+          >
+            +{displayPhotos.length - 3}
+          </div>
+        )}
+        <Camera className="h-3.5 w-3.5 text-red-500 ml-1.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+      </div>
+
+      {/* Lightbox Dialog */}
+      <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+        <DialogContent className="max-w-3xl p-0 bg-black/95 border-neutral-800 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Visualizador de Fotos</DialogTitle>
+            <DialogDescription>
+              Evidências fotográficas do item reprovado no checklist
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Contador */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1">
+            <span className="text-white text-xs font-medium">
+              {currentIndex + 1} / {displayPhotos.length}
+            </span>
+          </div>
+
+          {/* Fechar */}
+          <button
+            onClick={() => setLightboxOpen(false)}
+            className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-white/20 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          {/* Imagem principal */}
+          <div className="relative flex items-center justify-center min-h-[400px] max-h-[70vh]">
+            <img
+              src={displayPhotos[currentIndex]}
+              alt={`Evidência ${currentIndex + 1}`}
+              className="max-h-[70vh] max-w-full object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  "https://placehold.co/800x600/dc2626/ffffff?text=Imagem+Indisponivel";
+              }}
+            />
+
+            {/* Navegação */}
+            {displayPhotos.length > 1 && (
+              <>
+                <button
+                  onClick={goPrev}
+                  className="absolute left-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-white/20 transition-colors"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button
+                  onClick={goNext}
+                  className="absolute right-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-white/20 transition-colors"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Thumbnails */}
+          {displayPhotos.length > 1 && (
+            <div className="flex gap-2 p-3 justify-center bg-black/80 overflow-x-auto">
+              {displayPhotos.map((src, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={cn(
+                    "shrink-0 h-14 w-14 rounded-lg overflow-hidden border-2 transition-all",
+                    currentIndex === idx
+                      ? "border-red-500 scale-105"
+                      : "border-transparent opacity-60 hover:opacity-100",
+                  )}
+                >
+                  <img
+                    src={src}
+                    alt={`Thumb ${idx + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 export function AdminEmergencyModal({
   journey,
@@ -308,17 +479,20 @@ export function AdminEmergencyModal({
                             </Badge>
                           )}
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-xs",
-                            isHighSeverity
-                              ? "border-red-400 text-red-700"
-                              : "border-amber-400 text-amber-700",
-                          )}
-                        >
-                          Reprovado
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <ChecklistPhotoViewer />
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs",
+                              isHighSeverity
+                                ? "border-red-400 text-red-700"
+                                : "border-amber-400 text-amber-700",
+                            )}
+                          >
+                            Reprovado
+                          </Badge>
+                        </div>
                       </div>
                     );
                   })
