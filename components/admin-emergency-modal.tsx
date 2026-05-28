@@ -480,7 +480,7 @@ export function AdminEmergencyModal({
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <ChecklistPhotoViewer />
+                          <ChecklistPhotoViewer photos={journey.checklistPhotos} />
                           <Badge
                             variant="outline"
                             className={cn(

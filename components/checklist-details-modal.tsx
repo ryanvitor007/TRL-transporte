@@ -213,10 +213,9 @@ interface ChecklistDetailsModalProps {
   maintenance: any | null;
 }
 
-// Helper para parsear e normalizar os dados do checklist
 function parseChecklistItems(
   checklistData: any,
-): { name: string; passed: boolean; note?: string }[] {
+): { name: string; passed: boolean; note?: string; photos?: string[] }[] {
   if (!checklistData) return [];
 
   // Se ja e um array de itens estruturados (formato antigo)
@@ -225,6 +224,7 @@ function parseChecklistItems(
       name: item.name || item.id || "Item",
       passed: item.passed ?? item.value ?? true,
       note: item.note || item.observacao,
+      photos: item.photos || item.fotos || [],
     }));
   }
 
@@ -234,6 +234,7 @@ function parseChecklistItems(
       name: key,
       passed: value === true || value === "true" || value === "ok",
       note: undefined,
+      photos: checklistData.photos?.[key] || [],
     }));
   }
 
@@ -247,6 +248,8 @@ function parseChecklistItems(
       "notes",
       "observacoes",
       "created_at",
+      "photos",
+      "fotos"
     ];
     return Object.entries(checklistData)
       .filter(([key]) => !metadataKeys.includes(key))
@@ -254,6 +257,7 @@ function parseChecklistItems(
         name: key,
         passed: value === true || value === "true" || value === "ok",
         note: undefined,
+        photos: checklistData.photos?.[key] || [],
       }));
   }
 
@@ -412,7 +416,12 @@ export function ChecklistDetailsModal({
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {failedItems.map((item, index) => (
+                    {failedItems.map((item, index) => {
+                      // Extract photos correctly
+                      const globalPhotos = rawChecklistData?.photos || maintenance.photos || maintenance.fotos || maintenance.incident?.fotos || maintenance.incident?.photos || [];
+                      const itemPhotos = item.photos && item.photos.length > 0 ? item.photos : globalPhotos;
+
+                      return (
                       <div
                         key={index}
                         className={cn(
@@ -434,10 +443,10 @@ export function ChecklistDetailsModal({
                           )}
                         </div>
                         <div className="shrink-0">
-                          <ChecklistPhotoViewer />
+                          <ChecklistPhotoViewer photos={itemPhotos} />
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
               </div>

@@ -849,6 +849,7 @@ export interface JornadaMonitoramento {
   // Incidentes/Sinistros registrados nesta jornada
   incidents?: JornadaIncidente[];
   blockReason?: string | null;
+  checklistPhotos?: string[];
 }
 
 // Adaptador para converter dados do banco para o frontend
@@ -929,6 +930,7 @@ function adapterJornadaMonitoramento(data: any): JornadaMonitoramento {
     checklistRaw: checklistData || undefined,
     incidents: incidents.length > 0 ? incidents : undefined,
     blockReason: data.block_reason || data.blockReason || null,
+    checklistPhotos: data.checklist_photos || [],
   };
 }
 
