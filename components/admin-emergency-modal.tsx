@@ -62,56 +62,60 @@ const checklistLabels: Record<
 // =============================================================
 // SUB-COMPONENTE: Visualizador de fotos com efeito de leque
 // =============================================================
-const PLACEHOLDER_PHOTOS = [
-  "https://placehold.co/800x600/1a1a2e/e94560?text=Foto+1",
-  "https://placehold.co/800x600/16213e/0f3460?text=Foto+2",
-  "https://placehold.co/800x600/0f3460/e94560?text=Foto+3",
-];
-
 function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Usa placeholders se não vier fotos reais
-  const displayPhotos =
-    photos && photos.length > 0 ? photos : PLACEHOLDER_PHOTOS;
+  // Só exibe se houver fotos reais — sem placeholders
+  const realPhotos = (photos ?? []).filter((p) => p && p.trim() !== "");
+  const hasPhotos = realPhotos.length > 0;
 
-  const visibleCount = Math.min(displayPhotos.length, 3);
+  const visibleCount = Math.min(realPhotos.length, 3);
 
-  const openLightbox = (index: number) => {
-    setCurrentIndex(index);
+  const openLightbox = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!hasPhotos) return;
+    setCurrentIndex(0);
     setLightboxOpen(true);
   };
 
   const goPrev = (e: React.MouseEvent) => {
     e.stopPropagation();
     setCurrentIndex((prev) =>
-      prev === 0 ? displayPhotos.length - 1 : prev - 1,
+      prev === 0 ? realPhotos.length - 1 : prev - 1,
     );
   };
 
   const goNext = (e: React.MouseEvent) => {
     e.stopPropagation();
     setCurrentIndex((prev) =>
-      prev === displayPhotos.length - 1 ? 0 : prev + 1,
+      prev === realPhotos.length - 1 ? 0 : prev + 1,
     );
   };
 
+  // Se não houver fotos, mostra apenas ícone de câmera discreto
+  if (!hasPhotos) {
+    return (
+      <div className="flex items-center gap-1 text-muted-foreground/50" title="Sem fotos">
+        <Camera className="h-4 w-4" />
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* Leque de fotos */}
+      {/* Leque de fotos — shrink-0 para não comprimir outros elementos */}
       <div
-        className="group flex items-center cursor-pointer"
-        style={{ width: `${20 + (visibleCount - 1) * 14}px` }}
-        onClick={() => openLightbox(0)}
-        title={`Ver ${displayPhotos.length} foto(s)`}
+        className="group flex items-center cursor-pointer shrink-0"
+        style={{ width: `${28 + (visibleCount - 1) * 14}px` }}
+        onClick={openLightbox}
+        title={`Ver ${realPhotos.length} foto(s)`}
       >
-        {displayPhotos.slice(0, 3).map((src, idx) => (
+        {realPhotos.slice(0, 3).map((src, idx) => (
           <div
             key={idx}
             className="relative shrink-0 h-8 w-8 rounded-full border-2 border-white shadow-md overflow-hidden
-              transition-all duration-300 ease-out
-              group-hover:translate-x-0"
+              transition-all duration-300 ease-out"
             style={{
               marginLeft: idx === 0 ? 0 : -10,
               zIndex: 3 - idx,
@@ -124,21 +128,21 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
               className="h-full w-full object-cover"
               onError={(e) => {
                 (e.target as HTMLImageElement).src =
-                  "https://placehold.co/80x80/dc2626/ffffff?text=Err";
+                  "https://placehold.co/80x80/dc2626/ffffff?text=!";
               }}
             />
           </div>
         ))}
-        {displayPhotos.length > 3 && (
+        {realPhotos.length > 3 && (
           <div
             className="relative shrink-0 h-8 w-8 rounded-full border-2 border-white bg-red-600 shadow-md
               flex items-center justify-center text-white text-[10px] font-bold"
             style={{ marginLeft: -10, zIndex: 0 }}
           >
-            +{displayPhotos.length - 3}
+            +{realPhotos.length - 3}
           </div>
         )}
-        <Camera className="h-3.5 w-3.5 text-red-500 ml-1.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+        <Camera className="h-3 w-3 text-red-500 ml-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
       </div>
 
       {/* Lightbox Dialog */}
@@ -154,7 +158,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
           {/* Contador */}
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1">
             <span className="text-white text-xs font-medium">
-              {currentIndex + 1} / {displayPhotos.length}
+              {currentIndex + 1} / {realPhotos.length}
             </span>
           </div>
 
@@ -169,7 +173,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
           {/* Imagem principal */}
           <div className="relative flex items-center justify-center min-h-[400px] max-h-[70vh]">
             <img
-              src={displayPhotos[currentIndex]}
+              src={realPhotos[currentIndex]}
               alt={`Evidência ${currentIndex + 1}`}
               className="max-h-[70vh] max-w-full object-contain"
               onError={(e) => {
@@ -179,7 +183,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
             />
 
             {/* Navegação */}
-            {displayPhotos.length > 1 && (
+            {realPhotos.length > 1 && (
               <>
                 <button
                   onClick={goPrev}
@@ -197,10 +201,10 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
             )}
           </div>
 
-          {/* Thumbnails */}
-          {displayPhotos.length > 1 && (
+          {/* Thumbnails — só mostra se tiver mais de 1 foto */}
+          {realPhotos.length > 1 && (
             <div className="flex gap-2 p-3 justify-center bg-black/80 overflow-x-auto">
-              {displayPhotos.map((src, idx) => (
+              {realPhotos.map((src, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentIndex(idx)}
@@ -441,12 +445,13 @@ export function AdminEmergencyModal({
                       <div
                         key={itemId}
                         className={cn(
-                          "flex items-center gap-3 rounded-lg p-3 text-sm",
+                          "flex items-center gap-2 rounded-lg p-3 text-sm",
                           isHighSeverity
                             ? "bg-red-100 border border-red-300"
                             : "bg-amber-50 border border-amber-200",
                         )}
                       >
+                        {/* Ícone */}
                         <div
                           className={cn(
                             "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
@@ -462,10 +467,11 @@ export function AdminEmergencyModal({
                             )}
                           />
                         </div>
-                        <div className="flex-1">
+                        {/* Label — cresce e trunca se necessário */}
+                        <div className="flex-1 min-w-0">
                           <span
                             className={cn(
-                              "font-semibold",
+                              "font-semibold block truncate",
                               isHighSeverity
                                 ? "text-red-800"
                                 : "text-amber-800",
@@ -474,17 +480,18 @@ export function AdminEmergencyModal({
                             {label}
                           </span>
                           {isHighSeverity && (
-                            <Badge className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0">
+                            <Badge className="mt-0.5 bg-red-500 text-white text-[10px] px-1.5 py-0">
                               CRITICO
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        {/* Fotos + badge — shrink-0 para não comprimir o label */}
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <ChecklistPhotoViewer photos={journey.checklistPhotos} />
                           <Badge
                             variant="outline"
                             className={cn(
-                              "text-xs",
+                              "text-xs whitespace-nowrap",
                               isHighSeverity
                                 ? "border-red-400 text-red-700"
                                 : "border-amber-400 text-amber-700",

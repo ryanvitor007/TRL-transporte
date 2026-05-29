@@ -97,6 +97,95 @@ interface InspectionItem {
   photos?: File[];
 }
 
+// Mini visualizador de leque para fotos locais (File[]) na tela do motorista
+function DriverPhotoFan({ photos }: { photos?: File[] }) {
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (!photos || photos.length === 0) { setPreviews([]); return; }
+    const urls = photos.map((f) => URL.createObjectURL(f));
+    setPreviews(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [photos]);
+
+  if (previews.length === 0) return null;
+
+  const visibleCount = Math.min(previews.length, 3);
+
+  return (
+    <>
+      <div
+        className="group flex items-center cursor-pointer shrink-0 mt-1"
+        style={{ width: `${28 + (visibleCount - 1) * 14}px` }}
+        onClick={(e) => { e.stopPropagation(); setCurrentIndex(0); setLightboxOpen(true); }}
+        title={`Ver ${previews.length} foto(s)`}
+      >
+        {previews.slice(0, 3).map((src, idx) => (
+          <div
+            key={idx}
+            className="relative shrink-0 h-8 w-8 rounded-full border-2 border-white shadow-md overflow-hidden"
+            style={{ marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx }}
+          >
+            <img src={src} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
+          </div>
+        ))}
+        {previews.length > 3 && (
+          <div
+            className="relative shrink-0 h-8 w-8 rounded-full border-2 border-white bg-red-600 shadow-md flex items-center justify-center text-white text-[10px] font-bold"
+            style={{ marginLeft: -10, zIndex: 0 }}
+          >
+            +{previews.length - 3}
+          </div>
+        )}
+        <Camera className="h-3 w-3 text-red-500 ml-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+      </div>
+
+      {/* Lightbox local */}
+      <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+        <DialogContent className="max-w-3xl p-0 bg-black/95 border-neutral-800 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Fotos do Problema</DialogTitle>
+            <DialogDescription>Fotos registradas pelo motorista</DialogDescription>
+          </DialogHeader>
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-black/60 rounded-full px-3 py-1">
+            <span className="text-white text-xs">{currentIndex + 1} / {previews.length}</span>
+          </div>
+          <button
+            onClick={() => setLightboxOpen(false)}
+            className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-white/20"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div className="relative flex items-center justify-center min-h-[350px] max-h-[70vh]">
+            <img src={previews[currentIndex]} alt={`Foto ${currentIndex + 1}`} className="max-h-[70vh] max-w-full object-contain" />
+            {previews.length > 1 && (
+              <>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => p === 0 ? previews.length - 1 : p - 1); }} className="absolute left-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white">
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => p === previews.length - 1 ? 0 : p + 1); }} className="absolute right-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white">
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              </>
+            )}
+          </div>
+          {previews.length > 1 && (
+            <div className="flex gap-2 p-3 justify-center bg-black/80">
+              {previews.map((src, idx) => (
+                <button key={idx} onClick={() => setCurrentIndex(idx)} className={cn("shrink-0 h-12 w-12 rounded-lg overflow-hidden border-2 transition-all", currentIndex === idx ? "border-red-500 scale-105" : "border-transparent opacity-60 hover:opacity-100")}>
+                  <img src={src} alt={`Thumb ${idx + 1}`} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 interface APIVehicle {
   id: number;
   placa: string;
@@ -1673,7 +1762,12 @@ export function DriverJourneyView() {
                     <p className="text-xs text-red-600 font-medium mb-1">
                       Problema reportado:
                     </p>
-                    <p className="text-sm text-red-700">{item.problem}</p>
+                    <div className="flex items-start gap-3">
+                      <p className="text-sm text-red-700 flex-1">{item.problem}</p>
+                      {item.photos && item.photos.length > 0 && (
+                        <DriverPhotoFan photos={item.photos} />
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

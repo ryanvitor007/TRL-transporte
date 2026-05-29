@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useState } from "react";
 import {
   Dialog,
@@ -50,50 +51,53 @@ function translateItemName(name: string): string {
 // =============================================================
 // SUB-COMPONENTE: Visualizador de fotos com efeito de leque
 // =============================================================
-const PLACEHOLDER_PHOTOS = [
-  "https://placehold.co/800x600/1a1a2e/e94560?text=Foto+1",
-  "https://placehold.co/800x600/16213e/0f3460?text=Foto+2",
-  "https://placehold.co/800x600/0f3460/e94560?text=Foto+3",
-];
-
 function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const displayPhotos =
-    photos && photos.length > 0 ? photos : PLACEHOLDER_PHOTOS;
+  // Só exibe fotos reais — sem placeholders
+  const realPhotos = (photos ?? []).filter((p) => p && p.trim() !== "");
 
-  const visibleCount = Math.min(displayPhotos.length, 3);
+  if (realPhotos.length === 0) {
+    return (
+      <div className="flex items-center gap-1 text-muted-foreground/40" title="Sem fotos">
+        <Camera className="h-4 w-4" />
+      </div>
+    );
+  }
 
-  const openLightbox = (index: number) => {
-    setCurrentIndex(index);
+  const visibleCount = Math.min(realPhotos.length, 3);
+
+  const openLightbox = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(0);
     setLightboxOpen(true);
   };
 
   const goPrev = (e: React.MouseEvent) => {
     e.stopPropagation();
     setCurrentIndex((prev) =>
-      prev === 0 ? displayPhotos.length - 1 : prev - 1,
+      prev === 0 ? realPhotos.length - 1 : prev - 1,
     );
   };
 
   const goNext = (e: React.MouseEvent) => {
     e.stopPropagation();
     setCurrentIndex((prev) =>
-      prev === displayPhotos.length - 1 ? 0 : prev + 1,
+      prev === realPhotos.length - 1 ? 0 : prev + 1,
     );
   };
 
   return (
     <>
-      {/* Leque de fotos */}
+      {/* Leque de fotos — shrink-0 para não comprimir outros elementos */}
       <div
-        className="group flex items-center cursor-pointer"
-        style={{ width: `${20 + (visibleCount - 1) * 14}px` }}
-        onClick={() => openLightbox(0)}
-        title={`Ver ${displayPhotos.length} foto(s)`}
+        className="group flex items-center cursor-pointer shrink-0"
+        style={{ width: `${28 + (visibleCount - 1) * 14}px` }}
+        onClick={openLightbox}
+        title={`Ver ${realPhotos.length} foto(s)`}
       >
-        {displayPhotos.slice(0, 3).map((src, idx) => (
+        {realPhotos.slice(0, 3).map((src, idx) => (
           <div
             key={idx}
             className="relative shrink-0 h-7 w-7 rounded-full border-2 border-background shadow-md overflow-hidden transition-all duration-300 ease-out"
@@ -109,21 +113,21 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
               className="h-full w-full object-cover"
               onError={(e) => {
                 (e.target as HTMLImageElement).src =
-                  "https://placehold.co/80x80/dc2626/ffffff?text=Err";
+                  "https://placehold.co/80x80/dc2626/ffffff?text=!";
               }}
             />
           </div>
         ))}
-        {displayPhotos.length > 3 && (
+        {realPhotos.length > 3 && (
           <div
             className="relative shrink-0 h-7 w-7 rounded-full border-2 border-background bg-red-600 shadow-md
               flex items-center justify-center text-white text-[10px] font-bold"
             style={{ marginLeft: -10, zIndex: 0 }}
           >
-            +{displayPhotos.length - 3}
+            +{realPhotos.length - 3}
           </div>
         )}
-        <Camera className="h-3 w-3 text-red-500 ml-1.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+        <Camera className="h-3 w-3 text-red-500 ml-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
       </div>
 
       {/* Lightbox Dialog */}
@@ -138,7 +142,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
 
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1">
             <span className="text-white text-xs font-medium">
-              {currentIndex + 1} / {displayPhotos.length}
+              {currentIndex + 1} / {realPhotos.length}
             </span>
           </div>
 
@@ -151,7 +155,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
 
           <div className="relative flex items-center justify-center min-h-[400px] max-h-[70vh]">
             <img
-              src={displayPhotos[currentIndex]}
+              src={realPhotos[currentIndex]}
               alt={`Evidência ${currentIndex + 1}`}
               className="max-h-[70vh] max-w-full object-contain"
               onError={(e) => {
@@ -160,7 +164,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
               }}
             />
 
-            {displayPhotos.length > 1 && (
+            {realPhotos.length > 1 && (
               <>
                 <button
                   onClick={goPrev}
@@ -178,9 +182,9 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
             )}
           </div>
 
-          {displayPhotos.length > 1 && (
+          {realPhotos.length > 1 && (
             <div className="flex gap-2 p-3 justify-center bg-black/80 overflow-x-auto">
-              {displayPhotos.map((src, idx) => (
+              {realPhotos.map((src, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentIndex(idx)}
