@@ -82,6 +82,7 @@ import {
   Loader2,
   ImageIcon,
   X,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -97,8 +98,8 @@ interface InspectionItem {
   photos?: File[];
 }
 
-// Mini visualizador de leque para fotos locais (File[]) na tela do motorista
-function DriverPhotoFan({ photos }: { photos?: File[] }) {
+// Galeria de miniaturas integrada — thumbnails visiveis em faixa horizontal com lightbox
+function DriverPhotoStrip({ photos }: { photos?: File[] }) {
   const [previews, setPreviews] = useState<string[]>([]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -112,71 +113,133 @@ function DriverPhotoFan({ photos }: { photos?: File[] }) {
 
   if (previews.length === 0) return null;
 
-  const visibleCount = Math.min(previews.length, 3);
+  const openAt = (e: React.MouseEvent, idx: number) => {
+    e.stopPropagation();
+    setCurrentIndex(idx);
+    setLightboxOpen(true);
+  };
 
   return (
     <>
-      <div
-        className="group flex items-center cursor-pointer shrink-0 mt-1"
-        style={{ width: `${28 + (visibleCount - 1) * 14}px` }}
-        onClick={(e) => { e.stopPropagation(); setCurrentIndex(0); setLightboxOpen(true); }}
-        title={`Ver ${previews.length} foto(s)`}
-      >
-        {previews.slice(0, 3).map((src, idx) => (
-          <div
-            key={idx}
-            className="relative shrink-0 h-8 w-8 rounded-full border-2 border-white shadow-md overflow-hidden"
-            style={{ marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx }}
-          >
-            <img src={src} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
-          </div>
-        ))}
-        {previews.length > 3 && (
-          <div
-            className="relative shrink-0 h-8 w-8 rounded-full border-2 border-white bg-red-600 shadow-md flex items-center justify-center text-white text-[10px] font-bold"
-            style={{ marginLeft: -10, zIndex: 0 }}
-          >
-            +{previews.length - 3}
-          </div>
-        )}
-        <Camera className="h-3 w-3 text-red-500 ml-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+      {/* Header da secao de fotos */}
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-red-700">
+          <Camera className="h-3.5 w-3.5" />
+          {previews.length === 1 ? "1 foto anexada" : `${previews.length} fotos anexadas`}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => openAt(e, 0)}
+          className="text-[10px] text-red-500 hover:text-red-700 font-medium underline underline-offset-2 transition-colors"
+        >
+          Ver todas
+        </button>
       </div>
 
-      {/* Lightbox local */}
+      {/* Faixa de miniaturas quadradas */}
+      <div className="flex gap-2 overflow-x-auto pb-0.5">
+        {previews.map((src, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={(e) => openAt(e, idx)}
+            className="relative shrink-0 h-20 w-20 rounded-xl overflow-hidden border-2 border-white shadow-sm
+              hover:border-red-400 hover:scale-105 active:scale-95
+              transition-all duration-200 ease-out focus:outline-none"
+          >
+            <img
+              src={src}
+              alt={`Foto ${idx + 1}`}
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute bottom-0 inset-x-0 bg-black/40 py-0.5 text-center">
+              <span className="text-white text-[9px] font-semibold">{idx + 1}/{previews.length}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Lightbox */}
       <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
-        <DialogContent className="max-w-3xl p-0 bg-black/95 border-neutral-800 overflow-hidden">
+        <DialogContent className="w-[95vw] max-w-lg p-0 bg-black/97 border-neutral-800 overflow-hidden rounded-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Fotos do Problema</DialogTitle>
             <DialogDescription>Fotos registradas pelo motorista</DialogDescription>
           </DialogHeader>
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-black/60 rounded-full px-3 py-1">
-            <span className="text-white text-xs">{currentIndex + 1} / {previews.length}</span>
+
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <Camera className="h-4 w-4 text-white/60" />
+              <span className="text-white text-sm font-medium">Fotos do problema</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-white/60 text-xs">{currentIndex + 1} / {previews.length}</span>
+              <button
+                onClick={() => setLightboxOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:scale-95 transition-all"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setLightboxOpen(false)}
-            className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-white/20"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <div className="relative flex items-center justify-center min-h-[350px] max-h-[70vh]">
-            <img src={previews[currentIndex]} alt={`Foto ${currentIndex + 1}`} className="max-h-[70vh] max-w-full object-contain" />
+
+          <div className="relative flex items-center justify-center bg-black min-h-[220px] max-h-[55vh]">
+            <img
+              src={previews[currentIndex]}
+              alt={`Foto ${currentIndex + 1}`}
+              className="max-h-[55vh] max-w-full object-contain select-none"
+            />
             {previews.length > 1 && (
               <>
-                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => p === 0 ? previews.length - 1 : p - 1); }} className="absolute left-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => p === 0 ? previews.length - 1 : p - 1); }}
+                  className="absolute left-2 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 active:scale-95 transition-all"
+                  aria-label="Foto anterior"
+                >
                   <ChevronLeft className="h-6 w-6" />
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => p === previews.length - 1 ? 0 : p + 1); }} className="absolute right-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCurrentIndex(p => p === previews.length - 1 ? 0 : p + 1); }}
+                  className="absolute right-2 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 active:scale-95 transition-all"
+                  aria-label="Proxima foto"
+                >
                   <ChevronRight className="h-6 w-6" />
                 </button>
               </>
             )}
           </div>
+
           {previews.length > 1 && (
-            <div className="flex gap-2 p-3 justify-center bg-black/80">
+            <div className="flex gap-2 px-3 py-3 bg-black/80 overflow-x-auto snap-x snap-mandatory">
               {previews.map((src, idx) => (
-                <button key={idx} onClick={() => setCurrentIndex(idx)} className={cn("shrink-0 h-12 w-12 rounded-lg overflow-hidden border-2 transition-all", currentIndex === idx ? "border-red-500 scale-105" : "border-transparent opacity-60 hover:opacity-100")}>
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={cn(
+                    "snap-start shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition-all active:scale-95",
+                    currentIndex === idx
+                      ? "border-red-500 scale-105 shadow-lg shadow-red-500/30"
+                      : "border-white/20 opacity-50 hover:opacity-80",
+                  )}
+                >
                   <img src={src} alt={`Thumb ${idx + 1}`} className="h-full w-full object-cover" />
                 </button>
+              ))}
+            </div>
+          )}
+
+          {previews.length > 1 && (
+            <div className="flex justify-center gap-1.5 py-2 bg-black/80">
+              {previews.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all duration-300",
+                    currentIndex === idx ? "w-4 bg-red-500" : "w-1.5 bg-white/30 hover:bg-white/60",
+                  )}
+                  aria-label={`Ir para foto ${idx + 1}`}
+                />
               ))}
             </div>
           )}
@@ -1710,22 +1773,35 @@ export function DriverJourneyView() {
                   item.checked === false && "border-red-200 bg-red-50",
                 )}
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className={cn(
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-                      item.checked === true
-                        ? "bg-green-500 text-white"
-                        : item.checked === false
-                          ? "bg-red-500 text-white"
-                          : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {item.icon}
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                        item.checked === true
+                          ? "bg-green-500 text-white"
+                          : item.checked === false
+                            ? "bg-red-500 text-white"
+                            : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {item.icon}
+                    </div>
+                    <span className="font-medium text-sm leading-tight">
+                      {item.label}
+                    </span>
                   </div>
-                  <span className="font-medium text-sm leading-tight">
-                    {item.label}
-                  </span>
+                  {item.checked === false && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setCurrentProblemItem(item.id)}
+                      className="h-8 w-8 rounded-full p-0 text-red-600 hover:text-red-700 hover:bg-red-100/50 shrink-0"
+                      title="Editar relato"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -1758,16 +1834,39 @@ export function DriverJourneyView() {
                   </Button>
                 </div>
                 {item.checked === false && item.problem && (
-                  <div className="mt-3 p-3 rounded-lg bg-red-100 border border-red-200">
-                    <p className="text-xs text-red-600 font-medium mb-1">
-                      Problema reportado:
-                    </p>
-                    <div className="flex items-start gap-3">
-                      <p className="text-sm text-red-700 flex-1">{item.problem}</p>
-                      {item.photos && item.photos.length > 0 && (
-                        <DriverPhotoFan photos={item.photos} />
-                      )}
+                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 overflow-hidden">
+                    {/* Cabecalho do relato */}
+                    <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-200">
+                          <XCircle className="h-3 w-3 text-red-600" />
+                        </div>
+                        <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">
+                          Problema reportado
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentProblemItem(item.id)}
+                        className="flex items-center gap-1.5 text-xs text-red-600 hover:text-red-800 transition-colors font-semibold px-2 py-0.5 rounded hover:bg-red-200/50"
+                        title="Editar relato"
+                      >
+                        <Pencil className="h-3 w-3" />
+                        <span>Editar</span>
+                      </button>
                     </div>
+
+                    {/* Texto do relato */}
+                    <p className="px-3 pb-3 text-sm text-red-800 leading-relaxed">
+                      {item.problem}
+                    </p>
+
+                    {/* Secao de fotos — separada por divisor, so se houver */}
+                    {item.photos && item.photos.length > 0 && (
+                      <div className="border-t border-red-200 bg-white/70 px-3 py-3 flex flex-col gap-2.5">
+                        <DriverPhotoStrip photos={item.photos} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1815,6 +1914,7 @@ export function DriverJourneyView() {
             </DialogHeader>
             <div className="py-4 space-y-4">
               <Textarea
+                key={currentProblemItem || "textarea"}
                 id="problem-description"
                 placeholder="Ex: Pneu dianteiro esquerdo com calibragem baixa..."
                 className="min-h-[120px]"
