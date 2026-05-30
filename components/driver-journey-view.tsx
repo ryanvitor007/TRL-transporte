@@ -1836,24 +1836,13 @@ export function DriverJourneyView() {
                 {item.checked === false && item.problem && (
                   <div className="mt-3 rounded-xl border border-red-200 bg-red-50 overflow-hidden">
                     {/* Cabecalho do relato */}
-                    <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-200">
-                          <XCircle className="h-3 w-3 text-red-600" />
-                        </div>
-                        <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">
-                          Problema reportado
-                        </span>
+                    <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-200">
+                        <XCircle className="h-3 w-3 text-red-600" />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentProblemItem(item.id)}
-                        className="flex items-center gap-1.5 text-xs text-red-600 hover:text-red-800 transition-colors font-semibold px-2 py-0.5 rounded hover:bg-red-200/50"
-                        title="Editar relato"
-                      >
-                        <Pencil className="h-3 w-3" />
-                        <span>Editar</span>
-                      </button>
+                      <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">
+                        Problema reportado
+                      </span>
                     </div>
 
                     {/* Texto do relato */}
