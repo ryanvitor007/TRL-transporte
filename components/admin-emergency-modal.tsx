@@ -66,18 +66,11 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Só exibe se houver fotos reais — sem placeholders
   const realPhotos = (photos ?? []).filter((p) => p && p.trim() !== "");
   const hasPhotos = realPhotos.length > 0;
 
-  // Máximo de 2 thumbs visíveis no leque, o +N indica o restante
-  const MAX_VISIBLE = 2;
-  const visiblePhotos = realPhotos.slice(0, MAX_VISIBLE);
-  const extraCount = realPhotos.length - MAX_VISIBLE;
-
-  const openLightbox = (e: React.MouseEvent, idx = 0) => {
+  const openAt = (e: React.MouseEvent, idx: number) => {
     e.stopPropagation();
-    if (!hasPhotos) return;
     setCurrentIndex(idx);
     setLightboxOpen(true);
   };
@@ -92,38 +85,35 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
     setCurrentIndex((prev) => (prev === realPhotos.length - 1 ? 0 : prev + 1));
   };
 
-  // Sem fotos: ícone de câmera discreto
-  if (!hasPhotos) {
-    return (
-      <div className="flex items-center gap-1 text-muted-foreground/40" title="Sem fotos de evidência">
-        <Camera className="h-4 w-4" />
-        <span className="text-[10px] text-muted-foreground/60">Sem foto</span>
-      </div>
-    );
-  }
+  if (!hasPhotos) return null;
 
   return (
     <>
-      {/* ── Leque empilhado ─────────────────────────────────────
-           Mobile-first: thumbnails quadradas w-12 h-12 com
-           sobreposição via -space-x-4, hover expande para space-x-1
-      ──────────────────────────────────────────────────────── */}
-      <button
-        type="button"
-        onClick={(e) => openLightbox(e, 0)}
-        className="group flex items-center -space-x-4 hover:space-x-1 transition-all duration-300 ease-out cursor-pointer focus:outline-none"
-        aria-label={`Ver ${realPhotos.length} foto(s) de evidência`}
-      >
-        {visiblePhotos.map((src, idx) => (
-          <div
+      {/* Header da secao de fotos */}
+      <div className="flex items-center justify-between mb-1.5 w-full">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-red-700">
+          <Camera className="h-3.5 w-3.5" />
+          {realPhotos.length === 1 ? "1 foto anexada" : `${realPhotos.length} fotos anexadas`}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => openAt(e, 0)}
+          className="text-[10px] text-red-500 hover:text-red-700 font-semibold underline underline-offset-2 transition-colors"
+        >
+          Ver todas
+        </button>
+      </div>
+
+      {/* Faixa de miniaturas quadradas */}
+      <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none w-full">
+        {realPhotos.map((src, idx) => (
+          <button
             key={idx}
-            className={cn(
-              "relative shrink-0 w-12 h-12 rounded-md border-2 border-white shadow-md overflow-hidden",
-              "transition-all duration-300 ease-out",
-              // última foto visível pode ter overlay de +N
-              idx === MAX_VISIBLE - 1 && extraCount > 0 ? "brightness-50" : "",
-            )}
-            style={{ zIndex: MAX_VISIBLE - idx }}
+            type="button"
+            onClick={(e) => openAt(e, idx)}
+            className="relative shrink-0 h-16 w-16 rounded-xl overflow-hidden border-2 border-white shadow-sm
+              hover:border-red-400 hover:scale-105 active:scale-95
+              transition-all duration-200 ease-out focus:outline-none"
           >
             <img
               src={src}
@@ -134,24 +124,14 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
                   "https://placehold.co/96x96/dc2626/ffffff?text=!";
               }}
             />
-            {/* Overlay +N na última thumb visível */}
-            {idx === MAX_VISIBLE - 1 && extraCount > 0 && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/55 rounded-md">
-                <span className="text-white text-xs font-bold">+{extraCount}</span>
-              </div>
-            )}
-          </div>
+            <div className="absolute bottom-0 inset-x-0 bg-black/40 py-0.5 text-center">
+              <span className="text-white text-[8px] font-bold">{idx + 1}/{realPhotos.length}</span>
+            </div>
+          </button>
         ))}
-        {/* Ícone de câmera como call-to-action */}
-        <div className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-red-50 border border-red-200 ml-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
-          <Camera className="h-3.5 w-3.5 text-red-500" />
-        </div>
-      </button>
+      </div>
 
-      {/* ── Lightbox Mobile-first ───────────────────────────────
-           • Mobile: carrossel vertical / scroll suave com polegar
-           • md+: carrossel horizontal com setas laterais
-      ──────────────────────────────────────────────────────── */}
+      {/* Lightbox Modal */}
       <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
         <DialogContent
           className={cn(
@@ -167,7 +147,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
             </DialogDescription>
           </DialogHeader>
 
-          {/* ── Barra superior ── */}
+          {/* Barra superior */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
             <div className="flex items-center gap-2">
               <Camera className="h-4 w-4 text-white/60" />
@@ -186,7 +166,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
             </div>
           </div>
 
-          {/* ── Área principal: foto grande ── */}
+          {/* Área principal: foto grande */}
           <div className="relative flex items-center justify-center bg-black min-h-[240px] max-h-[55vh]">
             <img
               src={realPhotos[currentIndex]}
@@ -197,7 +177,6 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
                   "https://placehold.co/800x600/dc2626/ffffff?text=Imagem+Indisponivel";
               }}
             />
-            {/* Setas — tamanho confortável para toque */}
             {realPhotos.length > 1 && (
               <>
                 <button
@@ -218,7 +197,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
             )}
           </div>
 
-          {/* ── Galeria de thumbs: scroll horizontal tátil ── */}
+          {/* Galeria de thumbs */}
           {realPhotos.length > 1 && (
             <div className="flex gap-2 px-3 py-3 bg-black/80 overflow-x-auto snap-x snap-mandatory scrollbar-none">
               {realPhotos.map((src, idx) => (
@@ -243,7 +222,7 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
             </div>
           )}
 
-          {/* ── Dots de paginação (mobile-friendly) ── */}
+          {/* Dots de paginação */}
           {realPhotos.length > 1 && (
             <div className="flex justify-center gap-1.5 py-2 bg-black/80">
               {realPhotos.map((_, idx) => (
@@ -553,17 +532,17 @@ export function AdminEmergencyModal({
                         {showEvidenceBlock && (
                           <div
                             className={cn(
-                              "flex flex-col gap-3 rounded-lg border p-3",
+                              "flex flex-col rounded-lg border overflow-hidden",
                               isHighSeverity
-                                ? "border-red-100 bg-red-50"
-                                : "border-amber-100 bg-amber-50",
+                                ? "border-red-200 bg-red-50"
+                                : "border-amber-200 bg-amber-50",
                             )}
                           >
                             {/* Relato do motorista */}
                             {itemProblem && (
                               <p
                                 className={cn(
-                                  "text-sm leading-relaxed",
+                                  "text-sm leading-relaxed p-3",
                                   isHighSeverity ? "text-red-700" : "text-amber-700",
                                 )}
                               >
@@ -571,8 +550,8 @@ export function AdminEmergencyModal({
                                   className={cn(
                                     "mr-1 font-semibold",
                                     isHighSeverity
-                                      ? "text-red-800/80"
-                                      : "text-amber-800/80",
+                                      ? "text-red-800"
+                                      : "text-amber-800",
                                   )}
                                 >
                                   Relato:
@@ -581,31 +560,20 @@ export function AdminEmergencyModal({
                               </p>
                             )}
 
-                            {/* Leque de fotos agrupado com o relato */}
+                            {/* Seção de fotos — idêntica à da tela do motorista */}
                             {hasPhotos && (
                               <div
                                 className={cn(
-                                  "flex items-center justify-between pt-2",
+                                  "bg-white/70 p-3 flex flex-col gap-2.5",
                                   itemProblem &&
                                     cn(
-                                      "mt-1 border-t",
+                                      "border-t",
                                       isHighSeverity
-                                        ? "border-red-200/60"
-                                        : "border-amber-200/60",
+                                        ? "border-red-200"
+                                        : "border-amber-200",
                                     ),
                                 )}
                               >
-                                <span
-                                  className={cn(
-                                    "flex items-center gap-1.5 text-xs font-medium",
-                                    isHighSeverity
-                                      ? "text-red-800/70"
-                                      : "text-amber-800/70",
-                                  )}
-                                >
-                                  <Camera className="h-3.5 w-3.5" />
-                                  Evidências anexadas ({photos.length})
-                                </span>
                                 <ChecklistPhotoViewer photos={photos} />
                               </div>
                             )}
@@ -623,25 +591,6 @@ export function AdminEmergencyModal({
                   </div>
                 )}
               </div>
-
-              {journey.checklistNotes && (
-                <>
-                  <Separator />
-                  <div className="p-3 bg-amber-50">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-amber-800 text-sm">
-                          Observacao do Motorista:
-                        </p>
-                        <p className="mt-1 text-amber-700 text-sm">
-                          {journey.checklistNotes}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
             </div>
 
             {/* Campo de Notas do Admin */}
