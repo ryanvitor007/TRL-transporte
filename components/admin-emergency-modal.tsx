@@ -476,87 +476,141 @@ export function AdminEmergencyModal({
                       severity: "medium",
                     };
                     const isHighSeverity = itemInfo.severity === "high";
-                    const label = itemInfo.label;
+
+                    // Extrai o relato específico deste item de checklistNotes
+                    // Formato: "tires: Pneu careca; brakes: Freio falhando"
+                    const itemProblem = (() => {
+                      if (!journey.checklistNotes) return undefined;
+                      const parts = journey.checklistNotes.split(";");
+                      const match = parts.find((p) =>
+                        p.trim().toLowerCase().startsWith(itemId.toLowerCase() + ":"),
+                      );
+                      return match
+                        ? match.trim().substring(itemId.length + 1).trim()
+                        : undefined;
+                    })();
+
+                    const photos = (journey.checklistPhotos ?? []).filter(
+                      (p) => p && p.trim() !== "",
+                    );
+                    const hasPhotos = photos.length > 0;
+                    const showEvidenceBlock = !!itemProblem || hasPhotos;
 
                     return (
-                      /* ── Card Mobile-first ──────────────────────────────────
-                           Mobile (default): flex-col, tudo empilhado
-                           md+: flex-row com justify-between
-                      ─────────────────────────────────────────────────────── */
+                      /* ── Card com Bloco de Evidência Interno ── */
                       <div
                         key={itemId}
-                        className={cn(
-                          "flex flex-col gap-2 rounded-xl p-3 text-sm",
-                          "md:flex-row md:items-center md:justify-between",
-                          isHighSeverity
-                            ? "bg-red-50 border border-red-300"
-                            : "bg-amber-50 border border-amber-200",
-                        )}
+                        className="flex flex-col gap-3 rounded-xl border-2 border-red-200 bg-white p-4"
                       >
-                        {/* ── Grupo de texto (topo/esquerda) ── */}
-                        <div className="flex items-start gap-2.5">
-                          {/* Ícone de status */}
-                          <div
-                            className={cn(
-                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-0.5",
-                              isHighSeverity ? "bg-red-200" : "bg-amber-200",
-                            )}
-                          >
-                            <XCircle
+                        {/* 1. Cabeçalho do Item */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div
                               className={cn(
-                                "h-4 w-4",
-                                isHighSeverity ? "text-red-600" : "text-amber-600",
+                                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                                isHighSeverity ? "bg-red-100" : "bg-amber-100",
                               )}
-                            />
-                          </div>
-                          {/* Label + badge CRITICO */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2 md:justify-start">
+                            >
+                              <XCircle
+                                className={cn(
+                                  "h-4 w-4",
+                                  isHighSeverity ? "text-red-600" : "text-amber-600",
+                                )}
+                              />
+                            </div>
+                            <div className="min-w-0">
                               <span
                                 className={cn(
-                                  "font-semibold text-sm leading-tight",
+                                  "font-semibold leading-tight",
                                   isHighSeverity ? "text-red-800" : "text-amber-800",
                                 )}
                               >
-                                {label}
+                                {itemInfo.label}
                               </span>
-                              {/* Badge 'Reprovado' visível no mobile ao lado do nome */}
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "text-[10px] px-1.5 py-0 whitespace-nowrap shrink-0 md:hidden",
-                                  isHighSeverity
-                                    ? "border-red-400 text-red-700"
-                                    : "border-amber-400 text-amber-700",
-                                )}
-                              >
-                                Reprovado
-                              </Badge>
+                              {isHighSeverity && (
+                                <div className="mt-0.5">
+                                  <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0">
+                                    CRITICO
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
-                            {isHighSeverity && (
-                              <Badge className="mt-1 bg-red-500 text-white text-[10px] px-1.5 py-0">
-                                CRITICO
-                              </Badge>
-                            )}
                           </div>
-                        </div>
-
-                        {/* ── Grupo de mídia + badge (rodapé mobile / direita desktop) ── */}
-                        <div className="flex items-center justify-end gap-3 md:shrink-0">
-                          <ChecklistPhotoViewer photos={journey.checklistPhotos} />
-                          {/* Badge 'Reprovado' só no desktop (md+) */}
                           <Badge
                             variant="outline"
                             className={cn(
-                              "text-xs whitespace-nowrap hidden md:inline-flex",
+                              "shrink-0",
                               isHighSeverity
-                                ? "border-red-400 text-red-700"
-                                : "border-amber-400 text-amber-700",
+                                ? "border-red-300 bg-red-50 text-red-700"
+                                : "border-amber-300 bg-amber-50 text-amber-700",
                             )}
                           >
                             Reprovado
                           </Badge>
                         </div>
+
+                        {/* 2. Bloco de Evidência Interno */}
+                        {showEvidenceBlock && (
+                          <div
+                            className={cn(
+                              "flex flex-col gap-3 rounded-lg border p-3",
+                              isHighSeverity
+                                ? "border-red-100 bg-red-50"
+                                : "border-amber-100 bg-amber-50",
+                            )}
+                          >
+                            {/* Relato do motorista */}
+                            {itemProblem && (
+                              <p
+                                className={cn(
+                                  "text-sm leading-relaxed",
+                                  isHighSeverity ? "text-red-700" : "text-amber-700",
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "mr-1 font-semibold",
+                                    isHighSeverity
+                                      ? "text-red-800/80"
+                                      : "text-amber-800/80",
+                                  )}
+                                >
+                                  Relato:
+                                </span>
+                                {itemProblem}
+                              </p>
+                            )}
+
+                            {/* Leque de fotos agrupado com o relato */}
+                            {hasPhotos && (
+                              <div
+                                className={cn(
+                                  "flex items-center justify-between pt-2",
+                                  itemProblem &&
+                                    cn(
+                                      "mt-1 border-t",
+                                      isHighSeverity
+                                        ? "border-red-200/60"
+                                        : "border-amber-200/60",
+                                    ),
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "flex items-center gap-1.5 text-xs font-medium",
+                                    isHighSeverity
+                                      ? "text-red-800/70"
+                                      : "text-amber-800/70",
+                                  )}
+                                >
+                                  <Camera className="h-3.5 w-3.5" />
+                                  Evidências anexadas ({photos.length})
+                                </span>
+                                <ChecklistPhotoViewer photos={photos} />
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })
