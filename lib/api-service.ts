@@ -728,13 +728,42 @@ export async function listarFuncionariosAPI() {
 
 // --- MÓDULO: JORNADA ---
 
-export async function iniciarJornadaAPI(dados: {
-  driverId: number;
-  vehicleId: number;
-  startLocation: string;
-  startOdometer: number;
-  checklist: any;
-}) {
+export async function iniciarJornadaAPI(
+  dados: {
+    driverId: number;
+    vehicleId: number;
+    startLocation: string;
+    startOdometer: number;
+    checklist: any;
+  },
+  photos?: File[],
+) {
+  // Se houver fotos, enviamos via FormData
+  if (photos && photos.length > 0) {
+    const formData = new FormData();
+    formData.append("driverId", String(dados.driverId));
+    formData.append("vehicleId", String(dados.vehicleId));
+    formData.append("startLocation", dados.startLocation);
+    formData.append("startOdometer", String(dados.startOdometer));
+    formData.append("checklist", JSON.stringify(dados.checklist));
+
+    photos.forEach((photo) => {
+      formData.append("photos", photo);
+    });
+
+    const headers = buildHeaders();
+    const cleanHeaders = { ...headers };
+    delete cleanHeaders["Content-Type"];
+
+    const response = await customFetch(`${API_BASE_URL}/journeys`, {
+      method: "POST",
+      headers: cleanHeaders,
+      body: formData,
+    });
+    return handleResponse(response);
+  }
+
+  // Caso padrão (sem fotos): envia JSON tradicional
   const response = await customFetch(`${API_BASE_URL}/journeys`, {
     method: "POST",
     headers: buildHeaders(),

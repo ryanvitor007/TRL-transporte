@@ -306,6 +306,14 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         journey.hasProblems ||
         journey.inspectionItems.some((item) => item.checked === false);
 
+      // Coleta todas as fotos dos itens reprovados
+      const allPhotos: File[] = [];
+      journey.inspectionItems.forEach((item) => {
+        if (item.checked === false && item.photos && item.photos.length > 0) {
+          allPhotos.push(...item.photos);
+        }
+      });
+
       try {
         if (!user?.id) throw new Error("Usuário não identificado");
 
@@ -335,13 +343,14 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           JSON.stringify(checklistItemsPayload, null, 2),
         );
         console.log("[v0] hasRejectedItems:", hasRejectedItems);
+        console.log("[v0] checklistPhotos to upload:", allPhotos.length);
         console.log(
           "[v0] PAYLOAD FINAL PARA API:",
           JSON.stringify(payload, null, 2),
         );
         console.log("[v0] === FIM DEBUG CHECKLIST ===");
 
-        const data = await iniciarJornadaAPI(payload);
+        const data = await iniciarJornadaAPI(payload, allPhotos);
         console.log("Resposta Backend Iniciar:", data);
 
         // Se tem itens rejeitados, entra em modo de espera de aprovacao
