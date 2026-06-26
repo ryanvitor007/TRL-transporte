@@ -4,7 +4,7 @@ import type React from "react";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  consultarVeiculoAPI,
+  consultarPlacaAPI,
   salvarVeiculoAPI,
   buscarFrotaAPI,
   excluirVeiculoAPI,
@@ -249,43 +249,37 @@ export function FleetView() {
     setIsSearching(true);
 
     try {
-      const dadosVeiculo = await consultarVeiculoAPI(searchPlate);
+      const dadosVeiculo = await consultarPlacaAPI(searchPlate);
+
+      // Monta o nome do modelo unindo marca + modelo retornados pela Infosimples
+      const modeloCompleto =
+        [dadosVeiculo.marca, dadosVeiculo.modelo]
+          .filter(Boolean)
+          .join(" ") || dadosVeiculo.modelo || "";
 
       setNewVehicle({
-        placa: dadosVeiculo.placa,
-        modelo: dadosVeiculo.marca_modelo,
-        ano: String(dadosVeiculo.ano_modelo),
+        placa: dadosVeiculo.placa || searchPlate,
+        modelo: modeloCompleto,
+        ano: String(dadosVeiculo.anoModelo || dadosVeiculo.anoFabricacao || ""),
         quilometragem: "0",
         status: "Ativo",
-        renavam: dadosVeiculo.renavam,
-        chassi: dadosVeiculo.chassi,
-        cor: dadosVeiculo.cor,
-        combustivel: dadosVeiculo.combustivel,
+        renavam: dadosVeiculo.renavam || "",
+        chassi: dadosVeiculo.chassi || "",
+        cor: dadosVeiculo.cor || "",
+        combustivel: dadosVeiculo.combustivel || "",
       });
 
       setShowForm(true);
       toast.success(
         "Veículo encontrado!",
-        `Dados do ${dadosVeiculo.marca_modelo} carregados com sucesso.`,
+        `Dados do ${modeloCompleto} carregados com sucesso.`,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       toast.error(
-        "Erro na busca",
-        "Não foi possível encontrar o veículo. Preencha manualmente.",
+        "Erro na Consulta",
+        error.message || "Veículo não encontrado. Verifique a placa e tente novamente.",
       );
-      setNewVehicle({
-        placa: searchPlate,
-        modelo: "",
-        ano: "",
-        quilometragem: "0",
-        status: "Ativo",
-        renavam: "",
-        chassi: "",
-        cor: "",
-        combustivel: "",
-      });
-      setShowForm(true);
     } finally {
       setIsSearching(false);
     }

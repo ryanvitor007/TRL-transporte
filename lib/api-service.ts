@@ -135,6 +135,23 @@ export async function consultarVeiculoAPI(placa: string) {
   }
 }
 
+// Consulta dados oficiais de um veículo via Infosimples (DETRAN/SENATRAN)
+export const consultarPlacaAPI = async (placa: string) => {
+  try {
+    const response = await customFetch(
+      `${API_BASE_URL}/vehicles/consulta/${placa.replace(/[-\s]/g, "").toUpperCase()}`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+    return handleResponse(response);
+  } catch (error) {
+    console.error("Erro ao consultar placa na Infosimples:", error);
+    throw error;
+  }
+};
+
 // --- MÓDULO: FROTA / VEÍCULOS ---
 
 export async function buscarFrotaAPI() {

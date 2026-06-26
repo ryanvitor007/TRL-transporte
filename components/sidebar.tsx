@@ -18,6 +18,7 @@ import {
   Gauge,
   ClipboardList,
   Radio,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMobile } from "@/hooks/use-mobile";
@@ -32,7 +33,7 @@ const menuItems = [
   { id: "monitoring", label: "Monitoramento", icon: Radio },
   { id: "fleet", label: "Frota", icon: Car },
   { id: "financials", label: "Financeiro & TCO", icon: DollarSign },
-  { id: "tires", label: "Gestão de Pneus", icon: CircleDot },
+  { id: "tires", label: "Gestão de Pneus", icon: CircleDot, comingSoon: true },
   { id: "tachograph", label: "Tacógrafo", icon: Gauge },
   { id: "incidents", label: "Incidentes & Sinistros", icon: AlertOctagon },
   { id: "maintenance", label: "Manutenção", icon: Wrench },
@@ -45,6 +46,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [showComingSoonToast, setShowComingSoonToast] = useState(false);
   const isMobile = useMobile();
 
   const isEffectivelyCollapsed = isCollapsed && !isHovered;
@@ -54,6 +56,11 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     if (isMobile) {
       setIsMobileOpen(false);
     }
+  };
+
+  const handleComingSoonClick = () => {
+    setShowComingSoonToast(true);
+    setTimeout(() => setShowComingSoonToast(false), 3500);
   };
 
   const sidebarContent = (
@@ -101,28 +108,62 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-3">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => handleViewChange(item.id)}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors overflow-hidden whitespace-nowrap",
-              activeView === item.id
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            )}
-          >
-            <item.icon className="h-5 w-5 shrink-0" />
-            <span
+        {menuItems.map((item) => {
+          if (item.comingSoon) {
+            return (
+              <button
+                key={item.id}
+                onClick={handleComingSoonClick}
+                className={cn(
+                  "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors overflow-hidden whitespace-nowrap",
+                  "opacity-60 cursor-not-allowed",
+                  "text-sidebar-foreground hover:bg-sidebar-accent/40",
+                )}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                <span
+                  className={cn(
+                    "transition-opacity duration-200 relative",
+                    isEffectivelyCollapsed ? "opacity-0" : "opacity-100"
+                  )}
+                >
+                  {/* Label atrás levemente apagado */}
+                  <span className="opacity-40">{item.label}</span>
+                  {/* Badge "Em Breve" por cima */}
+                  <span className="absolute inset-0 flex items-center">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/15 border border-white/30 px-2 py-0.5 text-[10px] font-bold text-white tracking-wide uppercase">
+                      <Lock className="h-2.5 w-2.5" />
+                      Em Breve
+                    </span>
+                  </span>
+                </span>
+              </button>
+            );
+          }
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => handleViewChange(item.id)}
               className={cn(
-                "transition-opacity duration-200",
-                isEffectivelyCollapsed ? "opacity-0" : "opacity-100"
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors overflow-hidden whitespace-nowrap",
+                activeView === item.id
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}
             >
-              {item.label}
-            </span>
-          </button>
-        ))}
+              <item.icon className="h-5 w-5 shrink-0" />
+              <span
+                className={cn(
+                  "transition-opacity duration-200",
+                  isEffectivelyCollapsed ? "opacity-0" : "opacity-100"
+                )}
+              >
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
       </nav>
 
       {/* Footer */}
@@ -131,6 +172,28 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
           <p className="text-xs text-sidebar-foreground/70">
             © 2026 TRL Transporte
           </p>
+        </div>
+      )}
+
+      {/* Pop-up "Em Breve" */}
+      {showComingSoonToast && (
+        <div
+          className={cn(
+            "absolute bottom-6 left-1/2 -translate-x-1/2 z-50",
+            "flex items-start gap-3 rounded-xl border border-amber-400/30 bg-gray-900/95 px-4 py-3 shadow-2xl backdrop-blur-sm",
+            "animate-in fade-in slide-in-from-bottom-3 duration-300",
+            "w-[220px]"
+          )}
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15">
+            <Lock className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-white">Em Breve</p>
+            <p className="mt-0.5 text-[11px] leading-snug text-gray-300">
+              O módulo <strong className="text-white">Gestão de Pneus</strong> ainda não está disponível.
+            </p>
+          </div>
         </div>
       )}
     </div>
@@ -167,7 +230,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        "sticky top-0 hidden h-screen border-r border-sidebar-border transition-all duration-300 lg:block overflow-hidden z-50 shrink-0",
+        "relative sticky top-0 hidden h-screen border-r border-sidebar-border transition-all duration-300 lg:block overflow-hidden z-50 shrink-0",
         isEffectivelyCollapsed ? "w-16" : "w-64",
       )}
     >
