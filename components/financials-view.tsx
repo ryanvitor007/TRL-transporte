@@ -212,7 +212,7 @@ export function FinancialsView() {
   const maxTco = Math.max(...tcoData.map(d => d.value));
 
   return (
-    <div className="flex flex-col gap-4 lg:gap-5 p-0">
+    <div className="flex flex-col gap-6 w-full p-0">
 
       {/* ── TOP BAR ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -245,8 +245,8 @@ export function FinancialsView() {
         </div>
       </div>
 
-      {/* ── KPI CARDS ── */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* ── SEÇÃO 1: CARTÕES DE KPI (TOPO) ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           title="Custo Total Operacional" value="R$ 284.750" trend={8.4}
           icon={DollarSign} accent="#EF4444"
@@ -273,12 +273,12 @@ export function FinancialsView() {
         />
       </div>
 
-      {/* ── CHARTS ROW ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:items-stretch">
+      {/* ── SEÇÃO 2: GRÁFICOS PRINCIPAIS (EVOLUÇÃO E DISTRIBUIÇÃO) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Evolution Chart — 2/5 */}
-        <div className="rounded-2xl border border-border bg-card p-4 lg:col-span-2 flex flex-col min-h-[320px]">
-          <div className="flex items-start justify-between mb-3 shrink-0">
+        {/* Gráfico de Linhas (Evolução de Custos) */}
+        <div className="rounded-2xl border border-border bg-card p-5 lg:col-span-2 min-h-[420px] flex flex-col justify-between">
+          <div className="flex items-start justify-between mb-3">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Evolução de Custos — 12 meses</h3>
               <div className="flex items-center gap-4 mt-2">
@@ -296,9 +296,9 @@ export function FinancialsView() {
             </div>
             <button className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
           </div>
-          <div className="flex-1 min-h-0">
+          <div className="h-[300px] w-full mt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={evolutionData} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+              <AreaChart data={evolutionData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <defs>
                   <linearGradient id="gradM" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
@@ -331,15 +331,15 @@ export function FinancialsView() {
           </div>
         </div>
 
-        {/* Middle column: Donut + Alerts — 1/5 */}
-        <div className="flex flex-col gap-4 lg:col-span-1">
+        {/* Gráfico de Distribuição + Alertas */}
+        <div className="flex flex-col gap-6 lg:col-span-1 min-h-[420px] justify-between">
           {/* Donut */}
-          <div className="rounded-2xl border border-border bg-card p-4 flex-1 flex flex-col">
-            <div className="flex items-center justify-between mb-2 shrink-0">
+          <div className="rounded-2xl border border-border bg-card p-5 flex flex-col flex-1 justify-between min-h-[220px]">
+            <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-foreground">Distribuição de Custos</h3>
               <button className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
             </div>
-            <div className="flex-1 min-h-[120px]">
+            <div className="h-[130px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={distributionData} cx="50%" cy="50%" innerRadius={42} outerRadius={60}
@@ -353,7 +353,7 @@ export function FinancialsView() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 shrink-0">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
               {distributionData.map(d => (
                 <div key={d.name} className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
@@ -364,9 +364,9 @@ export function FinancialsView() {
             </div>
           </div>
 
-          {/* Alerts */}
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <div className="flex items-center justify-between mb-3">
+          {/* Alertas */}
+          <div className="rounded-2xl border border-border bg-card p-5 flex flex-col justify-between min-h-[176px]">
+            <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-foreground">Alertas Financeiros</h3>
               <Bell className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
@@ -398,102 +398,104 @@ export function FinancialsView() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Right column: TCO + Projection — 2/5 */}
-        <div className="flex flex-col gap-4 lg:col-span-2">
-          {/* TCO Bar */}
-          <div className="rounded-2xl border border-border bg-card p-4 flex-1">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-1.5">
-                <h3 className="text-sm font-semibold text-foreground">TCO por Veículo</h3>
-                <Info className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="flex rounded-lg border border-border overflow-hidden">
-                  {(["Semanal", "Mensal", "Anual"] as const).map(t => (
-                    <button key={t}
-                      onClick={() => setTcoTab(t)}
-                      className={cn(
-                        "px-2 py-1 text-[10px] font-medium transition-colors",
-                        tcoTab === t
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-muted"
-                      )}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                <button className="text-muted-foreground hover:text-foreground ml-1"><MoreVertical className="h-4 w-4" /></button>
-              </div>
+      {/* ── SEÇÃO 3: TCO E PROJEÇÕES ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* TCO por Veículo */}
+        <div className="rounded-2xl border border-border bg-card p-5 min-h-[380px] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-sm font-semibold text-foreground">TCO por Veículo</h3>
+              <Info className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
-            <div className="flex flex-col gap-2.5">
-              {tcoData.map(d => (
-                <div key={d.vehicle} className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">{d.vehicle}</span>
-                  <div className="flex-1 h-5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(d.value / maxTco) * 100}%`,
-                        background: "linear-gradient(90deg, #3B82F6, #60A5FA)"
-                      }}
-                    />
-                  </div>
-                  <span className="text-xs font-semibold text-foreground w-16 text-right shrink-0">{fmt(d.value)}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between mt-2 pt-1 border-t border-border">
-              <span className="text-[10px] text-muted-foreground">R$ 0</span>
-              <span className="text-[10px] text-muted-foreground">R$ 2k</span>
-              <span className="text-[10px] text-muted-foreground">R$ 4k</span>
-              <span className="text-[10px] text-muted-foreground">R$ 6k</span>
+            <div className="flex items-center gap-1">
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                {(["Semanal", "Mensal", "Anual"] as const).map(t => (
+                  <button key={t}
+                    onClick={() => setTcoTab(t)}
+                    className={cn(
+                      "px-2 py-1 text-[10px] font-medium transition-colors",
+                      tcoTab === t
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted"
+                    )}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <button className="text-muted-foreground hover:text-foreground ml-1"><MoreVertical className="h-4 w-4" /></button>
             </div>
           </div>
-
-          {/* Projection Chart */}
-          <div className="rounded-2xl border border-border bg-card p-4 flex flex-col">
-            <div className="flex items-center justify-between mb-3 shrink-0">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Projeção de Gastos — Próximos 3 meses</h3>
+          <div className="flex flex-col gap-3 justify-center flex-1">
+            {tcoData.map(d => (
+              <div key={d.vehicle} className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground w-16 shrink-0">{d.vehicle}</span>
+                <div className="flex-1 h-5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${(d.value / maxTco) * 100}%`,
+                      background: "linear-gradient(90deg, #3B82F6, #60A5FA)"
+                    }}
+                  />
+                </div>
+                <span className="text-xs font-semibold text-foreground w-16 text-right shrink-0">{fmt(d.value)}</span>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <span className="h-2 w-4 rounded-sm bg-blue-500" />Realizado
-                </span>
-                <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <span className="h-2 w-4 rounded-sm border-2 border-dashed border-blue-400 bg-blue-200/50" />Projeção
-                </span>
-                <button className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
-              </div>
-            </div>
-            <div className="flex-1 min-h-[120px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={projectionData} margin={{ top: 16, right: 4, bottom: 0, left: -10 }} barCategoryGap="30%">
-                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#27272A" : "#F4F4F5"} vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#71717A" }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: "#71717A" }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<ProjectionTooltip />} />
-                  <Bar dataKey="realizado" name="Realizado" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    {projectionData.map((entry, i) => (
-                      <Cell key={i} fill={entry.realizado ? "#3B82F6" : "transparent"} />
-                    ))}
-                  </Bar>
-                  <Bar dataKey="projecao" name="Projeção" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    {projectionData.map((entry, i) => (
-                      <Cell key={i}
-                        fill={entry.projecao ? (isDark ? "rgba(96,165,250,0.25)" : "rgba(59,130,246,0.15)") : "transparent"}
-                        stroke={entry.projecao ? "#60A5FA" : "transparent"}
-                        strokeWidth={entry.projecao ? 2 : 0}
-                        strokeDasharray={entry.projecao ? "4 2" : "0"}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between mt-2 pt-1 border-t border-border shrink-0">
+            <span className="text-[10px] text-muted-foreground">R$ 0</span>
+            <span className="text-[10px] text-muted-foreground">R$ 2k</span>
+            <span className="text-[10px] text-muted-foreground">R$ 4k</span>
+            <span className="text-[10px] text-muted-foreground">R$ 6k</span>
           </div>
         </div>
+
+        {/* Projeção de Gastos */}
+        <div className="rounded-2xl border border-border bg-card p-5 min-h-[380px] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Projeção de Gastos — Próximos 3 meses</h3>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <span className="h-2 w-4 rounded-sm bg-blue-500" />Realizado
+              </span>
+              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <span className="h-2 w-4 rounded-sm border-2 border-dashed border-blue-400 bg-blue-200/50" />Projeção
+              </span>
+              <button className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
+            </div>
+          </div>
+          <div className="h-[240px] w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={projectionData} margin={{ top: 16, right: 10, bottom: 0, left: -20 }} barCategoryGap="30%">
+                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#27272A" : "#F4F4F5"} vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#71717A" }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: "#71717A" }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ProjectionTooltip />} />
+                <Bar dataKey="realizado" name="Realizado" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  {projectionData.map((entry, i) => (
+                    <Cell key={i} fill={entry.realizado ? "#3B82F6" : "transparent"} />
+                  ))}
+                </Bar>
+                <Bar dataKey="projecao" name="Projeção" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  {projectionData.map((entry, i) => (
+                    <Cell key={i}
+                      fill={entry.projecao ? (isDark ? "rgba(96,165,250,0.25)" : "rgba(59,130,246,0.15)") : "transparent"}
+                      stroke={entry.projecao ? "#60A5FA" : "transparent"}
+                      strokeWidth={entry.projecao ? 2 : 0}
+                      strokeDasharray={entry.projecao ? "4 2" : "0"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
       </div>
 
       {/* ── TRANSACTIONS TABLE ── */}
