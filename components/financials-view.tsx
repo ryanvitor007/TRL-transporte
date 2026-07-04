@@ -1,989 +1,658 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useCallback } from "react";
+import { useTheme } from "next-themes";
 import {
-  format,
-  subDays,
-  startOfYear,
-  isAfter,
-  isBefore,
-  startOfDay,
-  endOfDay,
-} from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import {
-  DollarSign,
-  Fuel,
-  BarChart3,
-  GitCompare,
-  FileText,
-  Wrench,
-  Loader2,
-  CalendarRange,
-  Filter,
-  X,
-  Check,
-  Calendar as CalendarIcon,
-} from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
+  AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, PieChart, Pie, Legend
 } from "recharts";
-import { useApp } from "@/contexts/app-context";
-import { ComparisonPanel, DeltaBadge } from "@/components/comparison-panel";
 import {
-  buscarFrotaAPI,
-  buscarManutencoesAPI,
-  buscarMultasAPI,
-} from "@/lib/api-service";
+  DollarSign, Calculator, ShieldAlert, TrendingUp, TrendingDown,
+  AlertTriangle, CheckCircle, Bell, Download, Search, Filter,
+  Plus, ChevronLeft, ChevronRight, MoreVertical, Wrench, Fuel,
+  TriangleAlert, CircleDot, Shield, Boxes, Info, Calendar,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-// --- INTERFACES ---
-interface ExpenseItem {
-  id: string | number;
-  date: string;
-  vehicle_plate: string;
-  type: "Manutenção" | "Multa";
-  category: string;
-  cost: number;
-  status: string;
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+
+const evolutionData = [
+  { month: "Jan", manutencao: 28000, combustivel: 22000, multas: 4200 },
+  { month: "Fev", manutencao: 32000, combustivel: 19500, multas: 5100 },
+  { month: "Mar", manutencao: 25000, combustivel: 21000, multas: 3800 },
+  { month: "Abr", manutencao: 38000, combustivel: 20000, multas: 6200 },
+  { month: "Mai", manutencao: 24850, combustivel: 18420, multas: 7160 },
+  { month: "Jun", manutencao: 31000, combustivel: 23000, multas: 4500 },
+  { month: "Jul", manutencao: 29500, combustivel: 20500, multas: 5800 },
+  { month: "Ago", manutencao: 35000, combustivel: 22500, multas: 6100 },
+  { month: "Set", manutencao: 27000, combustivel: 19000, multas: 4800 },
+  { month: "Out", manutencao: 33000, combustivel: 21500, multas: 5500 },
+  { month: "Nov", manutencao: 30000, combustivel: 20000, multas: 6000 },
+  { month: "Dez", manutencao: 36000, combustivel: 24000, multas: 7200 },
+];
+
+const distributionData = [
+  { name: "Manutenção", value: 38, color: "#3B82F6" },
+  { name: "Combustível", value: 29, color: "#10B981" },
+  { name: "Multas", value: 14, color: "#F59E0B" },
+  { name: "Pneus", value: 11, color: "#8B5CF6" },
+  { name: "Outros", value: 8, color: "#6B7280" },
+];
+
+const tcoData = [
+  { vehicle: "ABC-1234", value: 5650 },
+  { vehicle: "DEF-5678", value: 4890 },
+  { vehicle: "GHI-9101", value: 4230 },
+  { vehicle: "JKL-1122", value: 3980 },
+  { vehicle: "MNO-3344", value: 3450 },
+  { vehicle: "PQR-5566", value: 2890 },
+];
+
+const projectionData = [
+  { month: "Mai 2024", realizado: 48350, projecao: null },
+  { month: "Jun 2024", realizado: 52160, projecao: null },
+  { month: "Jul 2024", realizado: null, projecao: 55890 },
+  { month: "Ago 2024", realizado: null, projecao: 58420 },
+];
+
+const transactions = [
+  { date: "24/05/2024", type: "Manutenção", vehicle: "ABC-1234", supplier: "Auto Peças Brasil", value: 2450, category: "Manutenção", status: "Pago" },
+  { date: "23/05/2024", type: "Combustível", vehicle: "DEF-5678", supplier: "Posto Shell", value: 1280, category: "Combustível", status: "Pago" },
+  { date: "22/05/2024", type: "Multa", vehicle: "GHI-9101", supplier: "DNIT", value: 880.41, category: "Multas", status: "Vencido" },
+  { date: "21/05/2024", type: "Pneus", vehicle: "JKL-1122", supplier: "Pneus Store", value: 1950, category: "Pneus", status: "Pendente" },
+  { date: "20/05/2024", type: "Seguro", vehicle: "MNO-3344", supplier: "Porto Seguro", value: 3200, category: "Seguro", status: "Pago" },
+  { date: "19/05/2024", type: "Outros", vehicle: "PQR-5566", supplier: "Praxis Serviços", value: 650, category: "Outros", status: "Pendente" },
+];
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+const fmt = (v: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+
+const fmtK = (v: number) => {
+  if (v >= 1000) return `R$ ${(v / 1000).toFixed(0)}k`;
+  return `R$ ${v}`;
+};
+
+const typeIcon: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
+  Manutenção: { icon: Wrench, color: "#3B82F6", bg: "bg-blue-100 dark:bg-blue-950" },
+  Combustível: { icon: Fuel, color: "#10B981", bg: "bg-emerald-100 dark:bg-emerald-950" },
+  Multa: { icon: TriangleAlert, color: "#F59E0B", bg: "bg-amber-100 dark:bg-amber-950" },
+  Pneus: { icon: CircleDot, color: "#8B5CF6", bg: "bg-violet-100 dark:bg-violet-950" },
+  Seguro: { icon: Shield, color: "#6366F1", bg: "bg-indigo-100 dark:bg-indigo-950" },
+  Outros: { icon: Boxes, color: "#6B7280", bg: "bg-gray-100 dark:bg-gray-800" },
+};
+
+const statusCfg: Record<string, { label: string; className: string }> = {
+  Pago: { label: "Pago", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 border-0" },
+  Pendente: { label: "Pendente", className: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 border-0" },
+  Vencido: { label: "Vencido", className: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400 border-0" },
+};
+
+// ─── CUSTOM TOOLTIP ───────────────────────────────────────────────────────────
+
+const EvolutionTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl border border-border bg-card shadow-xl p-3 text-xs min-w-[180px]">
+      <p className="font-semibold text-foreground mb-2">{label} 2024</p>
+      {payload.map((entry: any) => (
+        <div key={entry.dataKey} className="flex justify-between gap-6 mb-1">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-muted-foreground">{entry.name}</span>
+          </span>
+          <span className="font-medium text-foreground">{fmt(entry.value)}</span>
+        </div>
+      ))}
+      <div className="border-t border-border mt-2 pt-2 flex justify-between">
+        <span className="text-muted-foreground">Total</span>
+        <span className="font-bold text-foreground">
+          {fmt(payload.reduce((s: number, e: any) => s + (e.value || 0), 0))}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const ProjectionTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  const val = payload.find((p: any) => p.value)?.value;
+  const isProjection = payload[0]?.dataKey === "projecao";
+  return (
+    <div className="rounded-xl border border-border bg-card shadow-xl p-3 text-xs">
+      <p className="font-semibold text-foreground mb-1">{label}</p>
+      <p className="text-muted-foreground">{isProjection ? "Projeção" : "Realizado"}: <span className="font-bold text-foreground">{val ? fmt(val) : "—"}</span></p>
+    </div>
+  );
+};
+
+// ─── KPI CARD ─────────────────────────────────────────────────────────────────
+
+interface KpiCardProps {
+  title: string;
+  value: string;
+  trend: number;
+  icon: React.ElementType;
+  accent: string;
+  sparkData: number[];
+  sparkColor: string;
 }
 
-interface FilterState {
-  dateRange: {
-    start: string; // YYYY-MM-DD
-    end: string; // YYYY-MM-DD
-  };
-  selectedVehicles: string[]; // Placas
-  types: {
-    maintenance: boolean;
-    fines: boolean;
-  };
+function KpiCard({ title, value, trend, icon: Icon, accent, sparkData, sparkColor }: KpiCardProps) {
+  const isUp = trend > 0;
+  const sparkPoints = sparkData.map((v, i) => ({ v }));
+  return (
+    <div className={cn(
+      "relative rounded-2xl border border-border bg-card p-4 flex flex-col gap-3 overflow-hidden",
+      "transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+    )}>
+      <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ backgroundColor: accent }} />
+      <div className="flex items-start justify-between pl-2">
+        <div>
+          <p className="text-xs text-muted-foreground font-medium">{title}</p>
+          <p className="text-2xl font-bold text-foreground mt-1 tracking-tight">{value}</p>
+          <div className={cn("flex items-center gap-1 mt-1 text-xs font-medium", isUp ? "text-red-500" : "text-emerald-500")}>
+            {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            <span>{Math.abs(trend)}%</span>
+            <span className="text-muted-foreground font-normal">vs mês anterior</span>
+          </div>
+        </div>
+        <div className="rounded-xl p-2.5" style={{ backgroundColor: `${accent}18` }}>
+          <Icon className="h-5 w-5" style={{ color: accent }} />
+        </div>
+      </div>
+      <div className="h-10 pl-2">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={sparkPoints} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+            <defs>
+              <linearGradient id={`sg-${title.slice(0,3)}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={sparkColor} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={sparkColor} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <Area type="monotone" dataKey="v" stroke={sparkColor} strokeWidth={1.5}
+              fill={`url(#sg-${title.slice(0,3)})`} dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 }
+
+// ─── CUSTOM DONUT LABEL ───────────────────────────────────────────────────────
+
+const DonutCenter = ({ cx, cy }: any) => (
+  <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+    <tspan x={cx} dy="-8" className="text-xs" fill="#6B7280" fontSize={11}>Total</tspan>
+    <tspan x={cx} dy="22" className="font-bold" fill="currentColor" fontSize={13} fontWeight={700}>R$ 284.750</tspan>
+  </text>
+);
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export function FinancialsView() {
-  const { comparison, toggleComparison } = useApp();
-  const [loading, setLoading] = useState(true);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
-  // Estados de Dados Reais
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [maintenances, setMaintenances] = useState<any[]>([]);
-  const [fines, setFines] = useState<any[]>([]);
+  const [period, setPeriod] = useState<"Mensal" | "Trimestral" | "Anual">("Mensal");
+  const [tcoTab, setTcoTab] = useState<"Semanal" | "Mensal" | "Anual">("Mensal");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-  // Estado do Filtro
-  const [filters, setFilters] = useState<FilterState>({
-    dateRange: { start: "", end: "" },
-    selectedVehicles: [],
-    types: { maintenance: true, fines: true },
-  });
+  const filtered = transactions.filter(t =>
+    t.vehicle.toLowerCase().includes(search.toLowerCase()) ||
+    t.supplier.toLowerCase().includes(search.toLowerCase()) ||
+    t.type.toLowerCase().includes(search.toLowerCase())
+  );
 
-  // Estado local para busca de veículos no filtro
-  const [vehicleSearch, setVehicleSearch] = useState("");
-
-  // --- 1. CARREGAR DADOS ---
-  useEffect(() => {
-    async function loadFinancialData() {
-      try {
-        setLoading(true);
-        const [frotaRes, manutsRes, multasRes] = await Promise.all([
-          buscarFrotaAPI(),
-          buscarManutencoesAPI(),
-          buscarMultasAPI(),
-        ]);
-
-        setVehicles(Array.isArray(frotaRes) ? frotaRes : []);
-        setMaintenances(Array.isArray(manutsRes) ? manutsRes : []);
-        setFines(Array.isArray(multasRes) ? multasRes : []);
-      } catch (error) {
-        console.error("Erro ao carregar financeiro:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadFinancialData();
-  }, []);
-
-  // --- HELPERS ---
-  const parseCurrency = (value: any): number => {
-    if (typeof value === "number") return value;
-    if (!value) return 0;
-    const stringValue = String(value).replace("R$", "").trim();
-    if (stringValue.includes(",") && stringValue.includes(".")) {
-      return parseFloat(stringValue.replace(/\./g, "").replace(",", "."));
-    }
-    if (stringValue.includes(",")) {
-      return parseFloat(stringValue.replace(",", "."));
-    }
-    return parseFloat(stringValue) || 0;
-  };
-
-  const getDate = (item: any): Date => {
-    const dateStr =
-      item.date ||
-      item.due_date ||
-      item.vencimento ||
-      item.data ||
-      item.scheduled_date ||
-      item.created_at;
-    return dateStr ? new Date(dateStr) : new Date();
-  };
-
-  // --- LÓGICA DE FILTRAGEM CENTRALIZADA ---
-  const filteredData = useMemo(() => {
-    let filteredMaintenances = [...maintenances];
-    let filteredFines = [...fines];
-
-    // 1. Filtro de Tipo
-    if (!filters.types.maintenance) filteredMaintenances = [];
-    if (!filters.types.fines) filteredFines = [];
-
-    // 2. Filtro de Veículo
-    if (filters.selectedVehicles.length > 0) {
-      filteredMaintenances = filteredMaintenances.filter((m) =>
-        filters.selectedVehicles.includes(m.vehicle_plate)
-      );
-      filteredFines = filteredFines.filter((f) =>
-        filters.selectedVehicles.includes(f.vehicle_plate)
-      );
-    }
-
-    // 3. Filtro de Data
-    if (filters.dateRange.start) {
-      const startDate = startOfDay(new Date(filters.dateRange.start));
-      filteredMaintenances = filteredMaintenances.filter(
-        (m) => getDate(m) >= startDate
-      );
-      filteredFines = filteredFines.filter((f) => getDate(f) >= startDate);
-    }
-
-    if (filters.dateRange.end) {
-      const endDate = endOfDay(new Date(filters.dateRange.end));
-      filteredMaintenances = filteredMaintenances.filter(
-        (m) => getDate(m) <= endDate
-      );
-      filteredFines = filteredFines.filter((f) => getDate(f) <= endDate);
-    }
-
-    return { maintenances: filteredMaintenances, fines: filteredFines };
-  }, [maintenances, fines, filters]);
-
-  // Contagem de filtros ativos para o Badge
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filters.dateRange.start || filters.dateRange.end) count++;
-    if (filters.selectedVehicles.length > 0) count++;
-    if (!filters.types.maintenance || !filters.types.fines) count++;
-    return count;
-  }, [filters]);
-
-  // --- FUNÇÕES DE CONTROLE DE FILTRO ---
-  const applyPreset = (preset: "30days" | "90days" | "year" | "all") => {
-    const today = new Date();
-    let start = "";
-    let end = format(today, "yyyy-MM-dd");
-
-    switch (preset) {
-      case "30days":
-        start = format(subDays(today, 30), "yyyy-MM-dd");
-        break;
-      case "90days":
-        start = format(subDays(today, 90), "yyyy-MM-dd");
-        break;
-      case "year":
-        start = format(startOfYear(today), "yyyy-MM-dd");
-        break;
-      case "all":
-        start = "";
-        end = "";
-        break;
-    }
-    setFilters((prev) => ({ ...prev, dateRange: { start, end } }));
-  };
-
-  const toggleVehicle = (plate: string) => {
-    setFilters((prev) => {
-      const current = prev.selectedVehicles;
-      if (current.includes(plate)) {
-        return {
-          ...prev,
-          selectedVehicles: current.filter((p) => p !== plate),
-        };
-      } else {
-        return { ...prev, selectedVehicles: [...current, plate] };
-      }
-    });
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      dateRange: { start: "", end: "" },
-      selectedVehicles: [],
-      types: { maintenance: true, fines: true },
-    });
-  };
-
-  // --- CÁLCULOS COM DADOS FILTRADOS ---
-
-  // KPIs (Total Geral Filtrado)
-  const kpiData = useMemo(() => {
-    let totalMaintenance = 0;
-    let totalFines = 0;
-
-    filteredData.maintenances.forEach(
-      (m) => (totalMaintenance += parseCurrency(m.cost || m.valor))
-    );
-    filteredData.fines.forEach(
-      (f) =>
-        (totalFines += parseCurrency(
-          f.amount || f.valor || f.custo || f.value || f.cost
-        ))
-    );
-
-    return {
-      maintenance: totalMaintenance,
-      fines: totalFines,
-      total: totalMaintenance + totalFines,
-    };
-  }, [filteredData]);
-
-  // Gráfico Anual (2026) - Filtrado
-  const annualCosts = useMemo(() => {
-    const data: Record<
-      string,
-      {
-        month: string;
-        maintenance: number;
-        fines: number;
-        total: number;
-        index: number;
-      }
-    > = {};
-    const months = [
-      "Jan",
-      "Fev",
-      "Mar",
-      "Abr",
-      "Mai",
-      "Jun",
-      "Jul",
-      "Ago",
-      "Set",
-      "Out",
-      "Nov",
-      "Dez",
-    ];
-    const currentYear = new Date().getFullYear();
-
-    months.forEach((m, i) => {
-      data[m] = { month: m, maintenance: 0, fines: 0, total: 0, index: i };
-    });
-
-    filteredData.maintenances.forEach((m) => {
-      const d = getDate(m);
-      if (d.getFullYear() === currentYear) {
-        const key = months[d.getMonth()];
-        if (data[key]) {
-          const val = parseCurrency(m.cost || m.valor);
-          data[key].maintenance += val;
-          data[key].total += val;
-        }
-      }
-    });
-
-    filteredData.fines.forEach((f) => {
-      const d = getDate(f);
-      if (d.getFullYear() === currentYear) {
-        const key = months[d.getMonth()];
-        if (data[key]) {
-          const val = parseCurrency(
-            f.amount || f.valor || f.custo || f.value || f.cost
-          );
-          data[key].fines += val;
-          data[key].total += val;
-        }
-      }
-    });
-
-    return Object.values(data).sort((a, b) => a.index - b.index);
-  }, [filteredData]);
-
-  // TCO por Veículo - Filtrado
-  const vehicleTCOData = useMemo(() => {
-    const tcoMap: Record<
-      string,
-      { plate: string; maintenance: number; fines: number; total: number }
-    > = {};
-
-    // Inicializa apenas veículos visíveis (se filtro estiver ativo)
-    const visibleVehicles =
-      filters.selectedVehicles.length > 0
-        ? vehicles.filter((v) => filters.selectedVehicles.includes(v.placa))
-        : vehicles;
-
-    visibleVehicles.forEach((v) => {
-      tcoMap[v.id] = { plate: v.placa, maintenance: 0, fines: 0, total: 0 };
-    });
-
-    filteredData.maintenances.forEach((m) => {
-      if (tcoMap[m.vehicle_id]) {
-        const val = parseCurrency(m.cost || m.valor);
-        tcoMap[m.vehicle_id].maintenance += val;
-        tcoMap[m.vehicle_id].total += val;
-      }
-    });
-
-    filteredData.fines.forEach((f) => {
-      const vehicle = vehicles.find(
-        (v) => v.placa === f.vehicle_plate || v.id === f.vehicle_id
-      );
-      if (vehicle && tcoMap[vehicle.id]) {
-        const val = parseCurrency(
-          f.amount || f.valor || f.custo || f.value || f.cost
-        );
-        tcoMap[vehicle.id].fines += val;
-        tcoMap[vehicle.id].total += val;
-      }
-    });
-
-    return Object.values(tcoMap).sort((a, b) => b.total - a.total);
-  }, [vehicles, filteredData, filters.selectedVehicles]);
-
-  // Tabela de Despesas - Filtrada
-  const recentExpenses: ExpenseItem[] = useMemo(() => {
-    const items: ExpenseItem[] = [];
-
-    filteredData.maintenances.forEach((m) => {
-      items.push({
-        id: `m-${m.id}`,
-        date: getDate(m).toISOString(),
-        vehicle_plate: m.vehicle_plate,
-        type: "Manutenção",
-        category: m.type || "Geral",
-        cost: parseCurrency(m.cost || m.valor),
-        status: m.status,
-      });
-    });
-
-    filteredData.fines.forEach((f) => {
-      items.push({
-        id: `f-${f.id}`,
-        date: getDate(f).toISOString(),
-        vehicle_plate: f.vehicle_plate,
-        type: "Multa",
-        category: "Infração",
-        cost: parseCurrency(
-          f.amount || f.valor || f.custo || f.value || f.cost
-        ),
-        status: f.status,
-      });
-    });
-
-    return items
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 10);
-  }, [filteredData]);
-
-  // Dados Comparativos (Baseados no TCO filtrado)
-  const vehicleComparisonData = useMemo(() => {
-    if (!comparison.isActive || comparison.type !== "vehicles") return null;
-    return comparison.selectedVehicles.map((vehicleId) => {
-      const vehicle = vehicles.find((v) => String(v.id) === String(vehicleId));
-      const data = vehicleTCOData.find((t) => t.plate === vehicle?.placa);
-      return {
-        plate: vehicle?.placa || "N/A",
-        maintenanceCost: data?.maintenance || 0,
-        finesCost: data?.fines || 0,
-      };
-    });
-  }, [comparison, vehicles, vehicleTCOData]);
-
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const maxTco = Math.max(...tcoData.map(d => d.value));
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Financeiro & TCO
-          </h1>
-          <p className="text-muted-foreground flex items-center gap-2">
-            Visão consolidada de custos acumulados
-          </p>
+    <div className="flex flex-col gap-4 lg:gap-5 p-0">
+
+      {/* ── TOP BAR ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="text-foreground font-semibold text-base lg:text-lg">Financeiro & TCO</span>
         </div>
-
-        <div className="flex gap-2">
-          {/* BOTÃO DE FILTRO AVANÇADO */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="gap-2 relative">
-                <Filter className="h-4 w-4" />
-                Filtros
-                {activeFilterCount > 0 && (
-                  <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center bg-red-500 hover:bg-red-600">
-                    {activeFilterCount}
-                  </Badge>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[340px] p-4" align="end">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <h4 className="font-semibold text-sm">Filtros Avançados</h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearFilters}
-                    className="h-auto p-0 text-xs text-red-500 hover:text-red-600 hover:bg-transparent"
-                  >
-                    Limpar
-                  </Button>
-                </div>
-
-                {/* Seção de Datas */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-muted-foreground">
-                    Período
-                  </Label>
-                  <div className="flex gap-1 mb-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs flex-1"
-                      onClick={() => applyPreset("30days")}
-                    >
-                      30d
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs flex-1"
-                      onClick={() => applyPreset("90days")}
-                    >
-                      90d
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs flex-1"
-                      onClick={() => applyPreset("year")}
-                    >
-                      Ano
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs flex-1"
-                      onClick={() => applyPreset("all")}
-                    >
-                      Tudo
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="relative">
-                      <Input
-                        type="date"
-                        className="h-8 text-xs"
-                        value={filters.dateRange.start}
-                        onChange={(e) =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            dateRange: {
-                              ...prev.dateRange,
-                              start: e.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="relative">
-                      <Input
-                        type="date"
-                        className="h-8 text-xs"
-                        value={filters.dateRange.end}
-                        onChange={(e) =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            dateRange: {
-                              ...prev.dateRange,
-                              end: e.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Seção de Tipos */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-muted-foreground">
-                    Tipo de Despesa
-                  </Label>
-                  <div className="flex gap-4">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="type-maint"
-                        checked={filters.types.maintenance}
-                        onCheckedChange={(c) =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            types: { ...prev.types, maintenance: !!c },
-                          }))
-                        }
-                      />
-                      <label
-                        htmlFor="type-maint"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Manutenção
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="type-fine"
-                        checked={filters.types.fines}
-                        onCheckedChange={(c) =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            types: { ...prev.types, fines: !!c },
-                          }))
-                        }
-                      />
-                      <label
-                        htmlFor="type-fine"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Multas
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Seção de Veículos (Combobox simplificado) */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-xs font-semibold text-muted-foreground">
-                      Veículos ({filters.selectedVehicles.length})
-                    </Label>
-                    {filters.selectedVehicles.length > 0 && (
-                      <span
-                        className="text-xs text-blue-500 cursor-pointer hover:underline"
-                        onClick={() =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            selectedVehicles: [],
-                          }))
-                        }
-                      >
-                        Limpar seleção
-                      </span>
-                    )}
-                  </div>
-                  <Input
-                    placeholder="Buscar placa..."
-                    className="h-8 text-xs mb-2"
-                    value={vehicleSearch}
-                    onChange={(e) => setVehicleSearch(e.target.value)}
-                  />
-                  <ScrollArea className="h-[120px] border rounded-md p-2">
-                    {vehicles
-                      .filter((v) =>
-                        v.placa
-                          .toLowerCase()
-                          .includes(vehicleSearch.toLowerCase())
-                      )
-                      .map((vehicle) => (
-                        <div
-                          key={vehicle.id}
-                          className="flex items-center space-x-2 py-1.5 hover:bg-muted/50 rounded px-1 cursor-pointer"
-                          onClick={() => toggleVehicle(vehicle.placa)}
-                        >
-                          <div
-                            className={cn(
-                              "h-4 w-4 border rounded flex items-center justify-center transition-colors",
-                              filters.selectedVehicles.includes(vehicle.placa)
-                                ? "bg-primary border-primary text-white"
-                                : "border-muted-foreground"
-                            )}
-                          >
-                            {filters.selectedVehicles.includes(
-                              vehicle.placa
-                            ) && <Check className="h-3 w-3" />}
-                          </div>
-                          <span className="text-sm">
-                            {vehicle.placa}{" "}
-                            <span className="text-xs text-muted-foreground">
-                              - {vehicle.modelo}
-                            </span>
-                          </span>
-                        </div>
-                      ))}
-                    {vehicles.length === 0 && (
-                      <div className="text-xs text-center py-4 text-muted-foreground">
-                        Nenhum veículo encontrado
-                      </div>
-                    )}
-                  </ScrollArea>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <Button
-            variant={comparison.isActive ? "default" : "outline"}
-            onClick={toggleComparison}
-            className="gap-2"
-          >
-            <GitCompare className="h-4 w-4" />
-            Comparação
-          </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            {(["Mensal", "Trimestral", "Anual"] as const).map(p => (
+              <button key={p}
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium transition-colors",
+                  period === p
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                )}>
+                {p}
+              </button>
+            ))}
+          </div>
+          <button className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors">
+            <Calendar className="h-3.5 w-3.5" />
+            Mai 2024
+          </button>
+          <button className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors">
+            <Download className="h-3.5 w-3.5" />
+            Exportar
+          </button>
         </div>
       </div>
 
-      <ComparisonPanel />
-
-      {/* Métricas (KPIs ACUMULADOS FILTRADOS) */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Custo Total (Filtrado)
-            </CardTitle>
-            <DollarSign className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <span className="text-3xl font-bold">
-                {kpiData.total.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Soma conforme filtros ativos
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Manutenção
-            </CardTitle>
-            <BarChart3 className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <span className="text-3xl font-bold">
-                {kpiData.maintenance.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Multas
-            </CardTitle>
-            <FileText className="h-5 w-5 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <span className="text-3xl font-bold">
-                {kpiData.fines.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Combustível
-            </CardTitle>
-            <Fuel className="h-5 w-5 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-muted-foreground">---</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Módulo não ativado
-            </p>
-          </CardContent>
-        </Card>
+      {/* ── KPI CARDS ── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard
+          title="Custo Total Operacional" value="R$ 284.750" trend={8.4}
+          icon={DollarSign} accent="#EF4444"
+          sparkData={[28, 35, 22, 42, 38, 30, 45, 28, 38, 32, 40, 35]}
+          sparkColor="#EF4444"
+        />
+        <KpiCard
+          title="TCO por Veículo/Mês" value="R$ 4.230" trend={-5.7}
+          icon={Calculator} accent="#3B82F6"
+          sparkData={[20, 25, 18, 30, 22, 26, 24, 28, 20, 24, 22, 26]}
+          sparkColor="#3B82F6"
+        />
+        <KpiCard
+          title="Multas & Sinistros" value="R$ 18.420" trend={24.6}
+          icon={ShieldAlert} accent="#F59E0B"
+          sparkData={[5, 8, 6, 12, 9, 14, 10, 16, 12, 18, 14, 20]}
+          sparkColor="#F59E0B"
+        />
+        <KpiCard
+          title="Economia Gerada" value="R$ 9.800" trend={-12.1}
+          icon={TrendingUp} accent="#10B981"
+          sparkData={[6, 8, 10, 7, 12, 9, 14, 11, 13, 10, 12, 14]}
+          sparkColor="#10B981"
+        />
       </div>
 
-      {/* Comparison Charts */}
-      {comparison.isActive &&
-        comparison.type === "vehicles" &&
-        vehicleComparisonData &&
-        vehicleComparisonData.length >= 1 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparação de Custo Acumulado (TCO)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={vehicleComparisonData}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      className="stroke-muted"
-                    />
-                    <XAxis dataKey="plate" className="text-xs" />
-                    <YAxis
-                      tickFormatter={(value) => `R$${value / 1000}k`}
-                      className="text-xs"
-                    />
-                    <Tooltip
-                      formatter={(value: number) =>
-                        value.toLocaleString("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        })
-                      }
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                      }}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="maintenanceCost"
-                      name="Manutenção"
-                      fill="#3b82f6"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="finesCost"
-                      name="Multas"
-                      fill="#ef4444"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+      {/* ── CHARTS ROW ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:items-stretch">
 
-      {/* Gráfico de Custos ANUAL 2026 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarRange className="h-5 w-5" />
-            Evolução de Custos (Ano Atual - Filtrado)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-80">
+        {/* Evolution Chart — 2/5 */}
+        <div className="rounded-2xl border border-border bg-card p-4 lg:col-span-2 flex flex-col min-h-[320px]">
+          <div className="flex items-start justify-between mb-3 shrink-0">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Evolução de Custos — 12 meses</h3>
+              <div className="flex items-center gap-4 mt-2">
+                {[
+                  { label: "Manutenção", color: "#3B82F6" },
+                  { label: "Combustível", color: "#10B981" },
+                  { label: "Multas", color: "#F59E0B" },
+                ].map(l => (
+                  <span key={l.label} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="h-2 w-5 rounded-full" style={{ backgroundColor: l.color }} />
+                    {l.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <button className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
+          </div>
+          <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={annualCosts}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" />
-                <YAxis
-                  tickFormatter={(value) => `R$${value / 1000}k`}
-                  className="text-xs"
-                />
-                <Tooltip
-                  formatter={(value: number) =>
-                    value.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })
-                  }
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                  }}
-                />
-                <Legend />
-                <Bar
-                  dataKey="maintenance"
-                  name="Manutenção"
-                  fill="#3b82f6"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="fines"
-                  name="Multas"
-                  fill="#ef4444"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
+              <AreaChart data={evolutionData} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+                <defs>
+                  <linearGradient id="gradM" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradC" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradMu" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#27272A" : "#F4F4F5"} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#71717A" }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: "#71717A" }} axisLine={false} tickLine={false} />
+                <Tooltip content={<EvolutionTooltip />} />
+                <Area type="monotone" dataKey="manutencao" name="Manutenção" stroke="#3B82F6" strokeWidth={2}
+                  fill="url(#gradM)" dot={{ r: 3, fill: "#3B82F6", strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: "#3B82F6", strokeWidth: 2, stroke: "#fff" }} />
+                <Area type="monotone" dataKey="combustivel" name="Combustível" stroke="#10B981" strokeWidth={2}
+                  fill="url(#gradC)" dot={{ r: 3, fill: "#10B981", strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: "#10B981", strokeWidth: 2, stroke: "#fff" }} />
+                <Area type="monotone" dataKey="multas" name="Multas" stroke="#F59E0B" strokeWidth={2}
+                  fill="url(#gradMu)" dot={{ r: 3, fill: "#F59E0B", strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: "#F59E0B", strokeWidth: 2, stroke: "#fff" }} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Tabela de Últimas Despesas */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Últimas Despesas (Filtrado)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Veículo</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Custo</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentExpenses.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center py-4 text-muted-foreground"
-                    >
-                      Nenhuma despesa para os filtros selecionados.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  recentExpenses.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>
-                        {new Date(entry.date).toLocaleDateString("pt-BR")}
-                      </TableCell>
-                      <TableCell>{entry.vehicle_plate}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {entry.type === "Manutenção" ? (
-                            <Wrench className="h-3 w-3 text-blue-500" />
-                          ) : (
-                            <FileText className="h-3 w-3 text-red-500" />
-                          )}
-                          {entry.category}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {entry.cost.toLocaleString("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            entry.status === "Pendente" ||
-                            entry.status === "Urgente"
-                              ? "destructive"
-                              : "secondary"
-                          }
-                        >
-                          {entry.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Gráfico TCO - Top Veículos */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Ranking de Custos (Filtrado)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-72">
+        {/* Middle column: Donut + Alerts — 1/5 */}
+        <div className="flex flex-col gap-4 lg:col-span-1">
+          {/* Donut */}
+          <div className="rounded-2xl border border-border bg-card p-4 flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-2 shrink-0">
+              <h3 className="text-sm font-semibold text-foreground">Distribuição de Custos</h3>
+              <button className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
+            </div>
+            <div className="flex-1 min-h-[120px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={vehicleTCOData.slice(0, 5)} layout="vertical">
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    className="stroke-muted"
-                  />
-                  <XAxis
-                    type="number"
-                    tickFormatter={(value) => `R$${value / 1000}k`}
-                    className="text-xs"
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="plate"
-                    className="text-xs"
-                    width={80}
-                  />
-                  <Tooltip
-                    formatter={(value: number) =>
-                      `R$ ${value.toLocaleString("pt-BR")}`
-                    }
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="maintenance"
-                    name="Manutenção"
-                    fill="#3b82f6"
-                    radius={[0, 4, 4, 0]}
-                  />
-                  <Bar
-                    dataKey="fines"
-                    name="Multas"
-                    fill="#ef4444"
-                    radius={[0, 4, 4, 0]}
-                  />
+                <PieChart>
+                  <Pie data={distributionData} cx="50%" cy="50%" innerRadius={42} outerRadius={60}
+                    paddingAngle={2} dataKey="value" labelLine={false}>
+                    {distributionData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} strokeWidth={0} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: any) => `${v}%`} />
+                  <DonutCenter cx="50%" cy="50%" />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 shrink-0">
+              {distributionData.map(d => (
+                <div key={d.name} className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                  <span className="text-[10px] text-muted-foreground">{d.name}</span>
+                  <span className="text-[10px] font-semibold text-foreground ml-auto">{d.value}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Alerts */}
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-foreground">Alertas Financeiros</h3>
+              <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-start gap-2 p-2 rounded-lg bg-red-50 dark:bg-red-950/40">
+                <AlertTriangle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-medium text-foreground leading-tight">3 boletos vencidos</p>
+                  <p className="text-[10px] text-muted-foreground">Total em aberto: R$ 4.250,00</p>
+                </div>
+                <Badge className="text-[9px] bg-red-500 text-white border-0 shrink-0 px-1.5 py-0.5">Crítico</Badge>
+              </div>
+              <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-medium text-foreground leading-tight">Revisão de 2 veículos próxima</p>
+                  <p className="text-[10px] text-muted-foreground">Vencimento em até 7 dias</p>
+                </div>
+                <Badge className="text-[9px] bg-amber-500 text-white border-0 shrink-0 px-1.5 py-0.5">Atenção</Badge>
+              </div>
+              <div className="flex items-start gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                <CheckCircle className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-medium text-foreground leading-tight">Economia acima da meta</p>
+                  <p className="text-[10px] text-muted-foreground">Você economizou R$ 9.800,00</p>
+                </div>
+                <Badge className="text-[9px] bg-emerald-500 text-white border-0 shrink-0 px-1.5 py-0.5">Bom</Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right column: TCO + Projection — 2/5 */}
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          {/* TCO Bar */}
+          <div className="rounded-2xl border border-border bg-card p-4 flex-1">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-semibold text-foreground">TCO por Veículo</h3>
+                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="flex rounded-lg border border-border overflow-hidden">
+                  {(["Semanal", "Mensal", "Anual"] as const).map(t => (
+                    <button key={t}
+                      onClick={() => setTcoTab(t)}
+                      className={cn(
+                        "px-2 py-1 text-[10px] font-medium transition-colors",
+                        tcoTab === t
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-muted"
+                      )}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <button className="text-muted-foreground hover:text-foreground ml-1"><MoreVertical className="h-4 w-4" /></button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {tcoData.map(d => (
+                <div key={d.vehicle} className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">{d.vehicle}</span>
+                  <div className="flex-1 h-5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${(d.value / maxTco) * 100}%`,
+                        background: "linear-gradient(90deg, #3B82F6, #60A5FA)"
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-foreground w-16 text-right shrink-0">{fmt(d.value)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mt-2 pt-1 border-t border-border">
+              <span className="text-[10px] text-muted-foreground">R$ 0</span>
+              <span className="text-[10px] text-muted-foreground">R$ 2k</span>
+              <span className="text-[10px] text-muted-foreground">R$ 4k</span>
+              <span className="text-[10px] text-muted-foreground">R$ 6k</span>
+            </div>
+          </div>
+
+          {/* Projection Chart */}
+          <div className="rounded-2xl border border-border bg-card p-4 flex flex-col">
+            <div className="flex items-center justify-between mb-3 shrink-0">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Projeção de Gastos — Próximos 3 meses</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <span className="h-2 w-4 rounded-sm bg-blue-500" />Realizado
+                </span>
+                <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <span className="h-2 w-4 rounded-sm border-2 border-dashed border-blue-400 bg-blue-200/50" />Projeção
+                </span>
+                <button className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
+              </div>
+            </div>
+            <div className="flex-1 min-h-[120px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={projectionData} margin={{ top: 16, right: 4, bottom: 0, left: -10 }} barCategoryGap="30%">
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#27272A" : "#F4F4F5"} vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#71717A" }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: "#71717A" }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ProjectionTooltip />} />
+                  <Bar dataKey="realizado" name="Realizado" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                    {projectionData.map((entry, i) => (
+                      <Cell key={i} fill={entry.realizado ? "#3B82F6" : "transparent"} />
+                    ))}
+                  </Bar>
+                  <Bar dataKey="projecao" name="Projeção" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                    {projectionData.map((entry, i) => (
+                      <Cell key={i}
+                        fill={entry.projecao ? (isDark ? "rgba(96,165,250,0.25)" : "rgba(59,130,246,0.15)") : "transparent"}
+                        stroke={entry.projecao ? "#60A5FA" : "transparent"}
+                        strokeWidth={entry.projecao ? 2 : 0}
+                        strokeDasharray={entry.projecao ? "4 2" : "0"}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* ── TRANSACTIONS TABLE ── */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between border-b border-border">
+          <h3 className="text-sm font-semibold text-foreground">Lançamentos Financeiros</h3>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={e => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Buscar lançamento..."
+                className="pl-8 h-8 text-xs w-44 lg:w-56"
+              />
+            </div>
+            <Button variant="outline" size="sm" className="h-8 px-2.5 gap-1.5 text-xs">
+              <Filter className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Filtrar</span>
+            </Button>
+            <Button size="sm" className="h-8 px-3 gap-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90">
+              <Plus className="h-3.5 w-3.5" />
+              Novo Lançamento
+            </Button>
+          </div>
+        </div>
+
+        {/* Table desktop */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                {["Data", "Tipo", "Veículo", "Fornecedor", "Valor", "Categoria", "Status", ""].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((tx, i) => {
+                const cfg = typeIcon[tx.type] ?? typeIcon.Outros;
+                const TxIcon = cfg.icon;
+                return (
+                  <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{tx.date}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("h-7 w-7 rounded-lg flex items-center justify-center shrink-0", cfg.bg)}>
+                          <TxIcon className="h-3.5 w-3.5" style={{ color: cfg.color }} />
+                        </div>
+                        <span className="font-medium text-foreground">{tx.type}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-foreground font-medium">{tx.vehicle}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{tx.supplier}</td>
+                    <td className="px-4 py-3 font-semibold text-foreground">{fmt(tx.value)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: distributionData.find(d => d.name === tx.category)?.color ?? "#6B7280" }} />
+                        <span className="text-muted-foreground">{tx.category}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={cn("text-[10px] font-medium", statusCfg[tx.status]?.className)}>
+                        {statusCfg[tx.status]?.label}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button className="text-muted-foreground hover:text-foreground">
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Table mobile (card list) */}
+        <div className="sm:hidden divide-y divide-border">
+          {filtered.map((tx, i) => {
+            const cfg = typeIcon[tx.type] ?? typeIcon.Outros;
+            const TxIcon = cfg.icon;
+            return (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center shrink-0", cfg.bg)}>
+                  <TxIcon className="h-4 w-4" style={{ color: cfg.color }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{tx.type}</p>
+                  <p className="text-xs text-muted-foreground">{tx.vehicle} · {tx.date}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-sm font-semibold text-foreground">{fmt(tx.value)}</span>
+                  <Badge className={cn("text-[10px]", statusCfg[tx.status]?.className)}>{statusCfg[tx.status]?.label}</Badge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+          <p className="text-xs text-muted-foreground">
+            Mostrando 1 a {filtered.length} de 48 resultados
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="h-7 w-7 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            {[1, 2, 3].map(n => (
+              <button key={n}
+                onClick={() => setPage(n)}
+                className={cn(
+                  "h-7 w-7 rounded-lg text-xs font-medium transition-colors",
+                  page === n
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border text-muted-foreground hover:bg-muted"
+                )}>
+                {n}
+              </button>
+            ))}
+            <span className="text-muted-foreground text-xs px-1">...</span>
+            <button
+              onClick={() => setPage(8)}
+              className={cn(
+                "h-7 w-7 rounded-lg text-xs font-medium transition-colors",
+                page === 8
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-muted-foreground hover:bg-muted"
+              )}>
+              8
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(8, p + 1))}
+              disabled={page === 8}
+              className="h-7 w-7 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── FLOATING ACTION BUTTON ── */}
+      <button
+        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-2xl flex items-center justify-center hover:scale-105 transition-transform"
+        title="Novo Lançamento"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+      <div className="fixed bottom-6 right-20 z-50 hidden group-hover:flex items-center">
+        <span className="bg-foreground text-background text-xs font-medium rounded-lg px-2 py-1 shadow">Novo Lançamento</span>
       </div>
     </div>
   );

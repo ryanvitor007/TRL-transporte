@@ -82,7 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       // Chamada real à API
-      const data = await loginAPI({ email, password });
+      const trimmedEmail = email.trim();
+      const data = await loginAPI({ email: trimmedEmail, password });
       const token =
         data.token || data.accessToken || data.access_token || data.jwt;
 

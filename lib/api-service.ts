@@ -17,7 +17,18 @@ const buildHeaders = (headers?: HeadersInit) => {
 
 async function customFetch(input: RequestInfo | URL, init?: RequestInit) {
   try {
-    const response = await fetch(input, init);
+    const token = getAuthToken();
+    const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+    const headers = {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers || {}),
+    };
+
+    const response = await fetch(input, {
+      ...init,
+      headers,
+    });
     if (response.status === 401) {
       if (typeof window !== "undefined" && window.location.pathname !== "/login") {
         localStorage.removeItem("trl_auth_token");

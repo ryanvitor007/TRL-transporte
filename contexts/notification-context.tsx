@@ -11,6 +11,7 @@ import React, {
 import { CheckCircle, AlertCircle, AlertTriangle, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listarFuncionariosAPI } from "@/lib/api-service";
+import { useAuth } from "@/contexts/auth-context";
 
 // --- TYPES ---
 
@@ -244,6 +245,7 @@ export function NotificationProvider({
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const hasCheckedRef = useRef(false);
+  const { isAuthenticated } = useAuth();
 
   // Load notifications from localStorage on mount
   useEffect(() => {
@@ -268,6 +270,7 @@ export function NotificationProvider({
 
   // Proactive monitoring - Check driver documents on load
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (hasCheckedRef.current) return;
     hasCheckedRef.current = true;
 
@@ -366,7 +369,7 @@ export function NotificationProvider({
       checkDriverDocuments();
     }, 2000);
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [isAuthenticated]);
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));

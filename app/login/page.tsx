@@ -40,6 +40,8 @@ export default function LoginPage() {
   // Mobile welcome screen state
   const [showMobileForm, setShowMobileForm] = useState(false);
 
+
+
   useEffect(() => {
     if (isAuthenticated && user) {
       if (user.role === "motorista") {
@@ -563,6 +565,8 @@ export default function LoginPage() {
               </p>
             </div>
           </div>
+
+
 
           {/* Support Info */}
           <p className="text-center text-sm text-muted-foreground">
