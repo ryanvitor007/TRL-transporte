@@ -742,7 +742,7 @@ export function DriverTachographView() {
             <DialogTitle className="text-[#0B1F4D]">Novo registro de tacógrafo (papel)</DialogTitle>
             <DialogDescription className="text-xs text-gray-400">Preencha os dados da sua jornada de hoje</DialogDescription>
           </DialogHeader>
-          <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="flex-1 overflow-y-auto -mx-6 px-6 scrollbar-modal">
             <div className="space-y-4 py-4">
               {/* Dados do veículo */}
               <div className="rounded-xl border border-gray-200 p-4">
@@ -844,7 +844,7 @@ export function DriverTachographView() {
                 />
               </div>
             </div>
-          </ScrollArea>
+          </div>
           <DialogFooter className="shrink-0 gap-2 border-t border-gray-100 pt-4">
             <Button variant="outline" onClick={() => setIsNewRecordOpen(false)} className="flex-1 rounded-xl sm:flex-none">Cancelar</Button>
             <Button
@@ -870,7 +870,7 @@ export function DriverTachographView() {
             <DialogDescription className="sr-only">Detalhes completos do registro selecionado</DialogDescription>
           </DialogHeader>
           {selectedRecord && (
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="flex-1 overflow-y-auto -mx-6 px-6 scrollbar-modal">
               <div className="space-y-4 py-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   {(() => { const sc = statusConfig[selectedRecord.status] || statusConfig.Sincronizado; return (
@@ -920,7 +920,7 @@ export function DriverTachographView() {
                   </div>
                 )}
               </div>
-            </ScrollArea>
+            </div>
           )}
           <DialogFooter className="shrink-0 border-t border-gray-100 pt-4">
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)} className="w-full rounded-xl">Fechar</Button>

@@ -194,4 +194,17 @@
     border-radius: 9999px;
   }
   .scrollbar-kanban-orange::-webkit-scrollbar-thumb:hover { background: #f97316; }
+
+  /* ── Modal scroll — ultra-thin light grey ── */
+  .scrollbar-modal {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+  .scrollbar-modal::-webkit-scrollbar { width: 3px; }
+  .scrollbar-modal::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-modal::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 9999px;
+  }
+  .scrollbar-modal::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 }
