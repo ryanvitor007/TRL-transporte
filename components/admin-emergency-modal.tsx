@@ -60,11 +60,20 @@ const checklistLabels: Record<
 };
 
 // =============================================================
-// SUB-COMPONENTE: Visualizador de fotos — Mobile-first fan stack
+// SUB-COMPONENTE: Visualizador de fotos com accordeon
+// Sempre renderizado — câmera riscada se sem fotos,
+// accordeon colapsável fluido se houver fotos.
 // =============================================================
-function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
+function ChecklistPhotoViewer({
+  photos,
+  isHighSeverity = true,
+}: {
+  photos?: string[];
+  isHighSeverity?: boolean;
+}) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [accordionOpen, setAccordionOpen] = useState(false);
 
   const realPhotos = (photos ?? []).filter((p) => p && p.trim() !== "");
   const hasPhotos = realPhotos.length > 0;
@@ -85,166 +94,230 @@ function ChecklistPhotoViewer({ photos }: { photos?: string[] }) {
     setCurrentIndex((prev) => (prev === realPhotos.length - 1 ? 0 : prev + 1));
   };
 
-  if (!hasPhotos) return null;
+  const borderColor = isHighSeverity ? "border-red-200" : "border-amber-200";
+  const bgColor = isHighSeverity ? "bg-red-50/60" : "bg-amber-50/60";
+  const iconColor = isHighSeverity ? "text-red-500" : "text-amber-500";
+  const labelColor = isHighSeverity ? "text-red-700" : "text-amber-700";
+  const chevronBg = isHighSeverity
+    ? "bg-red-100 hover:bg-red-200"
+    : "bg-amber-100 hover:bg-amber-200";
 
   return (
     <>
-      {/* Header da secao de fotos */}
-      <div className="flex items-center justify-between mb-1.5 w-full">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-red-700">
-          <Camera className="h-3.5 w-3.5" />
-          {realPhotos.length === 1 ? "1 foto anexada" : `${realPhotos.length} fotos anexadas`}
+      {/* ── Gatilho do Accordeon ── */}
+      <button
+        type="button"
+        onClick={() => hasPhotos && setAccordionOpen((v) => !v)}
+        className={cn(
+          "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors",
+          hasPhotos
+            ? cn(bgColor, "cursor-pointer", borderColor, "border")
+            : cn(bgColor, "cursor-default opacity-70", borderColor, "border border-dashed"),
+        )}
+      >
+        <span className={cn("flex items-center gap-2 text-xs font-semibold", labelColor)}>
+          {/* Ícone de câmera — normal com fotos, riscado sem fotos */}
+          <span className="relative flex items-center justify-center">
+            <Camera className={cn("h-4 w-4", iconColor)} />
+            {!hasPhotos && (
+              <svg
+                className="absolute inset-0 h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <line x1="3" y1="3" x2="21" y2="21" className={iconColor} />
+              </svg>
+            )}
+          </span>
+          {hasPhotos
+            ? `${realPhotos.length} ${realPhotos.length === 1 ? "foto anexada" : "fotos anexadas"}`
+            : "Nenhuma foto anexada"}
         </span>
-        <button
-          type="button"
-          onClick={(e) => openAt(e, 0)}
-          className="text-[10px] text-red-500 hover:text-red-700 font-semibold underline underline-offset-2 transition-colors"
-        >
-          Ver todas
-        </button>
-      </div>
 
-      {/* Faixa de miniaturas quadradas */}
-      <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none w-full">
-        {realPhotos.map((src, idx) => (
-          <button
-            key={idx}
-            type="button"
-            onClick={(e) => openAt(e, idx)}
-            className="relative shrink-0 h-16 w-16 rounded-xl overflow-hidden border-2 border-white shadow-sm
-              hover:border-red-400 hover:scale-105 active:scale-95
-              transition-all duration-200 ease-out focus:outline-none"
+        {hasPhotos && (
+          <span
+            className={cn(
+              "flex h-5 w-5 items-center justify-center rounded-full transition-all duration-300",
+              chevronBg,
+            )}
           >
-            <img
-              src={src}
-              alt={`Evidência ${idx + 1}`}
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  "https://placehold.co/96x96/dc2626/ffffff?text=!";
-              }}
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 transition-transform duration-300",
+                labelColor,
+                accordionOpen && "rotate-180",
+              )}
             />
-            <div className="absolute bottom-0 inset-x-0 bg-black/40 py-0.5 text-center">
-              <span className="text-white text-[8px] font-bold">{idx + 1}/{realPhotos.length}</span>
-            </div>
-          </button>
-        ))}
-      </div>
+          </span>
+        )}
+      </button>
 
-      {/* Lightbox Modal */}
-      <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
-        <DialogContent
+      {/* ── Painel acordeão — animação suave via max-height ── */}
+      {hasPhotos && (
+        <div
           className={cn(
-            "p-0 bg-black/97 border-neutral-800 overflow-hidden",
-            "w-[95vw] max-w-lg md:max-w-2xl",
-            "rounded-2xl",
+            "overflow-hidden transition-all duration-300 ease-in-out",
+            accordionOpen ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0",
           )}
         >
-          <DialogHeader className="sr-only">
-            <DialogTitle>Evidências do Checklist</DialogTitle>
-            <DialogDescription>
-              Fotos registradas pelo motorista como evidência dos itens reprovados
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Barra superior */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <Camera className="h-4 w-4 text-white/60" />
-              <span className="text-white text-sm font-medium">Evidências</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-white/60 text-xs">
-                {currentIndex + 1} / {realPhotos.length}
-              </span>
-              <button
-                onClick={() => setLightboxOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:scale-95 transition-all"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Área principal: foto grande */}
-          <div className="relative flex items-center justify-center bg-black min-h-[240px] max-h-[55vh]">
-            <img
-              src={realPhotos[currentIndex]}
-              alt={`Evidência ${currentIndex + 1} de ${realPhotos.length}`}
-              className="max-h-[55vh] max-w-full object-contain select-none"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  "https://placehold.co/800x600/dc2626/ffffff?text=Imagem+Indisponivel";
-              }}
-            />
-            {realPhotos.length > 1 && (
-              <>
-                <button
-                  onClick={goPrev}
-                  className="absolute left-2 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 active:scale-95 transition-all"
-                  aria-label="Foto anterior"
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </button>
-                <button
-                  onClick={goNext}
-                  className="absolute right-2 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 active:scale-95 transition-all"
-                  aria-label="Próxima foto"
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Galeria de thumbs */}
-          {realPhotos.length > 1 && (
-            <div className="flex gap-2 px-3 py-3 bg-black/80 overflow-x-auto snap-x snap-mandatory scrollbar-none">
+          <div className="pt-2 pb-1">
+            {/* Corredor de fotos (horizontal scroll) */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none w-full">
               {realPhotos.map((src, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setCurrentIndex(idx)}
+                  type="button"
+                  onClick={(e) => openAt(e, idx)}
                   className={cn(
-                    "snap-start shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all active:scale-95",
-                    currentIndex === idx
-                      ? "border-red-500 scale-105 shadow-lg shadow-red-500/30"
-                      : "border-white/20 opacity-50 hover:opacity-80",
+                    "relative shrink-0 h-16 w-16 rounded-xl overflow-hidden border-2 shadow-sm",
+                    "hover:scale-105 active:scale-95 transition-all duration-200 ease-out focus:outline-none",
+                    isHighSeverity
+                      ? "border-red-200 hover:border-red-400"
+                      : "border-amber-200 hover:border-amber-400",
                   )}
-                  aria-label={`Ver foto ${idx + 1}`}
                 >
                   <img
                     src={src}
-                    alt={`Thumb ${idx + 1}`}
+                    alt={`Evidência ${idx + 1}`}
                     className="h-full w-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        "https://placehold.co/96x96/dc2626/ffffff?text=!";
+                    }}
                   />
+                  <div className="absolute bottom-0 inset-x-0 bg-black/40 py-0.5 text-center">
+                    <span className="text-white text-[8px] font-bold">
+                      {idx + 1}/{realPhotos.length}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
-          {/* Dots de paginação */}
-          {realPhotos.length > 1 && (
-            <div className="flex justify-center gap-1.5 py-2 bg-black/80">
-              {realPhotos.map((_, idx) => (
+      {/* ── Lightbox Modal ── */}
+      {hasPhotos && (
+        <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+          <DialogContent
+            className={cn(
+              "p-0 bg-black/97 border-neutral-800 overflow-hidden",
+              "w-[95vw] max-w-lg md:max-w-2xl",
+              "rounded-2xl",
+            )}
+          >
+            <DialogHeader className="sr-only">
+              <DialogTitle>Evidências do Checklist</DialogTitle>
+              <DialogDescription>
+                Fotos registradas pelo motorista como evidência dos itens reprovados
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Barra superior */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Camera className="h-4 w-4 text-white/60" />
+                <span className="text-white text-sm font-medium">Evidências</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-white/60 text-xs">
+                  {currentIndex + 1} / {realPhotos.length}
+                </span>
                 <button
-                  key={idx}
-                  onClick={() => setCurrentIndex(idx)}
-                  className={cn(
-                    "h-1.5 rounded-full transition-all duration-300",
-                    currentIndex === idx
-                      ? "w-4 bg-red-500"
-                      : "w-1.5 bg-white/30 hover:bg-white/60",
-                  )}
-                  aria-label={`Ir para foto ${idx + 1}`}
-                />
-              ))}
+                  onClick={() => setLightboxOpen(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:scale-95 transition-all"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
+            {/* Área principal: foto grande */}
+            <div className="relative flex items-center justify-center bg-black min-h-[240px] max-h-[55vh]">
+              <img
+                src={realPhotos[currentIndex]}
+                alt={`Evidência ${currentIndex + 1} de ${realPhotos.length}`}
+                className="max-h-[55vh] max-w-full object-contain select-none"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src =
+                    "https://placehold.co/800x600/dc2626/ffffff?text=Imagem+Indisponivel";
+                }}
+              />
+              {realPhotos.length > 1 && (
+                <>
+                  <button
+                    onClick={goPrev}
+                    className="absolute left-2 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 active:scale-95 transition-all"
+                    aria-label="Foto anterior"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+                  <button
+                    onClick={goNext}
+                    className="absolute right-2 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 active:scale-95 transition-all"
+                    aria-label="Próxima foto"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Galeria de thumbs */}
+            {realPhotos.length > 1 && (
+              <div className="flex gap-2 px-3 py-3 bg-black/80 overflow-x-auto snap-x snap-mandatory scrollbar-none">
+                {realPhotos.map((src, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentIndex(idx)}
+                    className={cn(
+                      "snap-start shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all active:scale-95",
+                      currentIndex === idx
+                        ? "border-red-500 scale-105 shadow-lg shadow-red-500/30"
+                        : "border-white/20 opacity-50 hover:opacity-80",
+                    )}
+                    aria-label={`Ver foto ${idx + 1}`}
+                  >
+                    <img
+                      src={src}
+                      alt={`Thumb ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Dots de paginação */}
+            {realPhotos.length > 1 && (
+              <div className="flex justify-center gap-1.5 py-2 bg-black/80">
+                {realPhotos.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentIndex(idx)}
+                    className={cn(
+                      "h-1.5 rounded-full transition-all duration-300",
+                      currentIndex === idx
+                        ? "w-4 bg-red-500"
+                        : "w-1.5 bg-white/30 hover:bg-white/60",
+                    )}
+                    aria-label={`Ir para foto ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
+
+
 
 export function AdminEmergencyModal({
   journey,
@@ -528,16 +601,15 @@ export function AdminEmergencyModal({
                           </Badge>
                         </div>
 
-                        {/* 2. Bloco de Evidência Interno */}
-                        {showEvidenceBlock && (
-                          <div
-                            className={cn(
-                              "flex flex-col rounded-lg border overflow-hidden",
-                              isHighSeverity
-                                ? "border-red-200 bg-red-50"
-                                : "border-amber-200 bg-amber-50",
-                            )}
-                          >
+                        {/* 2. Bloco de Evidência — sempre visível */}
+                        <div
+                          className={cn(
+                            "flex flex-col rounded-lg border overflow-hidden",
+                            isHighSeverity
+                              ? "border-red-200 bg-red-50"
+                              : "border-amber-200 bg-amber-50",
+                          )}
+                        >
                             {/* Relato do motorista */}
                             {itemProblem && (
                               <p
@@ -560,26 +632,26 @@ export function AdminEmergencyModal({
                               </p>
                             )}
 
-                            {/* Seção de fotos — idêntica à da tela do motorista */}
-                            {hasPhotos && (
-                              <div
-                                className={cn(
-                                  "bg-white/70 p-3 flex flex-col gap-2.5",
-                                  itemProblem &&
-                                    cn(
-                                      "border-t",
-                                      isHighSeverity
-                                        ? "border-red-200"
-                                        : "border-amber-200",
-                                    ),
-                                )}
-                              >
-                                <ChecklistPhotoViewer photos={photos} />
-                              </div>
-                            )}
+                            {/* Seção de fotos — sempre visível, câmera riscada se não houver fotos */}
+                            <div
+                              className={cn(
+                                "px-3 pb-3 flex flex-col gap-2",
+                                itemProblem &&
+                                  cn(
+                                    "border-t pt-2.5",
+                                    isHighSeverity
+                                      ? "border-red-200"
+                                      : "border-amber-200",
+                                  ),
+                              )}
+                            >
+                              <ChecklistPhotoViewer
+                                photos={photos}
+                                isHighSeverity={isHighSeverity}
+                              />
+                            </div>
                           </div>
-                        )}
-                      </div>
+                        </div>
                     );
                   })
                 ) : (

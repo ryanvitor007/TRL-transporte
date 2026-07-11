@@ -90,6 +90,7 @@ interface JourneyContextType {
   checkApprovalStatus: () => Promise<void>;
   handleApprovalGranted: () => void;
   handleJourneyBlocked: (reason: string) => void;
+  isStartingJourney: boolean;
 }
 
 const STORAGE_KEY = "trl_journey_state";
@@ -120,6 +121,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
   const toast = useToastNotification();
   const [journey, setJourney] = useState<JourneyState>(defaultJourneyState);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isStartingJourney, setIsStartingJourney] = useState(false);
 
   useEffect(() => {
     try {
@@ -167,7 +169,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     }
   }, [journey, isHydrated]);
 
-  // Cálculos de tempo (mantidos iguais)
   const getCurrentSegmentSeconds = useCallback(() => {
     if (!journey.currentSegmentStart) return 0;
     return Math.floor((Date.now() - journey.currentSegmentStart) / 1000);
@@ -207,8 +208,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     getCurrentSegmentSeconds,
   ]);
 
-  // --- AÇÕES ---
-
   const selectVehicle = useCallback((vehicle: VehicleData) => {
     setJourney((prev) => ({
       ...prev,
@@ -224,7 +223,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       if (!prev.selectedVehicle) return prev;
       return {
         ...prev,
-        status: "inspection", // Avança para a vistoria
+        status: "inspection",
       };
     });
   }, []);
@@ -259,7 +258,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           newItems.push({ id, checked, problem });
         }
 
-        console.log("Checklist atualizado:", newItems); // Debug visual
         return { ...prev, inspectionItems: newItems };
       });
     },
@@ -276,27 +274,22 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 
   const startJourney = useCallback(
     async (startKm: string, vehicleData: VehicleData, location: string) => {
+      if (isStartingJourney) return;
+      setIsStartingJourney(true);
+      
       const now = Date.now();
 
-      // TRANSFORMAÇÃO DE DADOS (CRUCIAL):
-      // Converte o Array da UI para o Objeto JSON que o Backend espera
-      // CORREÇÃO: Agora inclui TODOS os itens, mesmo os com checked = null (não interagidos)
-      // Isso garante que o backend receba o estado completo do checklist
       const checklistItemsPayload = journey.inspectionItems.reduce<
         Record<string, boolean>
       >((acc, item) => {
-        // Inclui o item se o valor for explicitamente true ou false
-        // Itens null (não preenchidos) são tratados como true (aprovado por padrão)
         if (item.checked === true || item.checked === false) {
           acc[item.id] = item.checked;
         } else if (item.checked === null) {
-          // Se o item não foi interagido, considera como aprovado
           acc[item.id] = true;
         }
         return acc;
       }, {});
 
-      // Monta as notas de problemas (apenas itens explicitamente reprovados)
       const problemsNote = journey.inspectionItems
         .filter((i) => i.checked === false && i.problem)
         .map((i) => `${i.id}: ${i.problem}`)
@@ -306,7 +299,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         journey.hasProblems ||
         journey.inspectionItems.some((item) => item.checked === false);
 
-      // Coleta todas as fotos dos itens reprovados
       const allPhotos: File[] = [];
       journey.inspectionItems.forEach((item) => {
         if (item.checked === false && item.photos && item.photos.length > 0) {
@@ -317,7 +309,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       try {
         if (!user?.id) throw new Error("Usuário não identificado");
 
-        // Garante o ID do veículo
         const finalVehicleId = vehicleData?.id || journey.selectedVehicle?.id;
         if (!finalVehicleId) throw new Error("Veículo não selecionado");
 
@@ -332,28 +323,8 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           },
         };
 
-        // DEBUG: Log detalhado para rastrear o fluxo de dados
-        console.log("[v0] === INICIO DEBUG CHECKLIST ===");
-        console.log(
-          "[v0] inspectionItems (estado bruto):",
-          JSON.stringify(journey.inspectionItems, null, 2),
-        );
-        console.log(
-          "[v0] checklistItemsPayload (após reduce):",
-          JSON.stringify(checklistItemsPayload, null, 2),
-        );
-        console.log("[v0] hasRejectedItems:", hasRejectedItems);
-        console.log("[v0] checklistPhotos to upload:", allPhotos.length);
-        console.log(
-          "[v0] PAYLOAD FINAL PARA API:",
-          JSON.stringify(payload, null, 2),
-        );
-        console.log("[v0] === FIM DEBUG CHECKLIST ===");
-
         const data = await iniciarJornadaAPI(payload, allPhotos);
-        console.log("Resposta Backend Iniciar:", data);
 
-        // Se tem itens rejeitados, entra em modo de espera de aprovacao
         if (hasRejectedItems) {
           toast.warning(
             "Aguardando aprovacao",
@@ -372,7 +343,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Jornada aprovada automaticamente (sem problemas no checklist)
         setJourney((prev) => ({
           ...prev,
           journeyId: data.id,
@@ -387,21 +357,29 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           accumulatedMealSeconds: 0,
           pendingApprovalSince: null,
         }));
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erro ao iniciar jornada:", error);
-        toast.error("Erro de conexão", "Não foi possível iniciar a jornada. Tente novamente.");
+        
+        if (error.message?.includes("já possui uma jornada ativa") || error.response?.data?.message?.includes("já possui uma jornada ativa")) {
+          toast.error(
+            "Viagem duplicada",
+            "Você já possui uma viagem ativa ou aguardando aprovação."
+          );
+        } else {
+          toast.error(
+            "Erro",
+            "Não foi possível iniciar a jornada. Tente novamente."
+          );
+        }
+        
+        throw error;
+      } finally {
+        setIsStartingJourney(false);
       }
     },
-    [
-      journey.inspectionItems,
-      journey.selectedVehicle,
-      journey.hasProblems,
-      toast,
-      user,
-    ],
+    [journey, user, toast, isStartingJourney],
   );
 
-  // ... (pauseJourney, resumeJourney, startCheckout mantidos iguais) ...
   const pauseJourney = useCallback(
     async (type: "rest" | "meal") => {
       const now = Date.now();
@@ -511,7 +489,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  // Funcao para verificar status de aprovacao (polling)
   const checkApprovalStatus = useCallback(async () => {
     if (!journey.journeyId || journey.status !== "pending_approval") return;
 
@@ -519,7 +496,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       const status = await buscarStatusJornadaAPI(journey.journeyId);
 
       if (status === "active") {
-        // Admin aprovou - libera para jornada
         const now = Date.now();
         toast.success(
           "Jornada autorizada",
@@ -536,7 +512,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           accumulatedMealSeconds: 0,
         }));
       } else if (status === "cancelled" || status === "blocked") {
-        // Admin bloqueou
         toast.error(
           "Jornada bloqueada",
           "A central bloqueou esta viagem. Verifique com a manutencao.",
@@ -552,7 +527,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     }
   }, [journey.journeyId, journey.status, toast]);
 
-  // Handler quando aprovacao e concedida (chamado via socket ou polling)
   const handleApprovalGranted = useCallback(() => {
     const now = Date.now();
     toast.success(
@@ -571,7 +545,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     }));
   }, [toast]);
 
-  // Handler quando jornada e bloqueada
   const handleJourneyBlocked = useCallback(
     (reason: string) => {
       toast.error(
@@ -587,11 +560,9 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
     [toast],
   );
 
-  // Polling automatico quando em estado de espera
   useEffect(() => {
     if (journey.status !== "pending_approval" || !journey.journeyId) return;
 
-    // Verifica a cada 5 segundos
     const interval = setInterval(() => {
       checkApprovalStatus();
     }, 5000);
@@ -616,16 +587,15 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         startCheckout,
         endJourney,
         updateLocation,
-
         cancelJourney,
         checkApprovalStatus,
         handleApprovalGranted,
         handleJourneyBlocked,
-
         getTotalElapsedSeconds,
         getDrivingSeconds,
         getRestSeconds,
         getMealSeconds,
+        isStartingJourney,
       }}
     >
       {children}

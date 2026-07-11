@@ -418,6 +418,7 @@ export function DriverJourneyView() {
     getRestSeconds,
     getMealSeconds,
     cancelJourney, // Certifique-se de que esta função está no Contexto
+    isStartingJourney,
   } = useJourney();
 
   const handleChangeVehicle = () => {
@@ -756,8 +757,8 @@ export function DriverJourneyView() {
   const toast = useToastNotification();
 
   const handleCheckIn = async () => {
-    // Adicionado verificação do veículo selecionado
-    if (!startKm || !journey.selectedVehicle) return;
+    // Adicionado verificação do veículo selecionado e loading state
+    if (!startKm || !journey.selectedVehicle || isStartingJourney) return;
 
     try {
       // CORREÇÃO: Passando os 3 argumentos exigidos (Km, Veículo, Localização)
@@ -2278,11 +2279,20 @@ export function DriverJourneyView() {
               </Button>
               <Button
                 className="flex-1 h-14 bg-green-500 hover:bg-green-600 text-base font-semibold active:scale-95 transition-transform"
-                disabled={!startKm}
+                disabled={!startKm || isStartingJourney}
                 onClick={handleCheckIn}
               >
-                <PlayCircle className="mr-2 h-5 w-5" />
-                INICIAR JORNADA
+                {isStartingJourney ? (
+                  <>
+                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                    INICIANDO...
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle className="mr-2 h-5 w-5" />
+                    INICIAR JORNADA
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>

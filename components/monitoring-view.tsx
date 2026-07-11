@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -63,6 +62,7 @@ const kanbanColumns = [
     color: "text-red-600",
     bgColor: "bg-red-50",
     borderColor: "border-red-200",
+    scrollClass: "scrollbar-kanban-red",
     emptyText: "Nenhuma jornada aguardando",
   },
   {
@@ -72,6 +72,7 @@ const kanbanColumns = [
     color: "text-green-600",
     bgColor: "bg-green-50",
     borderColor: "border-green-200",
+    scrollClass: "scrollbar-kanban-green",
     emptyText: "Nenhuma viagem ativa",
   },
   {
@@ -81,6 +82,7 @@ const kanbanColumns = [
     color: "text-amber-600",
     bgColor: "bg-amber-50",
     borderColor: "border-amber-200",
+    scrollClass: "scrollbar-kanban-amber",
     emptyText: "Nenhum motorista em descanso",
   },
   {
@@ -90,6 +92,7 @@ const kanbanColumns = [
     color: "text-orange-600",
     bgColor: "bg-orange-50",
     borderColor: "border-orange-200",
+    scrollClass: "scrollbar-kanban-orange",
     emptyText: "Nenhum motorista em almoco",
   },
 ];
@@ -399,7 +402,12 @@ export function MonitoringView() {
                         </p>
                       </div>
                     ) : (
-                      <ScrollArea className="max-h-[60vh] pr-2">
+                      <div
+                        className={cn(
+                          "max-h-[60vh] overflow-y-auto pr-1",
+                          column.scrollClass,
+                        )}
+                      >
                         {/* group on the list so siblings dim when one card is hovered */}
                         <div className="group/cards space-y-3">
                           {columnJourneys.map((journey) => (
@@ -417,7 +425,7 @@ export function MonitoringView() {
                             </div>
                           ))}
                         </div>
-                      </ScrollArea>
+                      </div>
                     )}
                   </CardContent>
                 </Card>

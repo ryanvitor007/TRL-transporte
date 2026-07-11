@@ -130,6 +130,21 @@ const ProjectionTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+const CustomBarCursor = ({ x, y, width, height, isDark }: any) => {
+  if (x === undefined || y === undefined || width === undefined || height === undefined) return null;
+  return (
+    <line
+      x1={x + width / 2}
+      y1={y}
+      x2={x + width / 2}
+      y2={y + height}
+      stroke={isDark ? "#60A5FA" : "#3B82F6"}
+      strokeWidth={1.5}
+      strokeDasharray="3 3"
+    />
+  );
+};
+
 // ─── KPI CARD ─────────────────────────────────────────────────────────────────
 
 interface KpiCardProps {
@@ -316,7 +331,7 @@ export function FinancialsView() {
                 <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#27272A" : "#F4F4F5"} />
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#71717A" }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: "#71717A" }} axisLine={false} tickLine={false} />
-                <Tooltip content={<EvolutionTooltip />} />
+                <Tooltip content={<EvolutionTooltip />} cursor={{ stroke: isDark ? "#3F3F46" : "#E4E4E7", strokeWidth: 1 }} />
                 <Area type="monotone" dataKey="manutencao" name="Manutenção" stroke="#3B82F6" strokeWidth={2}
                   fill="url(#gradM)" dot={{ r: 3, fill: "#3B82F6", strokeWidth: 0 }}
                   activeDot={{ r: 5, fill: "#3B82F6", strokeWidth: 2, stroke: "#fff" }} />
@@ -475,7 +490,7 @@ export function FinancialsView() {
                 <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#27272A" : "#F4F4F5"} vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#71717A" }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: "#71717A" }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ProjectionTooltip />} />
+                <Tooltip content={<ProjectionTooltip />} cursor={<CustomBarCursor isDark={isDark} />} />
                 <Bar dataKey="realizado" name="Realizado" radius={[4, 4, 0, 0]} maxBarSize={40}>
                   {projectionData.map((entry, i) => (
                     <Cell key={i} fill={entry.realizado ? "#3B82F6" : "transparent"} />

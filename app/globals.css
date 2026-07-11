@@ -127,10 +127,10 @@
     @apply bg-background text-foreground;
   }
 
-  /* Webkit Scrollbar Customization */
+  /* Webkit Scrollbar Customization — fino e discreto */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
   }
 
   ::-webkit-scrollbar-track {
@@ -145,4 +145,53 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
   }
+
+  /* ── Kanban column scrollbars — colored & ultra-thin ── */
+  .scrollbar-kanban-red {
+    scrollbar-width: thin;
+    scrollbar-color: #fca5a5 transparent;
+  }
+  .scrollbar-kanban-red::-webkit-scrollbar { width: 4px; }
+  .scrollbar-kanban-red::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-kanban-red::-webkit-scrollbar-thumb {
+    background: #fca5a5;
+    border-radius: 9999px;
+  }
+  .scrollbar-kanban-red::-webkit-scrollbar-thumb:hover { background: #ef4444; }
+
+  .scrollbar-kanban-green {
+    scrollbar-width: thin;
+    scrollbar-color: #86efac transparent;
+  }
+  .scrollbar-kanban-green::-webkit-scrollbar { width: 4px; }
+  .scrollbar-kanban-green::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-kanban-green::-webkit-scrollbar-thumb {
+    background: #86efac;
+    border-radius: 9999px;
+  }
+  .scrollbar-kanban-green::-webkit-scrollbar-thumb:hover { background: #22c55e; }
+
+  .scrollbar-kanban-amber {
+    scrollbar-width: thin;
+    scrollbar-color: #fcd34d transparent;
+  }
+  .scrollbar-kanban-amber::-webkit-scrollbar { width: 4px; }
+  .scrollbar-kanban-amber::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-kanban-amber::-webkit-scrollbar-thumb {
+    background: #fcd34d;
+    border-radius: 9999px;
+  }
+  .scrollbar-kanban-amber::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
+
+  .scrollbar-kanban-orange {
+    scrollbar-width: thin;
+    scrollbar-color: #fdba74 transparent;
+  }
+  .scrollbar-kanban-orange::-webkit-scrollbar { width: 4px; }
+  .scrollbar-kanban-orange::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-kanban-orange::-webkit-scrollbar-thumb {
+    background: #fdba74;
+    border-radius: 9999px;
+  }
+  .scrollbar-kanban-orange::-webkit-scrollbar-thumb:hover { background: #f97316; }
 }
