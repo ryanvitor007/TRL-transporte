@@ -77,8 +77,9 @@ import {
   Legend,
 } from "recharts";
 import { useAuth } from "@/contexts/auth-context";
+import { useToastNotification } from "@/contexts/notification-context";
 import { cn } from "@/lib/utils";
-import { buscarFrotaAPI } from "@/lib/api-service";
+import { buscarFrotaAPI, salvarTacografoAPI } from "@/lib/api-service";
 
 // ─── INTERFACES ────────────────────────────────────────────────
 interface TachographRecord {
@@ -225,6 +226,7 @@ function EmptyState() {
 // ─── MAIN COMPONENT ─────────────────────────────────────────────
 export function DriverTachographView() {
   const { user } = useAuth();
+  const toast = useToastNotification();
   const driverName = user?.name || "Motorista";
   const driverId   = user?.id   || "d1";
 
@@ -239,6 +241,7 @@ export function DriverTachographView() {
   const [dateFilter, setDateFilter]           = useState({ start: "", end: "" });
   const [isSubmitting, setIsSubmitting]       = useState(false);
   const [uploadedPhoto, setUploadedPhoto]     = useState<string | null>(null);
+  const [selectedFile, setSelectedFile]       = useState<File | null>(null);
   const [newRecord, setNewRecord]             = useState({
     vehicleId: "", date: format(new Date(), "yyyy-MM-dd"),
     startTime: "", endTime: "", kmStart: "", kmEnd: "",
@@ -311,16 +314,68 @@ export function DriverTachographView() {
     };
   }, [records, filteredRecords]);
 
-  // Submit
+  // Submit via FormData / API
   const handleSubmit = async () => {
-    if (!newRecord.vehicleId || !newRecord.startTime || !newRecord.endTime || !newRecord.kmEnd || isKmInvalid) return;
+    if (
+      !newRecord.vehicleId ||
+      !newRecord.date ||
+      !newRecord.startTime ||
+      !newRecord.endTime ||
+      !newRecord.kmStart ||
+      !newRecord.kmEnd ||
+      isKmInvalid ||
+      !selectedFile
+    ) {
+      toast.error(
+        "Campos Obrigatórios",
+        "Preencha todos os campos obrigatórios e selecione a foto do disco de tacógrafo."
+      );
+      return;
+    }
+
     setIsSubmitting(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setIsSubmitting(false);
-    setIsNewRecordOpen(false);
-    setNewRecord({ vehicleId:"", date: format(new Date(),"yyyy-MM-dd"), startTime:"", endTime:"", kmStart:"", kmEnd:"", readingType:"Diário", notes:"" });
-    setUploadedPhoto(null);
-    loadData();
+
+    try {
+      const formData = new FormData();
+      formData.append("driverId", String(driverId));
+      formData.append("vehicleId", String(newRecord.vehicleId));
+      formData.append("date", newRecord.date);
+      formData.append("startTime", newRecord.startTime);
+      formData.append("endTime", newRecord.endTime);
+      formData.append("startKm", String(newRecord.kmStart));
+      formData.append("endKm", String(newRecord.kmEnd));
+      if (newRecord.notes && newRecord.notes.trim()) {
+        formData.append("observation", newRecord.notes.trim());
+      }
+      formData.append("image", selectedFile);
+
+      await salvarTacografoAPI(formData);
+
+      toast.success(
+        "Tacógrafo Enviado!",
+        "O disco de tacógrafo foi recebido e está aguardando auditoria (202 Accepted)."
+      );
+
+      setIsNewRecordOpen(false);
+      setNewRecord({
+        vehicleId: "",
+        date: format(new Date(), "yyyy-MM-dd"),
+        startTime: "",
+        endTime: "",
+        kmStart: "",
+        kmEnd: "",
+        readingType: "Diário",
+        notes: "",
+      });
+      setUploadedPhoto(null);
+      setSelectedFile(null);
+      loadData();
+    } catch (error: any) {
+      console.error("Erro ao enviar tacógrafo:", error);
+      toast.error("Falha no Envio", error.message || "Erro ao conectar com o servidor.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getInfractionLabel = (type?: TachographRecord["infractionType"]) => {
@@ -817,7 +872,16 @@ export function DriverTachographView() {
                     <div className="relative">
                       <input
                         type="file" accept="image/*" capture="environment" aria-label="Foto do disco"
-                        onChange={e => setUploadedPhoto(e.target.files?.[0]?.name || null)}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setSelectedFile(file);
+                            setUploadedPhoto(file.name);
+                          } else {
+                            setSelectedFile(null);
+                            setUploadedPhoto(null);
+                          }
+                        }}
                         className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
                       />
                       <div className={cn("flex h-11 items-center justify-center gap-2 rounded-xl border-2 border-dashed text-xs transition",
@@ -827,7 +891,7 @@ export function DriverTachographView() {
                         <span className="truncate">{uploadedPhoto || "Clique para enviar"}</span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-gray-400">JPG, PNG ou PDF (máx. 10MB)</p>
+                    <p className="text-[10px] text-gray-400">JPG, JPEG ou PNG (máx. 5MB)</p>
                   </div>
                 </div>
               </div>
@@ -849,7 +913,7 @@ export function DriverTachographView() {
             <Button variant="outline" onClick={() => setIsNewRecordOpen(false)} className="flex-1 rounded-xl sm:flex-none">Cancelar</Button>
             <Button
               onClick={handleSubmit}
-              disabled={!newRecord.vehicleId || !newRecord.startTime || !newRecord.endTime || !newRecord.kmEnd || isKmInvalid || isSubmitting}
+              disabled={!newRecord.vehicleId || !newRecord.startTime || !newRecord.endTime || !newRecord.kmEnd || isKmInvalid || !selectedFile || isSubmitting}
               className="flex-1 rounded-xl bg-[#0B1F4D] hover:bg-[#0d2460] sm:flex-none active:scale-95 transition-transform"
             >
               {isSubmitting ? (

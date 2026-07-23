@@ -600,7 +600,25 @@ export const buscarTacografosAPI = async () => {
   return stored ? JSON.parse(stored) : [];
 };
 
-export const salvarTacografoAPI = async (dados: any) => {
+export const salvarTacografoAPI = async (dados: FormData | any) => {
+  if (dados instanceof FormData) {
+    const response = await customFetch(`${API_BASE_URL}/tachographs`, {
+      method: "POST",
+      body: dados,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const message = Array.isArray(errorData.message)
+        ? errorData.message.join(", ")
+        : errorData.message || "Erro ao enviar registro de tacógrafo";
+      throw new Error(message);
+    }
+
+    return response.json();
+  }
+
+  // Fallback para modo mock com objeto simples
   await new Promise((resolve) => setTimeout(resolve, 500));
   const currentData = await buscarTacografosAPI();
   const novoRegistro = {
