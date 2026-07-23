@@ -600,6 +600,16 @@ export const buscarTacografosAPI = async () => {
   return stored ? JSON.parse(stored) : [];
 };
 
+// Busca as estatísticas agregadas de tacógrafos do painel gerencial
+export const buscarTacografoStatsAPI = async () => {
+  const response = await customFetch(`${API_BASE_URL}/dashboard/tachographs-stats`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Erro ao buscar estatísticas de tacógrafos");
+  }
+  return response.json();
+};
+
 export const salvarTacografoAPI = async (dados: FormData | any) => {
   if (dados instanceof FormData) {
     const response = await customFetch(`${API_BASE_URL}/tachographs`, {

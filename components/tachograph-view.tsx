@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 // Avatar via plain div (component not installed)
 import {
   Clock,
@@ -46,6 +47,8 @@ import {
   Timer,
   ShieldCheck,
   ShieldAlert,
+  RefreshCw,
+  WifiOff,
 } from "lucide-react";
 import {
   AreaChart,
@@ -58,22 +61,48 @@ import {
   BarChart,
   Bar,
 } from "recharts";
+import { buscarTacografoStatsAPI } from "@/lib/api-service";
 
-// ── Mock Data ──────────────────────────────────────────────────────────────
-const weeklyComplianceData = [
-  { day: "Seg", conformidade: 45 },
-  { day: "Ter", conformidade: 52 },
-  { day: "Qua", conformidade: 48 },
-  { day: "Qui", conformidade: 70 },
-  { day: "Sex", conformidade: 65 },
-  { day: "Sáb", conformidade: 78 },
-  { day: "Dom", conformidade: 82 },
+// ── Interfaces para os dados da API ───────────────────────────────────────
+interface TachographStatsKpis {
+  pending: number;
+  alerts: number;
+  compliant: number;
+  totalAtivos: number;
+}
+
+interface WeeklyCompliancePoint {
+  name: string;
+  compliance: number;
+}
+
+interface AlertsDistributionPoint {
+  name: string;
+  value: number;
+}
+
+interface TachographStatsData {
+  kpis: TachographStatsKpis;
+  weeklyCompliance: WeeklyCompliancePoint[];
+  alertsDistribution: AlertsDistributionPoint[];
+  updatedAt: string;
+}
+
+// ── Fallback Mock Data (usados apenas se a API falhar) ─────────────────────
+const fallbackWeeklyCompliance: WeeklyCompliancePoint[] = [
+  { name: "Seg", compliance: 45 },
+  { name: "Ter", compliance: 52 },
+  { name: "Qua", compliance: 48 },
+  { name: "Qui", compliance: 70 },
+  { name: "Sex", compliance: 65 },
+  { name: "Sáb", compliance: 78 },
+  { name: "Dom", compliance: 82 },
 ];
 
-const alertDistributionData = [
-  { categoria: "Velocidade", alertas: 18 },
-  { categoria: "Tempo Condução", alertas: 11 },
-  { categoria: "Descanso", alertas: 5 },
+const fallbackAlertsDistribution: AlertsDistributionPoint[] = [
+  { name: "Excesso Velocidade", value: 18 },
+  { name: "Jornada Excessiva", value: 11 },
+  { name: "Falta Descanso", value: 5 },
 ];
 
 const recentAlerts = [
@@ -213,6 +242,11 @@ export function TachographView() {
   const [driverFilter, setDriverFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
 
+  // ── Stats API State ──
+  const [statsData, setStatsData] = useState<TachographStatsData | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState(false);
+
   // ── Audit Modal State ──
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
@@ -221,6 +255,39 @@ export function TachographView() {
     setSelectedRecord(record);
     setIsAuditModalOpen(true);
   };
+
+  // ── Fetch Stats ──
+  const loadStats = useCallback(async () => {
+    setIsLoadingStats(true);
+    setStatsError(false);
+    try {
+      const data = await buscarTacografoStatsAPI();
+      setStatsData(data);
+    } catch (err) {
+      console.error("Erro ao buscar estatísticas de tacógrafos:", err);
+      setStatsError(true);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  // ── Derived data (API real → fallback mock) ──
+  const kpis = statsData?.kpis ?? { pending: 0, alerts: 0, compliant: 0, totalAtivos: 0 };
+  const complianceRate = kpis.totalAtivos > 0
+    ? Math.round((kpis.compliant / kpis.totalAtivos) * 100)
+    : 0;
+
+  const weeklyComplianceData = (statsData?.weeklyCompliance ?? fallbackWeeklyCompliance).map(
+    (p) => ({ day: p.name, conformidade: p.compliance })
+  );
+
+  const alertDistributionData = (statsData?.alertsDistribution ?? fallbackAlertsDistribution).map(
+    (p) => ({ categoria: p.name, alertas: p.value })
+  );
 
   const filteredAlerts = recentAlerts.filter((a) => {
     if (activeTab === "pendentes") return a.status === "Pendente";
@@ -298,41 +365,72 @@ export function TachographView() {
       </Card>
 
       {/* ── KPI Cards ── */}
+      {statsError && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <WifiOff className="h-5 w-5 text-amber-600 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">Falha ao carregar estatísticas</p>
+            <p className="text-xs text-amber-600">Os dados exibidos podem estar desatualizados.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={loadStats} className="gap-2 shrink-0">
+            <RefreshCw className="h-3.5 w-3.5" />
+            Tentar novamente
+          </Button>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          title="Tacógrafos Pendentes"
-          value="15"
-          badge="+3 hoje"
-          badgeVariant="green"
-          icon={Clock}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
-        />
-        <KpiCard
-          title="Tacógrafos com Alerta"
-          value="8"
-          badge="+1"
-          badgeVariant="red"
-          icon={AlertTriangle}
-          iconBg="bg-red-50"
-          iconColor="text-red-500"
-        />
-        <KpiCard
-          title="Conformidade Geral"
-          value="92%"
-          badge="+0.5%"
-          badgeVariant="green"
-          icon={CheckCircle2}
-          iconBg="bg-green-50"
-          iconColor="text-green-600"
-        />
-        <KpiCard
-          title="Motoristas Ativos"
-          value="112"
-          icon={Truck}
-          iconBg="bg-sky-50"
-          iconColor="text-sky-600"
-        />
+        {isLoadingStats ? (
+          <>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="flex-1 min-w-0">
+                <CardContent className="p-2">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-6 w-12" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </>
+        ) : (
+          <>
+            <KpiCard
+              title="Tacógrafos Pendentes"
+              value={String(kpis.pending)}
+              icon={Clock}
+              iconBg="bg-blue-50"
+              iconColor="text-blue-600"
+            />
+            <KpiCard
+              title="Tacógrafos com Alerta"
+              value={String(kpis.alerts)}
+              badge={kpis.alerts > 0 ? `${kpis.alerts}` : undefined}
+              badgeVariant="red"
+              icon={AlertTriangle}
+              iconBg="bg-red-50"
+              iconColor="text-red-500"
+            />
+            <KpiCard
+              title="Conformidade Geral"
+              value={`${complianceRate}%`}
+              badge={complianceRate >= 90 ? "Bom" : complianceRate >= 70 ? "Regular" : "Crítico"}
+              badgeVariant={complianceRate >= 70 ? "green" : "red"}
+              icon={CheckCircle2}
+              iconBg="bg-green-50"
+              iconColor="text-green-600"
+            />
+            <KpiCard
+              title="Total de Registros"
+              value={String(kpis.totalAtivos)}
+              icon={Truck}
+              iconBg="bg-sky-50"
+              iconColor="text-sky-600"
+            />
+          </>
+        )}
       </div>
 
       {/* ── Charts Row ── */}
@@ -347,6 +445,13 @@ export function TachographView() {
           </CardHeader>
           <CardContent className="px-3 pb-2 pt-0">
             <div className="h-[150px] w-full">
+              {isLoadingStats ? (
+                <div className="flex items-end gap-2 h-full pt-4 pb-2">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <Skeleton key={i} className="flex-1 rounded-t-md" style={{ height: `${30 + Math.random() * 60}%` }} />
+                  ))}
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={weeklyComplianceData}
@@ -399,6 +504,7 @@ export function TachographView() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -413,6 +519,13 @@ export function TachographView() {
           </CardHeader>
           <CardContent className="px-3 pb-2 pt-0">
             <div className="h-[150px] w-full">
+              {isLoadingStats ? (
+                <div className="flex items-end gap-4 h-full pt-4 pb-2 px-6">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="flex-1 rounded-t-md" style={{ height: `${40 + Math.random() * 50}%` }} />
+                  ))}
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={alertDistributionData}
@@ -454,6 +567,7 @@ export function TachographView() {
                   />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -476,10 +590,10 @@ export function TachographView() {
                     Todos os Motoristas
                   </TabsTrigger>
                   <TabsTrigger value="pendentes" className="text-xs">
-                    Pendentes (15)
+                    Pendentes ({kpis.pending})
                   </TabsTrigger>
                   <TabsTrigger value="alerta" className="text-xs">
-                    Com Alerta (8)
+                    Com Alerta ({kpis.alerts})
                   </TabsTrigger>
                 </TabsList>
               </div>
