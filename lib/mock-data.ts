@@ -4,7 +4,7 @@
 export type Branch = "São Paulo" | "Recife" | "Piauí";
 
 export interface Vehicle {
-  id: number | string;
+  id: string;
   modelo: string;
   placa: string;
   ano: number;
@@ -112,7 +112,7 @@ export interface TrafficFine {
 
 export const mockDrivers: Driver[] = [
   {
-    id: "d1",
+    id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
     name: "João Pereira",
     cpf: "123.456.789-00",
     cnh: "12345678901",
@@ -120,7 +120,7 @@ export const mockDrivers: Driver[] = [
     branch: "São Paulo",
   },
   {
-    id: "d2",
+    id: "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
     name: "Carlos Silva",
     cpf: "234.567.890-11",
     cnh: "23456789012",
@@ -128,7 +128,7 @@ export const mockDrivers: Driver[] = [
     branch: "São Paulo",
   },
   {
-    id: "d3",
+    id: "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
     name: "Roberto Mendes",
     cpf: "345.678.901-22",
     cnh: "34567890123",
@@ -136,7 +136,7 @@ export const mockDrivers: Driver[] = [
     branch: "Recife",
   },
   {
-    id: "d4",
+    id: "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f80",
     name: "Antonio Costa",
     cpf: "456.789.012-33",
     cnh: "45678901234",
@@ -144,7 +144,7 @@ export const mockDrivers: Driver[] = [
     branch: "Recife",
   },
   {
-    id: "d5",
+    id: "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8091",
     name: "Marcos Oliveira",
     cpf: "567.890.123-44",
     cnh: "56789012345",
@@ -152,7 +152,7 @@ export const mockDrivers: Driver[] = [
     branch: "Piauí",
   },
   {
-    id: "d6",
+    id: "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f809102",
     name: "Paulo Santos",
     cpf: "678.901.234-55",
     cnh: "67890123456",
@@ -163,7 +163,7 @@ export const mockDrivers: Driver[] = [
 
 export const mockVehicles: Vehicle[] = [
   {
-    id: 1,
+    id: "11111111-1111-4111-b111-111111111101",
     modelo: "Volvo FH 540",
     placa: "ABC-1234",
     ano: 2022,
@@ -177,7 +177,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2025-12-15",
   },
   {
-    id: 2,
+    id: "22222222-2222-4222-b222-222222222202",
     modelo: "Scania R450",
     placa: "DEF-5678",
     ano: 2021,
@@ -191,7 +191,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2025-11-20",
   },
   {
-    id: 3,
+    id: "33333333-3333-4333-b333-333333333303",
     modelo: "Mercedes Actros",
     placa: "GHI-9012",
     ano: 2023,
@@ -205,7 +205,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2026-01-05",
   },
   {
-    id: 4,
+    id: "44444444-4444-4444-b444-444444444404",
     modelo: "DAF XF",
     placa: "JKL-3456",
     ano: 2020,
@@ -219,7 +219,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2025-10-10",
   },
   {
-    id: 5,
+    id: "55555555-5555-4555-b555-555555555505",
     modelo: "Iveco S-Way",
     placa: "MNO-7891",
     ano: 2022,
@@ -233,7 +233,7 @@ export const mockVehicles: Vehicle[] = [
     lastMaintenance: "2025-12-28",
   },
   {
-    id: 6,
+    id: "66666666-6666-4666-b666-666666666606",
     modelo: "Volvo FH 460",
     placa: "PQR-2345",
     ano: 2021,
@@ -251,7 +251,7 @@ export const mockVehicles: Vehicle[] = [
 export const mockDocuments: Document[] = [
   {
     id: "1",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     type: "IPVA",
     expirationDate: "2026-01-15",
@@ -266,7 +266,7 @@ export const mockDocuments: Document[] = [
   },
   {
     id: "2",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     type: "Licenciamento",
     expirationDate: "2026-03-20",
@@ -279,7 +279,7 @@ export const mockDocuments: Document[] = [
   },
   {
     id: "3",
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     type: "Seguro",
     expirationDate: "2026-01-10",
@@ -291,7 +291,7 @@ export const mockDocuments: Document[] = [
   },
   {
     id: "4",
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
     type: "CRLV",
     expirationDate: "2025-12-20",
@@ -303,7 +303,7 @@ export const mockDocuments: Document[] = [
   },
   {
     id: "5",
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
     type: "Licenciamento",
     expirationDate: "2025-12-25",
@@ -316,7 +316,7 @@ export const mockDocuments: Document[] = [
   },
   {
     id: "6",
-    vehicleId: "3",
+    vehicleId: "33333333-3333-4333-b333-333333333303",
     vehiclePlate: "GHI-9012",
     type: "IPVA",
     expirationDate: "2026-02-15",
@@ -334,7 +334,7 @@ export const mockDocuments: Document[] = [
 export const mockMaintenances: Maintenance[] = [
   {
     id: "1",
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
     vehicleModel: "DAF XF",
     type: "Troca de Óleo",
@@ -346,7 +346,7 @@ export const mockMaintenances: Maintenance[] = [
   },
   {
     id: "2",
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     vehicleModel: "Scania R450",
     type: "Revisão Geral",
@@ -358,7 +358,7 @@ export const mockMaintenances: Maintenance[] = [
   },
   {
     id: "3",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     vehicleModel: "Volvo FH 540",
     type: "Troca de Pneus",
@@ -370,7 +370,7 @@ export const mockMaintenances: Maintenance[] = [
   },
   {
     id: "4",
-    vehicleId: "3",
+    vehicleId: "33333333-3333-4333-b333-333333333303",
     vehiclePlate: "GHI-9012",
     vehicleModel: "Mercedes Actros",
     type: "Alinhamento",
@@ -382,7 +382,7 @@ export const mockMaintenances: Maintenance[] = [
   },
   {
     id: "5",
-    vehicleId: "5",
+    vehicleId: "55555555-5555-4555-b555-555555555505",
     vehiclePlate: "MNO-7891",
     vehicleModel: "Iveco S-Way",
     type: "Freios",
@@ -397,7 +397,7 @@ export const mockMaintenances: Maintenance[] = [
 export const mockFines: Fine[] = [
   {
     id: "1",
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     date: "2025-11-14",
     description: "Excesso de velocidade - 20% acima",
@@ -413,7 +413,7 @@ export const mockFines: Fine[] = [
   },
   {
     id: "2",
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
     date: "2025-10-27",
     description: "Estacionamento irregular",
@@ -428,7 +428,7 @@ export const mockFines: Fine[] = [
   },
   {
     id: "3",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     date: "2025-12-04",
     description: "Avanço de sinal vermelho",
@@ -527,7 +527,7 @@ export interface VehicleTCO {
 export const mockFuelEntries: FuelEntry[] = [
   {
     id: "1",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     date: "2026-01-05",
     liters: 320,
@@ -539,7 +539,7 @@ export const mockFuelEntries: FuelEntry[] = [
   },
   {
     id: "2",
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     date: "2026-01-04",
     liters: 280,
@@ -551,7 +551,7 @@ export const mockFuelEntries: FuelEntry[] = [
   },
   {
     id: "3",
-    vehicleId: "3",
+    vehicleId: "33333333-3333-4333-b333-333333333303",
     vehiclePlate: "GHI-9012",
     date: "2026-01-06",
     liters: 150,
@@ -563,7 +563,7 @@ export const mockFuelEntries: FuelEntry[] = [
   },
   {
     id: "4",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     date: "2025-12-28",
     liters: 310,
@@ -575,7 +575,7 @@ export const mockFuelEntries: FuelEntry[] = [
   },
   {
     id: "5",
-    vehicleId: "5",
+    vehicleId: "55555555-5555-4555-b555-555555555505",
     vehiclePlate: "MNO-7891",
     date: "2026-01-03",
     liters: 200,
@@ -587,7 +587,7 @@ export const mockFuelEntries: FuelEntry[] = [
   },
   {
     id: "6",
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
     date: "2026-01-02",
     liters: 350,
@@ -769,7 +769,7 @@ export const mockMonthlyCosts: MonthlyCost[] = [
 
 export const mockVehicleTCO: VehicleTCO[] = [
   {
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     vehicleModel: "Volvo FH 540",
     purchaseValue: 850000,
@@ -780,7 +780,7 @@ export const mockVehicleTCO: VehicleTCO[] = [
     branch: "São Paulo",
   },
   {
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     vehicleModel: "Scania R450",
     purchaseValue: 780000,
@@ -791,7 +791,7 @@ export const mockVehicleTCO: VehicleTCO[] = [
     branch: "São Paulo",
   },
   {
-    vehicleId: "3",
+    vehicleId: "33333333-3333-4333-b333-333333333303",
     vehiclePlate: "GHI-9012",
     vehicleModel: "Mercedes Actros",
     purchaseValue: 920000,
@@ -802,7 +802,7 @@ export const mockVehicleTCO: VehicleTCO[] = [
     branch: "Recife",
   },
   {
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
     vehicleModel: "DAF XF",
     purchaseValue: 650000,
@@ -813,7 +813,7 @@ export const mockVehicleTCO: VehicleTCO[] = [
     branch: "Recife",
   },
   {
-    vehicleId: "5",
+    vehicleId: "55555555-5555-4555-b555-555555555505",
     vehiclePlate: "MNO-7891",
     vehicleModel: "Iveco S-Way",
     purchaseValue: 720000,
@@ -824,7 +824,7 @@ export const mockVehicleTCO: VehicleTCO[] = [
     branch: "Piauí",
   },
   {
-    vehicleId: "6",
+    vehicleId: "66666666-6666-4666-b666-666666666606",
     vehiclePlate: "PQR-2345",
     vehicleModel: "Volvo FH 460",
     purchaseValue: 780000,
@@ -877,7 +877,7 @@ export interface SpareTire {
 
 export const mockVehicleTires: VehicleTires[] = [
   {
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     vehicleModel: "Volvo FH 540",
     branch: "São Paulo",
@@ -921,7 +921,7 @@ export const mockVehicleTires: VehicleTires[] = [
     ],
   },
   {
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     vehicleModel: "Scania R450",
     branch: "São Paulo",
@@ -965,7 +965,7 @@ export const mockVehicleTires: VehicleTires[] = [
     ],
   },
   {
-    vehicleId: "3",
+    vehicleId: "33333333-3333-4333-b333-333333333303",
     vehiclePlate: "GHI-9012",
     vehicleModel: "Mercedes Actros",
     branch: "Recife",
@@ -1013,7 +1013,7 @@ export const mockVehicleTires: VehicleTires[] = [
 export const mockTireRotations: TireRotation[] = [
   {
     id: "r1",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     date: "2025-10-20",
     description: "Rodízio dianteiros para traseiros",
@@ -1022,7 +1022,7 @@ export const mockTireRotations: TireRotation[] = [
   },
   {
     id: "r2",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     date: "2025-08-15",
     description: "Troca dos pneus dianteiros (novos)",
@@ -1031,7 +1031,7 @@ export const mockTireRotations: TireRotation[] = [
   },
   {
     id: "r3",
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     date: "2025-06-05",
     description: "Rodízio cruzado completo",
@@ -1040,7 +1040,7 @@ export const mockTireRotations: TireRotation[] = [
   },
   {
     id: "r4",
-    vehicleId: "3",
+    vehicleId: "33333333-3333-4333-b333-333333333303",
     vehiclePlate: "GHI-9012",
     date: "2025-11-01",
     description: "Troca de todos os pneus (novos)",
@@ -1125,7 +1125,7 @@ export interface Incident {
 export const mockIncidents: Incident[] = [
   {
     id: "i1",
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     vehicleModel: "Scania R450",
     driverName: "Carlos Silva",
@@ -1143,7 +1143,7 @@ export const mockIncidents: Incident[] = [
   },
   {
     id: "i2",
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
     vehicleModel: "DAF XF",
     driverName: "Roberto Mendes",
@@ -1161,7 +1161,7 @@ export const mockIncidents: Incident[] = [
   },
   {
     id: "i3",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     vehicleModel: "Volvo FH 540",
     driverName: "João Pereira",
@@ -1179,7 +1179,7 @@ export const mockIncidents: Incident[] = [
   },
   {
     id: "i4",
-    vehicleId: "5",
+    vehicleId: "55555555-5555-4555-b555-555555555505",
     vehiclePlate: "MNO-7891",
     vehicleModel: "Iveco S-Way",
     driverName: "Antonio Costa",
@@ -1253,7 +1253,7 @@ export interface VehicleDocuments {
 // Observe que agora usamos 'tollTag' em vez de 'semParar' dentro do objeto document
 export const mockVehicleDocuments: VehicleDocuments[] = [
   {
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     renavam: "00123456789",
     chassi: "9BWZZZ377VT004251",
@@ -1278,13 +1278,13 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       lastUpdate: "2026-01-07",
     },
     branch: "São Paulo",
-    id: "1",
+    id: "11111111-1111-4111-b111-111111111101",
     type: "IPVA",
     expirationDate: "2026-01-15",
     status: "Vencendo",
   },
   {
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     renavam: "00987654321",
     chassi: "9BWZZZ377VT004252",
@@ -1309,13 +1309,13 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       lastUpdate: "2026-01-05",
     },
     branch: "São Paulo",
-    id: "2",
+    id: "22222222-2222-4222-b222-222222222202",
     type: "Seguro",
     expirationDate: "2026-01-10",
     status: "Vencendo",
   },
   {
-    vehicleId: "3",
+    vehicleId: "33333333-3333-4333-b333-333333333303",
     vehiclePlate: "GHI-9012",
     renavam: "00321654987",
     chassi: "9BWZZZ377VT004253",
@@ -1340,13 +1340,13 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       lastUpdate: "2026-01-06",
     },
     branch: "Recife",
-    id: "3",
+    id: "33333333-3333-4333-b333-333333333303",
     type: "IPVA",
     expirationDate: "2026-02-15",
     status: "Válido",
   },
   {
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
     renavam: "00456789123",
     chassi: "9BWZZZ377VT004254",
@@ -1371,13 +1371,13 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       lastUpdate: "2026-01-05",
     },
     branch: "Recife",
-    id: "4",
+    id: "44444444-4444-4444-b444-444444444404",
     type: "Licenciamento",
     expirationDate: "2025-12-25",
     status: "Vencido",
   },
   {
-    vehicleId: "5",
+    vehicleId: "55555555-5555-4555-b555-555555555505",
     vehiclePlate: "MNO-7891",
     renavam: "00654987321",
     chassi: "9BWZZZ377VT004255",
@@ -1402,13 +1402,13 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       lastUpdate: "2026-01-07",
     },
     branch: "Piauí",
-    id: "temp1",
+    id: "55555555-5555-4555-b555-555555555505",
     type: "Licenciamento",
     expirationDate: "2026-06-05",
     status: "Válido",
   },
   {
-    vehicleId: "6",
+    vehicleId: "66666666-6666-4666-b666-666666666606",
     vehiclePlate: "PQR-2345",
     renavam: "00789321654",
     chassi: "9BWZZZ377VT004256",
@@ -1433,7 +1433,7 @@ export const mockVehicleDocuments: VehicleDocuments[] = [
       lastUpdate: "2026-01-04",
     },
     branch: "Piauí",
-    id: "6",
+    id: "66666666-6666-4666-b666-666666666606",
     type: "IPVA",
     expirationDate: "2026-01-15",
     status: "Pago",
@@ -1478,7 +1478,7 @@ export interface TachographReading {
 
 export const mockTachographCalibrations: TachographCalibration[] = [
   {
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
     vehicleModel: "Volvo FH 540",
     inmetroNumber: "INMETRO-SP-001234",
@@ -1488,7 +1488,7 @@ export const mockTachographCalibrations: TachographCalibration[] = [
     branch: "São Paulo",
   },
   {
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
     vehicleModel: "Scania R450",
     inmetroNumber: "INMETRO-SP-005678",
@@ -1498,7 +1498,7 @@ export const mockTachographCalibrations: TachographCalibration[] = [
     branch: "São Paulo",
   },
   {
-    vehicleId: "3",
+    vehicleId: "33333333-3333-4333-b333-333333333303",
     vehiclePlate: "GHI-9012",
     vehicleModel: "Mercedes Actros",
     inmetroNumber: "INMETRO-PE-009012",
@@ -1508,7 +1508,7 @@ export const mockTachographCalibrations: TachographCalibration[] = [
     branch: "Recife",
   },
   {
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
     vehicleModel: "DAF XF",
     inmetroNumber: "INMETRO-PE-003456",
@@ -1518,7 +1518,7 @@ export const mockTachographCalibrations: TachographCalibration[] = [
     branch: "Recife",
   },
   {
-    vehicleId: "5",
+    vehicleId: "55555555-5555-4555-b555-555555555505",
     vehiclePlate: "MNO-7891",
     vehicleModel: "Iveco S-Way",
     inmetroNumber: "INMETRO-PI-007891",
@@ -1528,7 +1528,7 @@ export const mockTachographCalibrations: TachographCalibration[] = [
     branch: "Piauí",
   },
   {
-    vehicleId: "6",
+    vehicleId: "66666666-6666-4666-b666-666666666606",
     vehiclePlate: "PQR-2345",
     vehicleModel: "Volvo FH 460",
     inmetroNumber: "INMETRO-PI-002345",
@@ -1542,9 +1542,9 @@ export const mockTachographCalibrations: TachographCalibration[] = [
 export const mockTachographReadings: TachographReading[] = [
   {
     id: "tr1",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
-    driverId: "d1",
+    driverId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
     driverName: "João Pereira",
     date: "2026-01-07",
     startKm: 124500,
@@ -1557,9 +1557,9 @@ export const mockTachographReadings: TachographReading[] = [
   },
   {
     id: "tr2",
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
-    driverId: "d2",
+    driverId: "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
     driverName: "Carlos Silva",
     date: "2026-01-07",
     startKm: 179500,
@@ -1572,9 +1572,9 @@ export const mockTachographReadings: TachographReading[] = [
   },
   {
     id: "tr3",
-    vehicleId: "3",
+    vehicleId: "33333333-3333-4333-b333-333333333303",
     vehiclePlate: "GHI-9012",
-    driverId: "d3",
+    driverId: "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
     driverName: "Roberto Mendes",
     date: "2026-01-06",
     startKm: 44500,
@@ -1587,9 +1587,9 @@ export const mockTachographReadings: TachographReading[] = [
   },
   {
     id: "tr4",
-    vehicleId: "1",
+    vehicleId: "11111111-1111-4111-b111-111111111101",
     vehiclePlate: "ABC-1234",
-    driverId: "d1",
+    driverId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
     driverName: "João Pereira",
     date: "2026-01-06",
     startKm: 124000,
@@ -1602,9 +1602,9 @@ export const mockTachographReadings: TachographReading[] = [
   },
   {
     id: "tr5",
-    vehicleId: "4",
+    vehicleId: "44444444-4444-4444-b444-444444444404",
     vehiclePlate: "JKL-3456",
-    driverId: "d4",
+    driverId: "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f80",
     driverName: "Antonio Costa",
     date: "2026-01-05",
     startKm: 219500,
@@ -1617,9 +1617,9 @@ export const mockTachographReadings: TachographReading[] = [
   },
   {
     id: "tr6",
-    vehicleId: "5",
+    vehicleId: "55555555-5555-4555-b555-555555555505",
     vehiclePlate: "MNO-7891",
-    driverId: "d5",
+    driverId: "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8091",
     driverName: "Marcos Oliveira",
     date: "2026-01-07",
     startKm: 97500,
@@ -1632,9 +1632,9 @@ export const mockTachographReadings: TachographReading[] = [
   },
   {
     id: "tr7",
-    vehicleId: "6",
+    vehicleId: "66666666-6666-4666-b666-666666666606",
     vehiclePlate: "PQR-2345",
-    driverId: "d6",
+    driverId: "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f809102",
     driverName: "Paulo Santos",
     date: "2026-01-06",
     startKm: 155500,
@@ -1647,9 +1647,9 @@ export const mockTachographReadings: TachographReading[] = [
   },
   {
     id: "tr8",
-    vehicleId: "2",
+    vehicleId: "22222222-2222-4222-b222-222222222202",
     vehiclePlate: "DEF-5678",
-    driverId: "d2",
+    driverId: "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
     driverName: "Carlos Silva",
     date: "2026-01-05",
     startKm: 179000,

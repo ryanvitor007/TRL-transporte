@@ -76,7 +76,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth, ensureUUID } from "@/contexts/auth-context";
 import { useToastNotification } from "@/contexts/notification-context";
 import { cn } from "@/lib/utils";
 import { buscarFrotaAPI, salvarTacografoAPI } from "@/lib/api-service";
@@ -112,17 +112,17 @@ const statusConfig: Record<string, { color: string; bg: string; dot: string; lab
 
 // ─── MOCK VEHICLES ──────────────────────────────────────────────
 const mockVehicles = [
-  { id: "v1", plate: "ABC-1234", model: "Volvo FH 540", km_atual: 125430 },
-  { id: "v2", plate: "DEF-5678", model: "Scania R450",  km_atual: 124968 },
-  { id: "v3", plate: "GHI-9012", model: "Mercedes Actros", km_atual: 98210 },
+  { id: "11111111-1111-4111-b111-111111111101", plate: "ABC-1234", model: "Volvo FH 540", km_atual: 125430 },
+  { id: "22222222-2222-4222-b222-222222222202", plate: "DEF-5678", model: "Scania R450",  km_atual: 124968 },
+  { id: "33333333-3333-4333-b333-333333333303", plate: "GHI-9012", model: "Mercedes Actros", km_atual: 98210 },
 ];
 
 // ─── MOCK RECORDS ───────────────────────────────────────────────
 const generateMockRecords = (driverId: string, driverName: string): TachographRecord[] => {
   const today = new Date();
   const vehicles = [
-    { id: "v1", plate: "ABC-1234", model: "Volvo FH 540" },
-    { id: "v2", plate: "DEF-5678", model: "Scania R450" },
+    { id: "11111111-1111-4111-b111-111111111101", plate: "ABC-1234", model: "Volvo FH 540" },
+    { id: "22222222-2222-4222-b222-222222222202", plate: "DEF-5678", model: "Scania R450" },
   ];
   const records: TachographRecord[] = [];
 
@@ -228,7 +228,7 @@ export function DriverTachographView() {
   const { user } = useAuth();
   const toast = useToastNotification();
   const driverName = user?.name || "Motorista";
-  const driverId   = user?.id   || "d1";
+  const driverId   = user?.id   || "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 
   const [isLoading, setIsLoading]             = useState(true);
   const [hasError, setHasError]               = useState(false);
@@ -336,9 +336,12 @@ export function DriverTachographView() {
     setIsSubmitting(true);
 
     try {
+      const validDriverId = ensureUUID(driverId, "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d");
+      const validVehicleId = ensureUUID(newRecord.vehicleId, "11111111-1111-4111-b111-111111111101");
+
       const formData = new FormData();
-      formData.append("driverId", String(driverId));
-      formData.append("vehicleId", String(newRecord.vehicleId));
+      formData.append("driverId", validDriverId);
+      formData.append("vehicleId", validVehicleId);
       formData.append("date", newRecord.date);
       formData.append("startTime", newRecord.startTime);
       formData.append("endTime", newRecord.endTime);
@@ -891,7 +894,7 @@ export function DriverTachographView() {
                         <span className="truncate">{uploadedPhoto || "Clique para enviar"}</span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-gray-400">JPG, JPEG ou PNG (máx. 5MB)</p>
+                    <p className="text-[10px] text-gray-400">JPG, JPEG ou PNG (máx. 10MB)</p>
                   </div>
                 </div>
               </div>
