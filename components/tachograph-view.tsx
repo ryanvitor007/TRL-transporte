@@ -61,7 +61,7 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import { buscarTacografoStatsAPI } from "@/lib/api-service";
+import { buscarTacografoStatsAPI, buscarTacografosAPI, atualizarTacografoAPI } from "@/lib/api-service";
 
 // ── Interfaces para os dados da API ───────────────────────────────────────
 interface TachographStatsKpis {
@@ -240,6 +240,7 @@ export function TachographView() {
   const [activeTab, setActiveTab] = useState("todos");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [driverFilter, setDriverFilter] = useState("");
+  const [vehicleFilter, setVehicleFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
 
   // ── Stats API State ──
@@ -254,6 +255,19 @@ export function TachographView() {
   const openAudit = (record: any) => {
     setSelectedRecord(record);
     setIsAuditModalOpen(true);
+  };
+
+  const handleUpdateStatus = async (status: string) => {
+    if (!selectedRecord) return;
+    try {
+      await atualizarTacografoAPI(selectedRecord.id, status);
+      setIsAuditModalOpen(false);
+      loadRecords();
+      loadStats();
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err);
+      alert("Erro ao atualizar status do tacógrafo");
+    }
   };
 
   // ── Fetch Stats ──
@@ -275,6 +289,96 @@ export function TachographView() {
     loadStats();
   }, [loadStats]);
 
+  // ── Records API State ──
+  const [records, setRecords] = useState<any[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(true);
+
+  const loadRecords = useCallback(async () => {
+    setIsLoadingRecords(true);
+    try {
+      let queryStatus: string | undefined = undefined;
+      
+      // Determine status from activeTab or statusFilter
+      if (activeTab === "pendentes") {
+        queryStatus = "PENDING_ANALYSIS";
+      } else if (activeTab === "alerta") {
+        queryStatus = "ALERT";
+      } else if (statusFilter !== "todos") {
+        queryStatus = statusFilter === "pendente" ? "PENDING_ANALYSIS" : "ALERT";
+      }
+
+      const driverId = (driverFilter && driverFilter !== "todos-motoristas" && driverFilter !== "todos" && driverFilter !== "all") ? driverFilter : undefined;
+      const vehicleId = (vehicleFilter && vehicleFilter !== "todos-veiculos" && vehicleFilter !== "todos" && vehicleFilter !== "all") ? vehicleFilter : undefined;
+
+      const queryParams: any = {
+        status: queryStatus,
+        driverId,
+        vehicleId,
+      };
+
+      if (dateFilter && dateFilter !== "all" && dateFilter.trim() !== "") {
+        queryParams.startDate = dateFilter;
+        queryParams.endDate = dateFilter;
+      }
+
+      const res = await buscarTacografosAPI(queryParams);
+      const fetched = res?.data || res || [];
+      
+      // Format backend records to match UI expected fields
+      const formatted = fetched.map((r: any) => {
+        const motorista = r.driver?.name || "Desconhecido";
+        const names = motorista.split(" ");
+        const initials = names.map((n: string) => n[0]).join("").substring(0, 2).toUpperCase();
+
+        let statusUi = "Pendente";
+        if (r.status === "ALERT") statusUi = "Alerta";
+        else if (r.status === "COMPLIANT") statusUi = "Conforme";
+
+        let dataUi = r.reading_date || "";
+        if (dataUi && dataUi.includes("-")) {
+          const parts = dataUi.split("T")[0].split("-");
+          if (parts.length === 3) {
+            dataUi = `${parts[2]}/${parts[1]}/${parts[0]}`;
+          }
+        }
+
+        let alertaUi = "–";
+        let detalhesUi = r.observations || "Sem observações";
+
+        if (r.status === "ALERT") {
+          alertaUi = "Inconsistência";
+          if (r.infractions && Array.isArray(r.infractions) && r.infractions.length > 0) {
+            alertaUi = r.infractions[0]?.type || "Inconsistência";
+            detalhesUi = r.infractions.map((inf: any) => inf.description || inf.type).join(", ");
+          } else if (typeof r.infractions === "string") {
+            alertaUi = r.infractions;
+          }
+        }
+
+        return {
+          ...r,
+          motorista,
+          initials,
+          placa: r.vehicle?.placa || "Sem Placa",
+          alerta: alertaUi,
+          detalhes: detalhesUi,
+          data: dataUi,
+          status: statusUi,
+        };
+      });
+
+      setRecords(formatted);
+    } catch (err) {
+      console.error("Erro ao carregar registros de tacógrafo:", err);
+    } finally {
+      setIsLoadingRecords(false);
+    }
+  }, [activeTab, statusFilter, driverFilter, vehicleFilter, dateFilter]);
+
+  useEffect(() => {
+    loadRecords();
+  }, [loadRecords]);
+
   // ── Derived data (API real → fallback mock) ──
   const kpis = statsData?.kpis ?? { pending: 0, alerts: 0, compliant: 0, totalAtivos: 0 };
   const complianceRate = kpis.totalAtivos > 0
@@ -288,12 +392,6 @@ export function TachographView() {
   const alertDistributionData = (statsData?.alertsDistribution ?? fallbackAlertsDistribution).map(
     (p) => ({ categoria: p.name, alertas: p.value })
   );
-
-  const filteredAlerts = recentAlerts.filter((a) => {
-    if (activeTab === "pendentes") return a.status === "Pendente";
-    if (activeTab === "alerta") return a.status === "Alerta";
-    return true;
-  });
 
   return (
     <div className="flex flex-col gap-3 w-full">
@@ -615,51 +713,86 @@ export function TachographView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredAlerts.map((alert) => (
-                        <TableRow
-                          key={alert.id}
-                          className="text-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={() => openAudit(alert)}
-                        >
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                <span className="text-[10px] font-bold text-blue-700">
-                                  {alert.initials}
-                                </span>
+                      {isLoadingRecords ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Skeleton className="h-7 w-7 rounded-full shrink-0" />
+                                <div className="space-y-1">
+                                  <Skeleton className="h-3 w-16" />
+                                  <Skeleton className="h-2 w-10" />
+                                </div>
                               </div>
-                              <span className="font-medium text-xs leading-tight">
-                                {alert.motorista.split(" ")[0]}
-                                <br />
-                                <span className="text-muted-foreground font-normal">
-                                  {alert.motorista.split(" ")[1]}
-                                </span>
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-xs font-mono text-muted-foreground">
-                            {alert.placa}
-                          </TableCell>
-                          <TableCell className="text-xs">{alert.alerta}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground max-w-[130px] truncate">
-                            {alert.detalhes}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                            {alert.data}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              className={`text-[10px] px-2 py-0.5 ${
-                                alert.status === "Alerta"
-                                  ? "bg-red-500 hover:bg-red-500 text-white"
-                                  : "bg-amber-100 text-amber-700 hover:bg-amber-100"
-                              }`}
-                            >
-                              {alert.status}
-                            </Badge>
+                            </TableCell>
+                            <TableCell><Skeleton className="h-3 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-3 w-12" /></TableCell>
+                            <TableCell><Skeleton className="h-3 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-3 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : records.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-xs text-muted-foreground">
+                            Nenhum registro de tacógrafo encontrado.
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        records.map((alert) => (
+                          <TableRow
+                            key={alert.id}
+                            className="text-sm cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => openAudit(alert)}
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                  <span className="text-[10px] font-bold text-blue-700">
+                                    {alert.initials}
+                                  </span>
+                                </div>
+                                <span className="font-medium text-xs leading-tight">
+                                  {alert.motorista.split(" ")[0]}
+                                  {alert.motorista.split(" ")[1] && (
+                                    <>
+                                      <br />
+                                      <span className="text-muted-foreground font-normal">
+                                        {alert.motorista.split(" ")[1]}
+                                      </span>
+                                    </>
+                                  )}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs font-mono text-muted-foreground">
+                              {alert.placa}
+                            </TableCell>
+                            <TableCell className="text-xs">{alert.alerta}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground max-w-[130px] truncate">
+                              {alert.detalhes}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              {alert.data}
+                            </TableCell>
+                            <TableCell>
+                              {alert.status === "Alerta" ? (
+                                <Badge className="text-[10px] px-2 py-0.5 bg-red-500 hover:bg-red-500 text-white border-0">
+                                  {alert.status}
+                                </Badge>
+                              ) : alert.status === "Pendente" ? (
+                                <Badge className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 hover:bg-amber-100 border-0">
+                                  {alert.status}
+                                </Badge>
+                              ) : (
+                                <Badge className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 hover:bg-green-100 border-0">
+                                  {alert.status}
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -750,18 +883,26 @@ export function TachographView() {
             {/* ── Coluna Esquerda: Foto do Disco ── */}
             <div className="flex flex-col gap-3">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Foto do Disco Enviada</p>
-              <div className="flex flex-1 flex-col items-center justify-center rounded-xl bg-muted/50 border border-dashed border-muted-foreground/30 min-h-[220px] gap-3 p-6">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-                  <ImageIcon className="h-7 w-7 text-muted-foreground" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-muted-foreground">Imagem do disco tacográfico</p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">Enviada pelo motorista no momento do registro</p>
-                </div>
-                <Button variant="outline" size="sm" className="text-xs gap-2">
-                  <ImageIcon className="h-3.5 w-3.5" />
-                  Visualizar imagem completa
-                </Button>
+              <div className="flex flex-1 flex-col items-center justify-center rounded-xl bg-muted/50 border border-dashed border-muted-foreground/30 min-h-[220px] gap-3 p-4 relative overflow-hidden">
+                {selectedRecord?.disk_image_url ? (
+                  <>
+                    <img src={selectedRecord.disk_image_url} alt="Disco de Tacógrafo" className="max-h-[200px] w-auto object-contain rounded-lg" />
+                    <Button variant="secondary" size="sm" className="text-xs gap-2 absolute bottom-4" onClick={() => window.open(selectedRecord.disk_image_url, "_blank")}>
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      Visualizar imagem completa
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+                      <ImageIcon className="h-7 w-7 text-muted-foreground" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-muted-foreground">Imagem do disco tacográfico</p>
+                      <p className="text-xs text-muted-foreground/60 mt-1">Nenhuma imagem disponível</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -785,15 +926,15 @@ export function TachographView() {
                   </div>
                   <div>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Hora Inicial</p>
-                    <p className="text-sm font-semibold">06:30</p>
+                    <p className="text-sm font-semibold">{selectedRecord?.start_at ? new Date(selectedRecord.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Hora Final</p>
-                    <p className="text-sm font-semibold">14:45</p>
+                    <p className="text-sm font-semibold">{selectedRecord?.end_at ? new Date(selectedRecord.end_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Km Rodado</p>
-                    <p className="text-sm font-semibold">312 km</p>
+                    <p className="text-sm font-semibold">{(selectedRecord?.km_end && selectedRecord?.km_start) ? `${(selectedRecord.km_end - selectedRecord.km_start).toLocaleString()} km` : "N/A"}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Tipo de Alerta</p>
@@ -816,7 +957,7 @@ export function TachographView() {
                     </div>
                     <span className={`text-sm font-bold ${
                       selectedRecord?.status === "Alerta" ? "text-red-600" : "text-foreground"
-                    }`}>98 km/h</span>
+                    }`}>{selectedRecord?.status === "Alerta" ? "Acima do Limite" : "Dentro do Limite"}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-lg bg-white dark:bg-card border px-3 py-2">
                     <div className="flex items-center gap-2">
@@ -825,7 +966,7 @@ export function TachographView() {
                     </div>
                     <span className={`text-sm font-bold ${
                       selectedRecord?.status === "Alerta" ? "text-red-600" : "text-foreground"
-                    }`}>8h 30min</span>
+                    }`}>{selectedRecord?.total_hours ? `${selectedRecord.total_hours}h` : "N/A"}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-lg bg-white dark:bg-card border px-3 py-2">
                     <div className="flex items-center gap-2">
@@ -861,14 +1002,14 @@ export function TachographView() {
             <Button
               variant="destructive"
               className="gap-2"
-              onClick={() => setIsAuditModalOpen(false)}
+              onClick={() => handleUpdateStatus("ALERT")}
             >
               <ShieldAlert className="h-4 w-4" />
               Registrar Incidente
             </Button>
             <Button
               className="bg-green-600 hover:bg-green-700 text-white gap-2"
-              onClick={() => setIsAuditModalOpen(false)}
+              onClick={() => handleUpdateStatus("COMPLIANT")}
             >
               <ShieldCheck className="h-4 w-4" />
               Aprovar Leitura

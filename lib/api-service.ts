@@ -594,10 +594,32 @@ export async function enviarIncidenteParaManutencaoAPI(id: number) {
 
 // --- MÓDULO: TACÓGRAFOS (Mock LocalStorage) ---
 
-export const buscarTacografosAPI = async () => {
-  if (typeof window === "undefined") return [];
-  const stored = localStorage.getItem("trl_tachographs");
-  return stored ? JSON.parse(stored) : [];
+export interface TachographsFilter {
+  driverId?: string;
+  vehicleId?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export const buscarTacografosAPI = async (filtros?: TachographsFilter) => {
+  const queryParams = new URLSearchParams();
+  if (filtros) {
+    Object.entries(filtros).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== "") {
+        queryParams.append(key, String(val));
+      }
+    });
+  }
+  const queryString = queryParams.toString();
+  const url = `${API_BASE_URL}/tachographs${queryString ? `?${queryString}` : ""}`;
+
+  const response = await customFetch(url);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Erro ao buscar registros de tacógrafos");
+  }
+  return response.json();
 };
 
 // Busca as estatísticas agregadas de tacógrafos do painel gerencial
@@ -630,7 +652,8 @@ export const salvarTacografoAPI = async (dados: FormData | any) => {
 
   // Fallback para modo mock com objeto simples
   await new Promise((resolve) => setTimeout(resolve, 500));
-  const currentData = await buscarTacografosAPI();
+  const currentData = await buscarTacografosAPI().catch(() => ({ data: [] }));
+  const dataArray = Array.isArray(currentData) ? currentData : (currentData?.data || []);
   const novoRegistro = {
     id: Date.now(),
     ...dados,
@@ -639,10 +662,24 @@ export const salvarTacografoAPI = async (dados: FormData | any) => {
   };
   localStorage.setItem(
     "trl_tachographs",
-    JSON.stringify([novoRegistro, ...currentData]),
+    JSON.stringify([novoRegistro, ...dataArray]),
   );
   return novoRegistro;
 };
+
+export const atualizarTacografoAPI = async (id: string, status: string) => {
+  const response = await customFetch(`${API_BASE_URL}/tachographs/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Erro ao atualizar status do tacógrafo");
+  }
+  return response.json();
+};
+
 
 // --- MÓDULO: JORNADA (Mock LocalStorage) ---
 
